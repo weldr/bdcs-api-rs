@@ -1,0 +1,15 @@
+[package]
+name = "bdcs-api-rs"
+version = "0.1.0"
+authors = ["Brian C. Lane <bcl@redhat.com>"]
+
+[dependencies]
+rusqlite = "0.*"
+getopts = "0.*"
+r2d2 = "0.*"
+r2d2_sqlite = "0.*"
+nickel = "0.*"
+nickel_sqlite = "0.*"
+hyper = "0.*"
+unicase = "1.*"
+rustc-serialize = "0.*"
