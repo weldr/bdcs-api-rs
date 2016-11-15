@@ -16,6 +16,7 @@ extern crate getopts;
 
 use std::env;
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 // Database
 use rusqlite::Connection;
@@ -34,13 +35,6 @@ use rustc_serialize::json;
 
 fn print_usage(program: &str, opts: Options) {
     println!("{}", opts.usage(&format!("Usage: {} [options] <sqlite.db>", program)));
-}
-
-/// Supported Composer output types
-#[derive(RustcEncodable)]
-struct ComposerTypes {
-    name: String,
-    supported: bool
 }
 
 /// bdcs database schema structs
@@ -377,20 +371,19 @@ fn unimplemented_v0<'mw>(_req: &mut Request, res: Response<'mw>) -> MiddlewareRe
 }
 
 fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    // There has to be a nicer way to fill a vec of structs...
-    let mut types = Vec::new();
-    types.push(ComposerTypes{ name: "iso".to_string(), supported: true });
-    types.push(ComposerTypes{ name: "disk-image".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "fs-image".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "ami".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "tar".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "live-pxe".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "live-ostree".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "oci".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "vagrant".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "qcow2".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "vmdk".to_string(), supported: false });
-    types.push(ComposerTypes{ name: "vhdx".to_string(), supported: false  });
+    let mut types = HashMap::new();
+    types.insert("iso", true);
+    types.insert("disk-image", false);
+    types.insert("fs-image", false);
+    types.insert("ami", false);
+    types.insert("tar", false);
+    types.insert("live-pxe", false);
+    types.insert("live-ostree", false);
+    types.insert("oci", false);
+    types.insert("vagrant", false);
+    types.insert("qcow2", false);
+    types.insert("vmdk", false);
+    types.insert("vhdx", false );
 
     res.set(MediaType::Json);
     res.send(json::encode(&types).expect("Failed to serialize"))
