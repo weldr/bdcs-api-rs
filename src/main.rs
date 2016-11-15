@@ -2,7 +2,7 @@
 //!
 //! <Copyright>
 //!
-//! Note: This requires sqlite-devel on the host in order to build
+//! Note: This requires sqlite-devel, and openssl-devel on the host in order to build
 
 #[macro_use] extern crate nickel;
 extern crate hyper;
@@ -398,38 +398,36 @@ fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> Middlewa
 
 fn dnf_info_packages_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     // Get the build details for NM
-    let pkg_name = req.param("packages").unwrap();
+    let packages = req.param("packages").unwrap_or("").split(",");
 
-    // Why does passing 'foo' match the route and passing: NetworkManager-1.4.0-12.el7.src.rpm
+    // Why does passing 'foo' match the route and passing: 'foo.1.1'
     // fail?
 
-    // How to split possibly comma-separated list?
-
-    // How to iterate possible list or one?
-
     let conn = req.db_conn().expect("Failed to get a database connection from the pool.");
-    let result = get_builds_name(&conn, pkg_name);
-    match result {
-        Ok(builds) => {
-            for build in builds {
-                println!("{:?}", build);
-                let s = String::from_utf8(build.changelog);
-                println!("Changelog:\n{}", s.unwrap());
-                println!("Files for build:");
-                let file_results = get_build_files(&conn, build.id);
-                match file_results {
-                    Ok(files) => {
-                        for f in files {
-                            println!("{:?}", f);
+    for pkg in packages {
+        let result = get_builds_name(&conn, pkg);
+        match result {
+            Ok(builds) => {
+                println!("===> package = {}", pkg);
+                for build in builds {
+                    println!("{:?}", build);
+                    let s = String::from_utf8(build.changelog);
+                    println!("Changelog:\n{}", s.unwrap());
+                    println!("Files for build:");
+                    let file_results = get_build_files(&conn, build.id);
+                    match file_results {
+                        Ok(files) => {
+                            for f in files {
+                                println!("{:?}", f);
+                            }
                         }
+                        Err(err) => println!("Error: {}", err)
                     }
-                    Err(err) => println!("Error: {}", err)
                 }
             }
+            Err(err) => println!("Error: {}", err)
         }
-        Err(err) => println!("Error: {}", err)
     }
-
 //    res.set(MediaType::Json);
     res.send("Write This")
 }
