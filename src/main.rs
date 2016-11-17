@@ -17,6 +17,7 @@ extern crate getopts;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 // Database
 use rusqlite::Connection;
@@ -30,7 +31,7 @@ use nickel::status::StatusCode;
 use nickel_sqlite::{SqliteMiddleware, SqliteRequestExtensions};
 use hyper::header;
 use unicase::UniCase;
-use rustc_serialize::json;
+use rustc_serialize::json::{self, ToJson, Json};
 
 
 fn print_usage(program: &str, opts: Options) {
@@ -127,7 +128,7 @@ struct KeyVal {
 #[derive(Debug)]
 struct ProjectKeyValues {
     id: i64,
-    package_id: i64,
+    project_id: i64,
     key_val_id: i64
 }
 
@@ -322,6 +323,155 @@ fn get_projects_filename(conn: &Connection, filename: &str) -> rusqlite::Result<
     Ok(contents)
 }
 
+/// Find all projects matching a name
+fn get_projects_name(conn: &Connection, project: &str) -> rusqlite::Result<Vec<Projects>> {
+    let mut stmt = try!(conn.prepare("
+            select projects.*
+            from projects
+            where projects.name == :project"));
+    let mut rows = try!(stmt.query_named(&[(":project", &project)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Projects {
+                        id: row.get(0),
+                        name: row.get(1),
+                        summary: row.get(2),
+                        description: row.get(3),
+                        homepage: row.get(4),
+                        upstream_vcs: row.get(5)
+                    });
+    }
+    Ok(contents)
+}
+
+/// Find all sources matching a source id
+fn get_source_id(conn: &Connection, source_id: i64) -> rusqlite::Result<Vec<Sources>> {
+    let mut stmt = try!(conn.prepare("
+            select sources.*
+            from sources
+            where sources.id == :source_id"));
+    let mut rows = try!(stmt.query_named(&[(":source_id", &source_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Sources {
+                        id: row.get(0),
+                        project_id: row.get(1),
+                        license: row.get(2),
+                        version: row.get(3),
+                        source_ref: row.get(4)
+                 });
+    }
+    Ok(contents)
+}
+
+/// Get builds for a project based on project id
+fn get_builds_project_id(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<Builds>> {
+    let mut stmt = try!(conn.prepare("
+            select builds.*
+            from builds, sources, projects
+            on builds.source_id == sources.id and
+               sources.project_id == projects.id
+            where projects.id == :project_id"));
+    let mut rows = try!(stmt.query_named(&[(":project_id", &project_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Builds {
+                        id: row.get(0),
+                        source_id: row.get(1),
+                        epoch: row.get(2),
+                        release: row.get(3),
+                        arch: row.get(4),
+                        build_time: row.get(5),
+                        changelog: row.get(6),
+                        build_config_ref: row.get(7),
+                        build_env_ref: row.get(8),
+                    });
+        // NOTE: build_time should be some kind of time type, but crashed with Timespec because the
+        // format used is incompatible (I think it is the T instead of ' ' in the middle)
+        // changelog is a BLOB which is a Vec[u8] so it needs to be converted to a String with
+        // .from _utf8() to be useful.
+    }
+    Ok(contents)
+}
+
+
+/// Get k:v data for project based on project id
+fn get_project_kv_project_id(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
+    let mut stmt = try!(conn.prepare("
+            select key_val.*
+            from project_key_values, key_val
+            on key_val.id == project_key_values.key_val_id
+            where project_key_values.package_id == :project_id"));
+    let mut rows = try!(stmt.query_named(&[(":project_id", &project_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(KeyVal {
+                        id: row.get(0),
+                        key_value: row.get(1),
+                        val_value: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+/// Get k:v data for sources based on id
+fn get_source_kv_source_id(conn: &Connection, source_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
+    let mut stmt = try!(conn.prepare("
+            select key_val.*
+            from source_key_values, key_val
+            on key_val.id == source_key_values.key_val_id
+            where source_key_values.source_id == :source_id"));
+    let mut rows = try!(stmt.query_named(&[(":source_id", &source_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(KeyVal {
+                        id: row.get(0),
+                        key_value: row.get(1),
+                        val_value: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+
+/// Get k:v data for builds based on id
+fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
+    let mut stmt = try!(conn.prepare("
+            select key_val.*
+            from build_key_values, key_val
+            on key_val.id == build_key_values.key_val_id
+            where build_key_values.build_id == :build_id"));
+    let mut rows = try!(stmt.query_named(&[(":build_id", &build_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(KeyVal {
+                        id: row.get(0),
+                        key_value: row.get(1),
+                        val_value: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+
 fn bcl_queries(conn: &Connection) {
     // Run some queries
 //    let result = get_pkg_files_name(&conn, "lorax");
@@ -425,6 +575,109 @@ fn dnf_info_packages_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middl
     res.send("Write This")
 }
 
+/// Get information about a project
+fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    let projects = req.param("projects").unwrap_or("").split(",");
+
+    // Why does passing 'foo' match the route and passing: 'foo.1.1'
+    // fail?
+
+    let conn = req.db_conn().expect("Failed to get a database connection from the pool.");
+    let mut project_info = Vec::new();
+    for proj in projects {
+        let result = get_projects_name(&conn, proj);
+        match result {
+            Ok(projs) => {
+                // SQL query could potentially return more than one, so loop.
+                for p in projs {
+                    let mut proj_map: BTreeMap<String, json::Json> = BTreeMap::new();
+                    proj_map.insert("name".to_string(), p.name.to_json());
+                    proj_map.insert("summary".to_string(), p.summary.to_json());
+                    proj_map.insert("description".to_string(), p.description.to_json());
+                    proj_map.insert("homepage".to_string(), p.homepage.unwrap_or("".to_string()).to_json());
+                    proj_map.insert("upstream_vcs".to_string(), p.upstream_vcs.to_json());
+
+                    // Add the project's key:value mappings
+                    let result_2 = get_project_kv_project_id(&conn, p.id);
+                    match result_2 {
+                        Ok(kvs) => {
+                            for kv in kvs {
+                                proj_map.entry(kv.key_value.to_string()).or_insert(kv.val_value.to_json());
+                            }
+                        }
+                        Err(err) => println!("Error: {}", err)
+                    }
+
+
+                    let mut builds_list = Vec::new();
+                    let result_3 = get_builds_project_id(&conn, p.id);
+                    match result_3 {
+                        Ok(builds) => {
+                            for b in builds {
+                                let mut build_map: BTreeMap<String, json::Json> = BTreeMap::new();
+                                build_map.insert("epoch".to_string(), b.epoch.to_json());
+                                build_map.insert("release".to_string(), b.release.to_json());
+                                build_map.insert("arch".to_string(), b.arch.to_json());
+                                build_map.insert("build_time".to_string(), b.build_time.to_json());
+
+                                // changelog is a Vec[u8] so convert it to a String
+                                let s = String::from_utf8(b.changelog).unwrap_or("".to_string());
+                                build_map.insert("changelog".to_string(), s.to_json());
+
+                                build_map.insert("build_config_ref".to_string(), b.build_config_ref.to_json());
+                                build_map.insert("build_env_ref".to_string(), b.build_env_ref.to_json());
+
+                                let result_4 = get_build_kv_build_id(&conn, b.id);
+                                match result_4 {
+                                    Ok(kvs) => {
+                                        for kv in kvs {
+                                            build_map.entry(kv.key_value.to_string()).or_insert(kv.val_value.to_json());
+                                        }
+                                    }
+                                    Err(err) => println!("Error: {}", err)
+                                }
+
+                                let result_5 = get_source_id(&conn, b.source_id);
+                                match result_5 {
+                                    // FIXME Only one possible result, not a Vec
+                                    Ok(sources) => {
+                                        for s in sources {
+                                            build_map.insert("license".to_string(), s.license.to_json());
+                                            build_map.insert("version".to_string(), s.version.to_json());
+                                            build_map.insert("source_ref".to_string(), s.source_ref.to_json());
+                                        }
+                                    }
+                                    Err(err) => println!("Error: {}", err)
+                                }
+
+                                let result_6 = get_source_kv_source_id(&conn, b.source_id);
+                                match result_6 {
+                                    Ok(kvs) => {
+                                        for kv in kvs {
+                                            build_map.entry(kv.key_value.to_string()).or_insert(kv.val_value.to_json());
+                                        }
+                                    }
+                                    Err(err) => println!("Error: {}", err)
+                                }
+
+
+                                builds_list.push(Json::Object(build_map));
+                            }
+                        }
+                        Err(err) => println!("Error: {}", err)
+                    }
+                    proj_map.insert("builds".to_string(), builds_list.to_json());
+                    project_info.push(proj_map);
+                }
+            }
+            Err(err) => println!("Error: {}", err)
+        }
+    }
+
+    res.set(MediaType::Json);
+    res.send(json::encode(&project_info).expect("Failed to serialize"))
+}
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -471,6 +724,8 @@ fn main() {
 
     server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
     server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
+
+    server.get("/api/v0/projects/info/:projects", project_info_v0);
 
     server.get("/api/v0/module/info/:modules", unimplemented_v0);
     // Is this first needed or will the 2nd just have an empty param?
