@@ -13,11 +13,13 @@ extern crate r2d2;
 extern crate r2d2_sqlite;
 extern crate unicase;
 extern crate getopts;
+extern crate flate2;
 
 use std::env;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
+use std::io::Write;
 
 // Database
 use rusqlite::Connection;
@@ -29,9 +31,11 @@ use r2d2_sqlite::SqliteConnectionManager;
 use nickel::{Nickel, MediaType, HttpRouter, Request, Response, MiddlewareResult, NickelError};
 use nickel::status::StatusCode;
 use nickel_sqlite::{SqliteMiddleware, SqliteRequestExtensions};
-use hyper::header;
+use hyper::header::{self, qitem};
 use unicase::UniCase;
 use rustc_serialize::json::{self, ToJson, Json};
+use flate2::Compression;
+use flate2::write::GzEncoder;
 
 
 fn print_usage(program: &str, opts: Options) {
@@ -594,8 +598,23 @@ fn project_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middleware
     }
 
     res.set(MediaType::Json);
-    res.send(json::encode(&project_list).expect("Failed to serialize"))
 
+
+    // TODO Make this some kind of middleware thing
+    match req.origin.headers.get::<header::AcceptEncoding>() {
+        Some(header) => {
+            if header.contains(&qitem(header::Encoding::Gzip)) {
+                // Client accepts gzip, go ahead and compress it
+                res.set(header::ContentEncoding(vec![header::Encoding::Gzip]));
+
+                let mut encoder = GzEncoder::new(Vec::new(), Compression::Default);
+                let _ = encoder.write(json::encode(&project_list).expect("Failed to serialize").as_bytes());
+                return res.send(encoder.finish().unwrap());
+            }
+        }
+        None => ()
+    }
+    res.send(json::encode(&project_list).expect("Failed to serialize"))
 }
 
  /// Get information about a project
