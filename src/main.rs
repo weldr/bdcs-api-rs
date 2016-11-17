@@ -701,6 +701,25 @@ fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middleware
     res.send(json::encode(&project_info).expect("Failed to serialize"))
 }
 
+/// Enable CORS support
+/// https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
+fn enable_cors<'mw>(_req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    // Set appropriate headers
+    res.set(header::AccessControlAllowOrigin::Any);
+    res.set(header::AccessControlAllowHeaders(vec![
+        // Hyper uses the `unicase::Unicase` type to ensure comparisons are done
+        // case-insensitively. Here, we use `into()` to convert to one from a `&str`
+        // so that we don't have to import the type ourselves.
+        "Origin".into(),
+        "X-Requested-With".into(),
+        "Content-Type".into(),
+        "Accept".into(),
+    ]));
+
+    // Pass control to the next middleware
+    res.next_middleware()
+}
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -733,6 +752,8 @@ fn main() {
     let db_pool = Pool::new(Config::default(), db_mgr)
         .expect("Unable to initialize the connection pool.");
     server.utilize(SqliteMiddleware::with_pool(db_pool));
+
+    server.utilize(enable_cors);
 
     server.get("/api/v0/test", test_v0);
 
