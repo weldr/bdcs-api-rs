@@ -328,7 +328,7 @@ fn get_projects_name(conn: &Connection, project: &str) -> rusqlite::Result<Vec<P
     let mut stmt = try!(conn.prepare("
             select projects.*
             from projects
-            where projects.name == :project"));
+            where projects.name GLOB :project"));
     let mut rows = try!(stmt.query_named(&[(":project", &project)]));
 
     let mut contents = Vec::new();
@@ -575,7 +575,30 @@ fn dnf_info_packages_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middl
     res.send("Write This")
 }
 
-/// Get information about a project
+/// List all of the available projects
+fn project_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    let conn = req.db_conn().expect("Failed to get a database connection from the pool.");
+    let mut project_list = Vec::new();
+    let result = get_projects_name(&conn, "*");
+    match result {
+        Ok(projs) => {
+            // SQL query could potentially return more than one, so loop.
+            for p in projs {
+                let mut proj_map: BTreeMap<String, json::Json> = BTreeMap::new();
+                proj_map.insert("name".to_string(), p.name.to_json());
+                proj_map.insert("summary".to_string(), p.summary.to_json());
+                project_list.push(proj_map);
+            }
+        }
+        Err(err) => println!("Error: {}", err)
+    }
+
+    res.set(MediaType::Json);
+    res.send(json::encode(&project_list).expect("Failed to serialize"))
+
+}
+
+ /// Get information about a project
 fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     let projects = req.param("projects").unwrap_or("").split(",");
 
@@ -725,6 +748,7 @@ fn main() {
     server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
     server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
 
+    server.get("/api/v0/projects/list", project_list_v0);
     server.get("/api/v0/projects/info/:projects", project_info_v0);
 
     server.get("/api/v0/module/info/:modules", unimplemented_v0);
