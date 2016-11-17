@@ -42,6 +42,20 @@ fn print_usage(program: &str, opts: Options) {
     println!("{}", opts.usage(&format!("Usage: {} [options] <sqlite.db>", program)));
 }
 
+#[derive(RustcEncodable)]
+struct ComposeTypes {
+    name: String,
+    enabled: bool
+}
+
+impl ComposeTypes {
+    fn new<S: Into<String>>(name: S, enabled: bool) -> ComposeTypes {
+        ComposeTypes { name: name.into(), enabled: enabled }
+    }
+}
+
+
+
 /// bdcs database schema structs
 #[derive(Debug)]
 struct Projects {
@@ -525,19 +539,19 @@ fn unimplemented_v0<'mw>(_req: &mut Request, res: Response<'mw>) -> MiddlewareRe
 }
 
 fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    let mut types = HashMap::new();
-    types.insert("iso", true);
-    types.insert("disk-image", false);
-    types.insert("fs-image", false);
-    types.insert("ami", false);
-    types.insert("tar", false);
-    types.insert("live-pxe", false);
-    types.insert("live-ostree", false);
-    types.insert("oci", false);
-    types.insert("vagrant", false);
-    types.insert("qcow2", false);
-    types.insert("vmdk", false);
-    types.insert("vhdx", false );
+    let mut types = Vec::new();
+    types.push(ComposeTypes::new("iso", true));
+    types.push(ComposeTypes::new("disk-image", false));
+    types.push(ComposeTypes::new("fs-image", false));
+    types.push(ComposeTypes::new("ami", false));
+    types.push(ComposeTypes::new("tar", false));
+    types.push(ComposeTypes::new("live-pxe", false));
+    types.push(ComposeTypes::new("live-ostree", false));
+    types.push(ComposeTypes::new("oci", false));
+    types.push(ComposeTypes::new("vagrant", false));
+    types.push(ComposeTypes::new("qcow2", false));
+    types.push(ComposeTypes::new("vmdk", false));
+    types.push(ComposeTypes::new("vhdx", false));
 
     res.set(MediaType::Json);
     res.send(json::encode(&types).expect("Failed to serialize"))
