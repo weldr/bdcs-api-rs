@@ -14,12 +14,14 @@ extern crate r2d2_sqlite;
 extern crate unicase;
 extern crate getopts;
 extern crate flate2;
+extern crate clap;
 
 use std::env;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
 use std::io::Write;
+use clap::{Arg, App};
 
 // Database
 use rusqlite::Connection;
@@ -29,6 +31,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 
 // API Framework
 use nickel::{Nickel, MediaType, HttpRouter, Request, Response, MiddlewareResult, NickelError, QueryString};
+use nickel::{StaticFilesHandler};
 use nickel::status::StatusCode;
 use nickel_sqlite::{SqliteMiddleware, SqliteRequestExtensions};
 use hyper::header::{self, qitem};
@@ -37,10 +40,6 @@ use rustc_serialize::json::{self, ToJson, Json};
 use flate2::Compression;
 use flate2::write::GzEncoder;
 
-
-fn print_usage(program: &str, opts: Options) {
-    println!("{}", opts.usage(&format!("Usage: {} [options] <sqlite.db>", program)));
-}
 
 #[derive(RustcEncodable)]
 struct ComposeTypes {
@@ -770,28 +769,32 @@ fn enable_cors<'mw>(_req: &mut Request, mut res: Response<'mw>) -> MiddlewareRes
 
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let program = &args[0];
+    let matches = App::new("bdcs-api")
+                            .about("A REST API on top of the BDCS")
+                            .arg(Arg::with_name("host")
+                                        .long("host")
+                                        .value_name("HOSTNAME|IP")
+                                        .help("Host or IP to bind to (127.0.0.1)")
+                                        .takes_value(true))
+                            .arg(Arg::with_name("port")
+                                        .long("port")
+                                        .value_name("PORT")
+                                        .help("Port to bind to (8000)")
+                                        .takes_value(true))
+                            .arg(Arg::with_name("DB")
+                                        .help("Path to the BDCS sqlite database")
+                                        .required(true)
+                                        .index(1))
+                            .arg(Arg::with_name("STATIC")
+                                        .help("Path to the static files")
+                                        .required(true)
+                                        .index(2))
+                        .get_matches();
 
-    let mut opts = Options::new();
-    opts.optflag("h", "help", "Show this usage message.");
-// TODO: Set the host (default to 127.0.0.1)
-// TODO: Set the port (default to 8000)
-
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m }
-        Err(e) => { panic!(e.to_string()) }
-    };
-    if matches.opt_present("h") {
-        print_usage(&program, opts);
-        return;
-    }
-    let db_path = if !matches.free.is_empty() {
-        &matches.free[0]
-    } else {
-        print_usage(&program, opts);
-        return;
-    };
+    let host = matches.value_of("host").unwrap_or("127.0.0.1");
+    let port: u16 = matches.value_of("port").unwrap_or("").parse().unwrap_or(8000);
+    let db_path = matches.value_of("DB").unwrap();
+    let static_files = matches.value_of("STATIC").unwrap();
 
     let mut server = Nickel::new();
 
@@ -802,6 +805,7 @@ fn main() {
     server.utilize(SqliteMiddleware::with_pool(db_pool));
 
     server.utilize(enable_cors);
+    server.utilize(StaticFilesHandler::new(static_files));
 
     server.get("/api/v0/test", test_v0);
 
@@ -829,5 +833,5 @@ fn main() {
     server.get("/api/v0/recipe/:names", unimplemented_v0);
     server.post("/api/v0/recipe/:name", unimplemented_v0);
 
-    server.listen("127.0.0.1:8000").unwrap();
+    server.listen(&(host, port)).unwrap();
 }
