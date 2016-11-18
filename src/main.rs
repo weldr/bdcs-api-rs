@@ -28,7 +28,7 @@ use r2d2::{Pool, Config};
 use r2d2_sqlite::SqliteConnectionManager;
 
 // API Framework
-use nickel::{Nickel, MediaType, HttpRouter, Request, Response, MiddlewareResult, NickelError};
+use nickel::{Nickel, MediaType, HttpRouter, Request, Response, MiddlewareResult, NickelError, QueryString};
 use nickel::status::StatusCode;
 use nickel_sqlite::{SqliteMiddleware, SqliteRequestExtensions};
 use hyper::header::{self, qitem};
@@ -342,12 +342,12 @@ fn get_projects_filename(conn: &Connection, filename: &str) -> rusqlite::Result<
 }
 
 /// Find all projects matching a name
-fn get_projects_name(conn: &Connection, project: &str) -> rusqlite::Result<Vec<Projects>> {
+fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Projects>> {
     let mut stmt = try!(conn.prepare("
             select projects.*
             from projects
-            where projects.name GLOB :project"));
-    let mut rows = try!(stmt.query_named(&[(":project", &project)]));
+            where projects.name GLOB :project ORDER BY projects.id LIMIT :limit OFFSET :offset"));
+    let mut rows = try!(stmt.query_named(&[(":project", &project), (":offset", &offset), (":limit", &limit)]));
 
     let mut contents = Vec::new();
     while let Some(row) = rows.next() {
@@ -595,9 +595,17 @@ fn dnf_info_packages_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middl
 
 /// List all of the available projects
 fn project_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    let offset: i64;
+    let limit: i64;
+    {
+        let query = req.query();
+        offset = query.get("offset").unwrap_or("").parse().unwrap_or(0);
+        limit = query.get("limit").unwrap_or("").parse().unwrap_or(20);
+    }
+
     let conn = req.db_conn().expect("Failed to get a database connection from the pool.");
     let mut project_list = Vec::new();
-    let result = get_projects_name(&conn, "*");
+    let result = get_projects_name(&conn, "*", offset, limit);
     match result {
         Ok(projs) => {
             // SQL query could potentially return more than one, so loop.
@@ -633,6 +641,13 @@ fn project_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middleware
 
  /// Get information about a project
 fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    let offset: i64;
+    let limit: i64;
+    {
+        let query = req.query();
+        offset = query.get("offset").unwrap_or("").parse().unwrap_or(0);
+        limit = query.get("limit").unwrap_or("").parse().unwrap_or(20);
+    }
     let projects = req.param("projects").unwrap_or("").split(",");
 
     // Why does passing 'foo' match the route and passing: 'foo.1.1'
@@ -641,7 +656,7 @@ fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middleware
     let conn = req.db_conn().expect("Failed to get a database connection from the pool.");
     let mut project_info = Vec::new();
     for proj in projects {
-        let result = get_projects_name(&conn, proj);
+        let result = get_projects_name(&conn, proj, offset, limit);
         match result {
             Ok(projs) => {
                 // SQL query could potentially return more than one, so loop.
