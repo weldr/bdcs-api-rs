@@ -18,13 +18,17 @@
 //!
 use flate2::Compression;
 use flate2::write::GzEncoder;
+use glob::glob;
 use hyper::header::{self, qitem};
 use nickel::{MediaType, Request, Response, MiddlewareResult, QueryString};
 use nickel::status::StatusCode;
 use nickel_sqlite::SqliteRequestExtensions;
 use rustc_serialize::json::{self, ToJson, Json};
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+use toml;
 
 // bdcs database functions
 use db::{get_builds_name, get_build_files, get_projects_name, get_project_kv_project_id, get_builds_project_id, get_build_kv_build_id, get_source_id, get_source_kv_source_id, };
@@ -40,6 +44,33 @@ impl ComposeTypes {
     fn new<S: Into<String>>(name: S, enabled: bool) -> ComposeTypes {
         ComposeTypes { name: name.into(), enabled: enabled }
     }
+}
+
+// Recipe TOML Parsing
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+struct RecipeList {
+    name: Option<String>,
+    description: Option<String>,
+}
+
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+struct Recipe {
+    name: Option<String>,
+    description: Option<String>,
+    modules: Option<Vec<Modules>>,
+    packages: Option<Vec<Packages>>
+}
+
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+struct Modules {
+    name: Option<String>,
+    version: Option<String>
+}
+
+#[derive(Debug, RustcDecodable, RustcEncodable)]
+struct Packages {
+    name: Option<String>,
+    version: Option<String>
 }
 
 
@@ -261,4 +292,72 @@ pub fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middle
 
     res.set(MediaType::Json);
     res.send(json::encode(&project_info).expect("Failed to serialize"))
+}
+
+/// Fetch the list of available recipes
+/// [{"name": "name of recipe", "description": "description from recipe"}, ]
+/// XXX I do not know how to pass in additional configuration data, like a recipe path
+pub fn recipe_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    // This is more kludgy than normal because recipe_path_cfg should really come from main()
+    let recipe_path_cfg = "/var/tmp/recipes/";
+    // XXX Really? To add 1 character?
+    let mut recipe_path: String = String::new();
+    recipe_path = format!("{}*", recipe_path_cfg);
+
+    let offset: i64;
+    let limit: i64;
+    {
+        let query = req.query();
+        offset = query.get("offset").unwrap_or("").parse().unwrap_or(0);
+        limit = query.get("limit").unwrap_or("").parse().unwrap_or(20);
+    }
+
+    let mut recipe_list = Vec::new();
+    for path in glob(&recipe_path).unwrap().filter_map(Result::ok) {
+        // Parse the TOML recipe into a Recipe struct
+        let mut input = String::new();
+        let mut f = File::open(path).unwrap();
+        f.read_to_string(&mut input).unwrap();
+        let recipe: RecipeList = toml::decode_str(&input).unwrap();
+        recipe_list.push(recipe);
+    }
+
+    res.set(MediaType::Json);
+    res.send(json::encode(&recipe_list).expect("Failed to serialize"))
+}
+
+
+pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    // This is more kludgy than normal because recipe_path_cfg should really come from main()
+    let recipe_path_cfg = "/var/tmp/recipes/";
+
+    let offset: i64;
+    let limit: i64;
+    {
+        let query = req.query();
+        offset = query.get("offset").unwrap_or("").parse().unwrap_or(0);
+        limit = query.get("limit").unwrap_or("").parse().unwrap_or(20);
+    }
+    let names = req.param("names").unwrap_or("").split(",");
+
+    // XXX For now the filename matches the name. Later: Better retrieval
+    let mut recipe_list = Vec::new();
+    for name in names {
+        // This is more kludgy than normal because recipe_path_cfg should really come from main()
+        // XXX Really? To add 1 character?
+        let mut recipe_path: String = String::new();
+        recipe_path = format!("{}{}", recipe_path_cfg, name);
+
+        for path in glob(&recipe_path).unwrap().filter_map(Result::ok) {
+            // Parse the TOML recipe into a Recipe struct
+            let mut input = String::new();
+            let mut f = File::open(path).unwrap();
+            f.read_to_string(&mut input).unwrap();
+            let recipe: Recipe = toml::decode_str(&input).unwrap();
+            recipe_list.push(recipe);
+        }
+    }
+
+    res.set(MediaType::Json);
+    res.send(json::encode(&recipe_list).expect("Failed to serialize"))
 }

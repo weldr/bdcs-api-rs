@@ -38,7 +38,8 @@ use nickel::{Nickel, HttpRouter, StaticFilesHandler};
 
 // API v0 functions
 use bdcs::api::enable_cors;
-use bdcs::api::v0::{unimplemented_v0, test_v0, compose_types_v0, dnf_info_packages_v0, project_list_v0, project_info_v0};
+use bdcs::api::v0::{unimplemented_v0, test_v0, compose_types_v0, dnf_info_packages_v0, project_list_v0, project_info_v0,
+                    recipe_list_v0, get_recipe_v0};
 
 /// Process Command Line Arguments and Serve the http API
 fn main() {
@@ -62,12 +63,17 @@ fn main() {
                                         .help("Path to the static files")
                                         .required(true)
                                         .index(2))
+                            .arg(Arg::with_name("RECIPES")
+                                        .help("Path to the recipes")
+                                        .required(true)
+                                        .index(3))
                         .get_matches();
 
     let host = matches.value_of("host").unwrap_or("127.0.0.1");
     let port: u16 = matches.value_of("port").unwrap_or("").parse().unwrap_or(8000);
     let db_path = matches.value_of("DB").unwrap();
     let static_files = matches.value_of("STATIC").unwrap();
+    let recipe_path = matches.value_of("RECIPES").unwrap();
 
     let mut server = Nickel::new();
 
@@ -102,8 +108,8 @@ fn main() {
     server.get("/api/v0/module/list", unimplemented_v0);
     server.get("/api/v0/module/list/:modules", unimplemented_v0);
 
-    server.get("/api/v0/recipe/list", unimplemented_v0);
-    server.get("/api/v0/recipe/:names", unimplemented_v0);
+    server.get("/api/v0/recipe/list", recipe_list_v0);
+    server.get("/api/v0/recipe/:names", get_recipe_v0);
     server.post("/api/v0/recipe/:name", unimplemented_v0);
 
     server.listen(&(host, port)).unwrap();
