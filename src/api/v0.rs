@@ -31,7 +31,8 @@ use std::path::Path;
 use toml;
 
 // bdcs database functions
-use db::{get_builds_name, get_build_files, get_projects_name, get_project_kv_project_id, get_builds_project_id, get_build_kv_build_id, get_source_id, get_source_kv_source_id, };
+use db::{get_builds_name, get_build_files, get_projects_name, get_project_kv_project_id, get_builds_project_id,
+        get_build_kv_build_id, get_source_id, get_source_kv_source_id, get_groups_name};
 
 
 #[derive(RustcEncodable)]
@@ -416,4 +417,57 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
 
     res.set(StatusCode::Ok);
     res.send("")
+}
+
+/// List the available groups
+pub fn group_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    let offset: i64;
+    let limit: i64;
+    {
+        let query = req.query();
+        offset = query.get("offset").unwrap_or("").parse().unwrap_or(0);
+        limit = query.get("limit").unwrap_or("").parse().unwrap_or(20);
+    }
+
+    // List all groups if there is no groups param or if it is empty.
+    let groups = match req.param("groups") {
+        Some(groups) => if groups.len() > 0 { groups } else {"*"},
+        None => "*"
+    };
+
+    let conn = req.db_conn().expect("Failed to get a database connection from the pool.");
+    let mut group_list = Vec::new();
+    for group in groups.split(",") {
+        let result = get_groups_name(&conn, group, offset, limit);
+        match result {
+            Ok(grps) => {
+                // SQL query could potentially return more than one, so loop.
+                for g in grps {
+                    let mut group_map: BTreeMap<String, json::Json> = BTreeMap::new();
+                    group_map.insert("name".to_string(), g.name.to_json());
+                    group_map.insert("group_type".to_string(), g.group_type.to_json());
+                    group_list.push(group_map);
+                }
+            }
+            Err(err) => println!("Error: {}", err)
+        }
+    }
+    res.set(MediaType::Json);
+
+
+    // TODO Make this some kind of middleware thing
+    match req.origin.headers.get::<header::AcceptEncoding>() {
+        Some(header) => {
+            if header.contains(&qitem(header::Encoding::Gzip)) {
+                // Client accepts gzip, go ahead and compress it
+                res.set(header::ContentEncoding(vec![header::Encoding::Gzip]));
+
+                let mut encoder = GzEncoder::new(Vec::new(), Compression::Default);
+                let _ = encoder.write(json::encode(&group_list).expect("Failed to serialize").as_bytes());
+                return res.send(encoder.finish().unwrap());
+            }
+        }
+        None => ()
+    }
+    res.send(json::encode(&group_list).expect("Failed to serialize"))
 }
