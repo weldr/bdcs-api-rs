@@ -352,9 +352,23 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
         for path in glob(&recipe_path).unwrap().filter_map(Result::ok) {
             // Parse the TOML recipe into a Recipe struct
             let mut input = String::new();
-            let mut f = File::open(path).unwrap();
-            f.read_to_string(&mut input).unwrap();
-            let recipe: Recipe = toml::decode_str(&input).unwrap();
+            let mut file = match File::open(&path) {
+                Ok(file) => file,
+                Err(err) => {
+                    println!("Error reading {:?}: {}", path, err);
+                    return res.error(StatusCode::InternalServerError, "File Open Error.")
+                }
+            };
+            match file.read_to_string(&mut input) {
+                Ok(_) => println!("Read recipe from {:?}", path),
+                Err(err) => {
+                    return res.error(StatusCode::InternalServerError, "Read Error.")
+                }
+            };
+            let recipe = match toml::decode_str::<Recipe>(&input) {
+                Some(recipe) => recipe,
+                None => return res.error(StatusCode::InternalServerError, "Error parsing TOML")
+            };
             recipe_list.push(recipe);
         }
     }
@@ -371,7 +385,7 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
     // Parse the JSON into Recipe structs (XXX Why does this work here, and not below req.param?)
     let recipe = match req.json_as::<Recipe>() {
         Ok(recipe) => recipe,
-        Err(err) => return res.error(StatusCode::InternalServerError, "Too many names.")
+        Err(err) => return res.error(StatusCode::InternalServerError, "Error parsing JSON")
     };
     let recipe_toml = toml::encode::<Recipe>(&recipe);
     println!("{:?}", recipe_toml);
