@@ -20,7 +20,7 @@ use flate2::Compression;
 use flate2::write::GzEncoder;
 use glob::glob;
 use hyper::header::{self, qitem};
-use nickel::{MediaType, Request, Response, MiddlewareResult, QueryString};
+use nickel::{MediaType, Request, Response, MiddlewareResult, QueryString, JsonBody};
 use nickel::status::StatusCode;
 use nickel_sqlite::SqliteRequestExtensions;
 use rustc_serialize::json::{self, ToJson, Json};
@@ -345,6 +345,7 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
     for name in names {
         // This is more kludgy than normal because recipe_path_cfg should really come from main()
         // XXX Really? To add 1 character?
+        // TODO Needs to be sanitized!
         let mut recipe_path: String = String::new();
         recipe_path = format!("{}{}", recipe_path_cfg, name);
 
@@ -360,4 +361,45 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
 
     res.set(MediaType::Json);
     res.send(json::encode(&recipe_list).expect("Failed to serialize"))
+}
+
+
+pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+    // This is more kludgy than normal because recipe_path_cfg should really come from main()
+    let recipe_path_cfg = "/var/tmp/recipes/";
+
+    // Parse the JSON into Recipe structs (XXX Why does this work here, and not below req.param?)
+    let recipe = match req.json_as::<Recipe>() {
+        Ok(recipe) => recipe,
+        Err(err) => return res.error(StatusCode::InternalServerError, "Too many names.")
+    };
+    let recipe_toml = toml::encode::<Recipe>(&recipe);
+    println!("{:?}", recipe_toml);
+
+    let name = req.param("name").unwrap_or("");
+    if name.find(',') != None {
+        // TODO Need to define a common error response for bad API calls
+        return res.error(StatusCode::InternalServerError, "Too many names.");
+    }
+
+    // TODO Needs to be sanitized!
+    let mut recipe_path: String = String::new();
+    recipe_path = format!("{}{}", recipe_path_cfg, name);
+    let mut file = match File::create(&recipe_path) {
+        Ok(file) => file,
+        Err(err) => {
+            println!("Error opening {} for write: {}", recipe_path, err);
+            return res.error(StatusCode::InternalServerError, "Error opening file.")
+        }
+    };
+    match file.write_all(toml::encode_str(&recipe_toml).as_bytes()) {
+        Ok(_) => println!("Wrote Recipe to {}", recipe_path),
+        Err(err) => {
+            println!("Error writing {}: {}", recipe_path, err);
+            return res.error(StatusCode::InternalServerError, "Error writing file.")
+        }
+    };
+
+    res.set(StatusCode::Ok);
+    res.send("")
 }
