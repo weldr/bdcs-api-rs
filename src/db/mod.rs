@@ -135,6 +135,51 @@ pub struct FileKeyValues {
     pub key_val_id: i64
 }
 
+#[derive(Debug)]
+pub struct Groups {
+    pub id: i64,
+    pub name: String,
+    pub group_type: String
+}
+
+#[derive(Debug)]
+pub struct GroupFiles {
+    pub id: i64,
+    pub group_id: i64,
+    pub file_id: i64
+}
+
+#[derive(Debug)]
+pub struct GroupGroups {
+    pub id: i64,
+    pub parent_group_id: i64,
+    pub child_group_id: i64
+}
+
+#[derive(Debug)]
+pub struct GroupKeyValues {
+    pub id: i64,
+    pub group_id: i64,
+    pub key_val_id: i64
+}
+
+#[derive(Debug)]
+pub struct Requirements {
+    pub id: i64,
+    pub req_language: String,
+    pub req_context: String,
+    pub req_strength: String,
+    pub req_expr: String
+}
+
+#[derive(Debug)]
+pub struct GroupRequirements {
+    pub id: i64,
+    pub group_id: i64,
+    pub req_id: i64
+}
+
+
 /// List contents of a package given by name.
 pub fn get_pkg_files_name(conn: &Connection, pkgname: &str) -> rusqlite::Result<Vec<PathBuf>> {
     let mut stmt = try!(conn.prepare("
@@ -448,6 +493,76 @@ pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Resu
                         id: row.get(0),
                         key_value: row.get(1),
                         val_value: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+
+/// Find all groups matching a name
+pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Groups>> {
+    let mut stmt = try!(conn.prepare("
+            select groups.*
+            from groups
+            where groups.name GLOB :group ORDER BY groups.id LIMIT :limit OFFSET :offset"));
+    let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Groups {
+                        id: row.get(0),
+                        name: row.get(1),
+                        group_type: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+
+/// Get k:v data for groups based on id
+pub fn get_groups_kv_group_id(conn: &Connection, group_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
+    let mut stmt = try!(conn.prepare("
+            select key_val.*
+            from group_key_values, key_val
+            on key_val.id == group_key_values.key_val_id
+            where group_key_values.group_id == :group_id"));
+    let mut rows = try!(stmt.query_named(&[(":group_id", &group_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(KeyVal {
+                        id: row.get(0),
+                        key_value: row.get(1),
+                        val_value: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+
+/// Get group requirements
+pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::Result<Vec<Requirements>> {
+    let mut stmt = try!(conn.prepare("
+            select requirements.*
+            from group_requirements, requirements
+            on requirements.id == group_requirements.req_id
+            where group_requirements.group_id == :group_id"));
+    let mut rows = try!(stmt.query_named(&[(":group_id", &group_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Requirements {
+                        id: row.get(0),
+                        req_language: row.get(1),
+                        req_context: row.get(2),
+                        req_strength: row.get(3),
+                        req_expr: row.get(4),
                     });
     }
     Ok(contents)
