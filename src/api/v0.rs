@@ -296,14 +296,11 @@ pub fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middle
 }
 
 /// Fetch the list of available recipes
-/// [{"name": "name of recipe", "description": "description from recipe"}, ]
-/// XXX I do not know how to pass in additional configuration data, like a recipe path
+/// { "recipes": ["name1", "name2", ...] }
 pub fn recipe_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     // This is more kludgy than normal because recipe_path_cfg should really come from main()
     let recipe_path_cfg = "/var/tmp/recipes/";
-    // XXX Really? To add 1 character?
-    let mut recipe_path: String = String::new();
-    recipe_path = format!("{}*", recipe_path_cfg);
+    let recipe_path = recipe_path_cfg.to_string() + "*";
 
     let offset: i64;
     let limit: i64;
@@ -320,11 +317,14 @@ pub fn recipe_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
         let mut f = File::open(path).unwrap();
         f.read_to_string(&mut input).unwrap();
         let recipe: RecipeList = toml::decode_str(&input).unwrap();
-        recipe_list.push(recipe);
+        recipe_list.push(recipe.name);
     }
 
+    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
+    response.insert("recipes".to_string(), recipe_list.to_json());
+
     res.set(MediaType::Json);
-    res.send(json::encode(&recipe_list).expect("Failed to serialize"))
+    res.send(json::encode(&response).expect("Failed to serialize"))
 }
 
 
