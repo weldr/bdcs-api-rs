@@ -9,3 +9,5 @@ extern crate toml;
 
 pub mod api;
 pub mod db;
+mod config;
+pub use config::BDCSConfig;

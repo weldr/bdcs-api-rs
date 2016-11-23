@@ -16,6 +16,7 @@
 //! You should have received a copy of the GNU General Public License
 //! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
+use config::BDCSConfig;
 use flate2::Compression;
 use flate2::write::GzEncoder;
 use glob::glob;
@@ -115,15 +116,15 @@ impl ToJson for Packages {
 
 
 // Composer API v0 Implementations
-pub fn test_v0<'mw>(_req: &mut Request, res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn test_v0<'mw>(_req: &mut Request<BDCSConfig>, res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
    res.send("API v0 test")
 }
 
-pub fn unimplemented_v0<'mw>(_req: &mut Request, res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn unimplemented_v0<'mw>(_req: &mut Request<BDCSConfig>, res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
    res.error(StatusCode::ImATeapot, "API Not Yet Implemented.")
 }
 
-pub fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn compose_types_v0<'mw>(_req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let mut types = Vec::new();
     types.push(ComposeTypes::new("iso", true));
     types.push(ComposeTypes::new("disk-image", false));
@@ -145,7 +146,7 @@ pub fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> Midd
     res.send(json::encode(&response).expect("Failed to serialize"))
 }
 
-pub fn dnf_info_packages_v0<'mw>(req: &mut Request, res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn dnf_info_packages_v0<'mw>(req: &mut Request<BDCSConfig>, res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     // Get the build details for NM
     let packages = req.param("packages").unwrap_or("").split(",");
 
@@ -182,7 +183,7 @@ pub fn dnf_info_packages_v0<'mw>(req: &mut Request, res: Response<'mw>) -> Middl
 }
 
 /// List all of the available projects
-pub fn project_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn project_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let offset: i64;
     let limit: i64;
     {
@@ -228,7 +229,7 @@ pub fn project_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middle
 }
 
  /// Get information about a project
-pub fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn project_info_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let offset: i64;
     let limit: i64;
     {
@@ -339,10 +340,9 @@ pub fn project_info_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middle
 
 /// Fetch the list of available recipes
 /// { "recipes": ["name1", "name2", ...] }
-pub fn recipe_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    // This is more kludgy than normal because recipe_path_cfg should really come from main()
-    let recipe_path_cfg = "/var/tmp/recipes/";
-    let recipe_path = recipe_path_cfg.to_string() + "*";
+pub fn recipe_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
+    let bdcs_config = req.server_data();
+    let recipe_path = bdcs_config.recipe_path.to_string() + "*";
 
     let offset: i64;
     let limit: i64;
@@ -372,9 +372,8 @@ pub fn recipe_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
 
 /// Return the contents of a recipe or list of recipes as JSON
 /// { "name1": { "name": "name1", ... }, ... }
-pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    // This is more kludgy than normal because recipe_path_cfg should really come from main()
-    let recipe_path_cfg = "/var/tmp/recipes/";
+pub fn get_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
+    let bdcs_config = req.server_data();
 
     let offset: i64;
     let limit: i64;
@@ -388,10 +387,8 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
     // XXX For now the filename matches the name. Later: Better retrieval
     let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
     for name in names {
-        // This is more kludgy than normal because recipe_path_cfg should really come from main()
-        // XXX Really? To add 1 character?
         // TODO Needs to be sanitized!
-        let recipe_path = recipe_path_cfg.to_string() + name;
+        let recipe_path = bdcs_config.recipe_path.to_string() + name;
 
         for path in glob(&recipe_path).unwrap().filter_map(Result::ok) {
             // Parse the TOML recipe into a Recipe struct
@@ -426,9 +423,8 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
 }
 
 
-pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
-    // This is more kludgy than normal because recipe_path_cfg should really come from main()
-    let recipe_path_cfg = "/var/tmp/recipes/";
+pub fn post_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
+    let bdcs_config = req.server_data();
 
     // Parse the JSON into Recipe structs (XXX Why does this work here, and not below req.param?)
     let recipe = match req.json_as::<Recipe>() {
@@ -448,7 +444,7 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
     }
 
     // TODO Needs to be sanitized!
-    let recipe_path = recipe_path_cfg.to_string() + name;
+    let recipe_path = bdcs_config.recipe_path.to_string() + name;
     let mut file = match File::create(&recipe_path) {
         Ok(file) => file,
         Err(err) => {
@@ -471,7 +467,7 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
 /// List the available groups
 /// AKA modules
 /// { "modules": [{"name": "group1", ...}, ...] }
-pub fn group_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn group_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let offset: i64;
     let limit: i64;
     {

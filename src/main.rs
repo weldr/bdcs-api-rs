@@ -36,6 +36,7 @@ use nickel_sqlite::{SqliteMiddleware};
 // Web API Framework
 use nickel::{Nickel, HttpRouter, StaticFilesHandler};
 
+use bdcs::BDCSConfig;
 // API v0 functions
 use bdcs::api::enable_cors;
 use bdcs::api::v0::{unimplemented_v0, test_v0, compose_types_v0, dnf_info_packages_v0, project_list_v0, project_info_v0,
@@ -69,22 +70,24 @@ fn main() {
                                         .index(3))
                         .get_matches();
 
-    let host = matches.value_of("host").unwrap_or("127.0.0.1");
-    let port: u16 = matches.value_of("port").unwrap_or("").parse().unwrap_or(8000);
-    let db_path = matches.value_of("DB").unwrap();
-    let static_files = matches.value_of("STATIC").unwrap();
-    let recipe_path = matches.value_of("RECIPES").unwrap();
+    let bdcs_config = BDCSConfig {
+        host: matches.value_of("host").unwrap_or("127.0.0.1").to_string(),
+        port: matches.value_of("port").unwrap_or("").parse().unwrap_or(8000),
+        db_path: matches.value_of("DB").unwrap().to_string(),
+        static_files: matches.value_of("STATIC").unwrap().to_string(),
+        recipe_path: matches.value_of("RECIPES").unwrap().to_string()
+    };
 
-    let mut server = Nickel::new();
+    let mut server = Nickel::with_data(bdcs_config.clone());
 
     // Use a pool of connections to the sqlite database
-    let db_mgr = SqliteConnectionManager::new(db_path);
+    let db_mgr = SqliteConnectionManager::new(&bdcs_config.db_path);
     let db_pool = Pool::new(Config::default(), db_mgr)
         .expect("Unable to initialize the connection pool.");
     server.utilize(SqliteMiddleware::with_pool(db_pool));
 
     server.utilize(enable_cors);
-    server.utilize(StaticFilesHandler::new(static_files));
+    server.utilize(StaticFilesHandler::new(&bdcs_config.static_files));
 
     server.get("/api/v0/test", test_v0);
 
@@ -111,5 +114,5 @@ fn main() {
     server.get("/api/v0/recipe/:names", get_recipe_v0);
     server.post("/api/v0/recipe/:name", post_recipe_v0);
 
-    server.listen(&(host, port)).unwrap();
+    server.listen((bdcs_config.host.as_ref(), bdcs_config.port)).unwrap();
 }

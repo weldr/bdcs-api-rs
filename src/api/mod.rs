@@ -1,12 +1,13 @@
 pub mod v0;
 
 
+use config::BDCSConfig;
 use hyper::header;
 use nickel::{Request, Response, MiddlewareResult};
 
 /// Enable CORS support
 /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS
-pub fn enable_cors<'mw>(_req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn enable_cors<'mw>(_req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     // Set appropriate headers
     res.set(header::AccessControlAllowOrigin::Any);
     res.set(header::AccessControlAllowHeaders(vec![
