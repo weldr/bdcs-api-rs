@@ -17,7 +17,7 @@
 //! along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
 use rusqlite::{self, Connection};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 
 /// bdcs database schema structs
@@ -77,9 +77,9 @@ pub struct Files {
 
 #[derive(Debug)]
 pub enum FileAttrValues {
-    file_id,
-    attribute_type,
-    attribute_value
+    FileId,
+    AttributeType,
+    AttributeValue
 }
 
 #[derive(Debug)]
@@ -88,9 +88,9 @@ pub struct FileAttributes {
     pub file_id: i64,
     pub attribute_type: String,
     pub attribute_value: String,
-    pub FileIdKey: i64,
-    pub TypeKey: FileAttrValues,
-    pub XattrKey: FileAttrValues
+    pub file_id_key: i64,
+    pub type_key: FileAttrValues,
+    pub xattr_key: FileAttrValues
 }
 
 #[derive(Debug)]
@@ -566,43 +566,4 @@ pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::
                     });
     }
     Ok(contents)
-}
-
-
-fn bcl_queries(conn: &Connection) {
-    // Run some queries
-//    let result = get_pkg_files_name(&conn, "lorax");
-    let result = get_pkg_files_nevra(&conn, "lorax", 0, "19.6.78", "1.el7", "x86_64");
-    match result {
-        Ok(files) => {
-            for f in files {
-                println!("{:?}", f);
-            }
-        }
-        Err(err) => println!("Error: {}", err)
-    }
-
-    // Get the builds that include /usr/bin/ls
-    let result = get_builds_filename(&conn, "/usr/bin/ls");
-    match result {
-        Ok(builds) => {
-            for build in builds {
-                println!("{:?}", build);
-                let s = String::from_utf8(build.changelog);
-                println!("Changelog:\n{}", s.unwrap());
-            }
-        }
-        Err(err) => println!("Error: {}", err)
-    }
-
-    // Get the projects that include /usr/bin/ls
-    let result = get_projects_filename(&conn, "/usr/bin/ls");
-    match result {
-        Ok(projects) => {
-            for project in projects {
-                println!("{:?}", project);
-            }
-        }
-        Err(err) => println!("Error: {}", err)
-    }
 }

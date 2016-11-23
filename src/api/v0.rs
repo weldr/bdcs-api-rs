@@ -27,7 +27,6 @@ use rustc_serialize::json::{self, ToJson, Json};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
 use toml;
 
 // bdcs database functions
@@ -146,7 +145,7 @@ pub fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> Midd
     res.send(json::encode(&response).expect("Failed to serialize"))
 }
 
-pub fn dnf_info_packages_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
+pub fn dnf_info_packages_v0<'mw>(req: &mut Request, res: Response<'mw>) -> MiddlewareResult<'mw> {
     // Get the build details for NM
     let packages = req.param("packages").unwrap_or("").split(",");
 
@@ -407,6 +406,7 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
             match file.read_to_string(&mut input) {
                 Ok(_) => println!("Read recipe from {:?}", path),
                 Err(err) => {
+                    println!("Error reading {:?}: {}", path, err);
                     return res.error(StatusCode::InternalServerError, "Read Error.")
                 }
             };
@@ -433,7 +433,10 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
     // Parse the JSON into Recipe structs (XXX Why does this work here, and not below req.param?)
     let recipe = match req.json_as::<Recipe>() {
         Ok(recipe) => recipe,
-        Err(err) => return res.error(StatusCode::InternalServerError, "Error parsing JSON")
+        Err(err) => {
+            println!("Error parsing JSON: {}", err);
+            return res.error(StatusCode::InternalServerError, "Error parsing JSON")
+        }
     };
     let recipe_toml = toml::encode::<Recipe>(&recipe);
     println!("{:?}", recipe_toml);
@@ -445,8 +448,7 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
     }
 
     // TODO Needs to be sanitized!
-    let mut recipe_path: String = String::new();
-    recipe_path = format!("{}{}", recipe_path_cfg, name);
+    let recipe_path = recipe_path_cfg.to_string() + name;
     let mut file = match File::create(&recipe_path) {
         Ok(file) => file,
         Err(err) => {
