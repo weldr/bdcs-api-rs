@@ -47,11 +47,20 @@ impl ComposeTypes {
     }
 }
 
+impl ToJson for ComposeTypes {
+    fn to_json(&self) -> Json {
+        let mut d = BTreeMap::new();
+        d.insert("name".to_string(), self.name.to_json());
+        d.insert("enabled".to_string(), self.enabled.to_json());
+        Json::Object(d)
+    }
+}
+
+
 // Recipe TOML Parsing
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct RecipeList {
     name: Option<String>,
-    description: Option<String>,
 }
 
 #[derive(Debug, RustcDecodable, RustcEncodable)]
@@ -62,16 +71,47 @@ struct Recipe {
     packages: Option<Vec<Packages>>
 }
 
+impl ToJson for Recipe {
+    fn to_json(&self) -> Json {
+        let mut d = BTreeMap::new();
+        d.insert("name".to_string(), self.name.to_json());
+        d.insert("description".to_string(), self.description.to_json());
+        d.insert("modules".to_string(), self.modules.to_json());
+        d.insert("packages".to_string(), self.packages.to_json());
+        Json::Object(d)
+    }
+}
+
+
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Modules {
     name: Option<String>,
     version: Option<String>
 }
 
+impl ToJson for Modules {
+    fn to_json(&self) -> Json {
+        let mut d = BTreeMap::new();
+        d.insert("name".to_string(), self.name.to_json());
+        d.insert("version".to_string(), self.version.to_json());
+        Json::Object(d)
+    }
+}
+
+
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Packages {
     name: Option<String>,
     version: Option<String>
+}
+
+impl ToJson for Packages {
+    fn to_json(&self) -> Json {
+        let mut d = BTreeMap::new();
+        d.insert("name".to_string(), self.name.to_json());
+        d.insert("version".to_string(), self.version.to_json());
+        Json::Object(d)
+    }
 }
 
 
@@ -99,8 +139,11 @@ pub fn compose_types_v0<'mw>(_req: &mut Request, mut res: Response<'mw>) -> Midd
     types.push(ComposeTypes::new("vmdk", false));
     types.push(ComposeTypes::new("vhdx", false));
 
+    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
+    response.insert("types".to_string(), types.to_json());
+
     res.set(MediaType::Json);
-    res.send(json::encode(&types).expect("Failed to serialize"))
+    res.send(json::encode(&response).expect("Failed to serialize"))
 }
 
 pub fn dnf_info_packages_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
@@ -328,6 +371,8 @@ pub fn recipe_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
 }
 
 
+/// Return the contents of a recipe or list of recipes as JSON
+/// { "name1": { "name": "name1", ... }, ... }
 pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     // This is more kludgy than normal because recipe_path_cfg should really come from main()
     let recipe_path_cfg = "/var/tmp/recipes/";
@@ -342,13 +387,12 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
     let names = req.param("names").unwrap_or("").split(",");
 
     // XXX For now the filename matches the name. Later: Better retrieval
-    let mut recipe_list = Vec::new();
+    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
     for name in names {
         // This is more kludgy than normal because recipe_path_cfg should really come from main()
         // XXX Really? To add 1 character?
         // TODO Needs to be sanitized!
-        let mut recipe_path: String = String::new();
-        recipe_path = format!("{}{}", recipe_path_cfg, name);
+        let recipe_path = recipe_path_cfg.to_string() + name;
 
         for path in glob(&recipe_path).unwrap().filter_map(Result::ok) {
             // Parse the TOML recipe into a Recipe struct
@@ -370,12 +414,15 @@ pub fn get_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
                 Some(recipe) => recipe,
                 None => return res.error(StatusCode::InternalServerError, "Error parsing TOML")
             };
-            recipe_list.push(recipe);
+
+            // XXX Is this the right way to do this?
+            let name = recipe.name.as_ref().unwrap();
+            response.insert(name.to_string(), recipe.to_json());
         }
     }
 
     res.set(MediaType::Json);
-    res.send(json::encode(&recipe_list).expect("Failed to serialize"))
+    res.send(json::encode(&response).expect("Failed to serialize"))
 }
 
 
@@ -420,6 +467,8 @@ pub fn post_recipe_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlew
 }
 
 /// List the available groups
+/// AKA modules
+/// { "modules": [{"name": "group1", ...}, ...] }
 pub fn group_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> MiddlewareResult<'mw> {
     let offset: i64;
     let limit: i64;
@@ -454,6 +503,8 @@ pub fn group_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
     }
     res.set(MediaType::Json);
 
+    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
+    response.insert("modules".to_string(), group_list.to_json());
 
     // TODO Make this some kind of middleware thing
     match req.origin.headers.get::<header::AcceptEncoding>() {
@@ -463,11 +514,11 @@ pub fn group_list_v0<'mw>(req: &mut Request, mut res: Response<'mw>) -> Middlewa
                 res.set(header::ContentEncoding(vec![header::Encoding::Gzip]));
 
                 let mut encoder = GzEncoder::new(Vec::new(), Compression::Default);
-                let _ = encoder.write(json::encode(&group_list).expect("Failed to serialize").as_bytes());
+                let _ = encoder.write(json::encode(&response).expect("Failed to serialize").as_bytes());
                 return res.send(encoder.finish().unwrap());
             }
         }
         None => ()
     }
-    res.send(json::encode(&group_list).expect("Failed to serialize"))
+    res.send(json::encode(&response).expect("Failed to serialize"))
 }
