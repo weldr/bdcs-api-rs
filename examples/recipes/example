@@ -1,4 +1,4 @@
-name = "Example Recipe"
+name = "example"
 description = "A stunning example"
 
 [[modules]]
