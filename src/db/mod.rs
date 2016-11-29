@@ -1,26 +1,38 @@
 //! BDCS Sqlite Database Functions
 //!
-//! Copyright (C) 2016
-//! Red Hat, Inc.  All rights reserved.
+// Copyright (C) 2016
+// Red Hat, Inc.  All rights reserved.
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
-//! This program is free software; you can redistribute it and/or modify
-//! it under the terms of the GNU General Public License as published by
-//! the Free Software Foundation; either version 2 of the License, or
-//! (at your option) any later version.
+//! ## BDCS database structs
 //!
-//! This program is distributed in the hope that it will be useful,
-//! but WITHOUT ANY WARRANTY; without even the implied warranty of
-//! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//! GNU General Public License for more details.
+//! These structs are a 1:1 mapping of the sqlite tables used in the
+//! bdcs sqlite database. The Int type maps to i64, Blob to Vec<u8>,
+//! and everything else to String.
 //!
-//! You should have received a copy of the GNU General Public License
-//! along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//! ## TODO
 //!
+//! The database schema support should be versioned, with the ability
+//! to upgrade older databases to newer schema.
+//!
+
 use rusqlite::{self, Connection};
 use std::path::PathBuf;
 
 
-/// bdcs database schema structs
+/// High level details for upstream projects
 #[derive(Debug)]
 pub struct Projects {
     pub id: i64,
@@ -31,6 +43,7 @@ pub struct Projects {
     pub upstream_vcs: String
 }
 
+/// The location for source code used to build `Builds`
 #[derive(Debug)]
 pub struct Sources {
     pub id: i64,
@@ -40,6 +53,7 @@ pub struct Sources {
     pub source_ref: String
 }
 
+/// A specific build of a project
 #[derive(Debug)]
 pub struct Builds {
     pub id: i64,
@@ -53,6 +67,7 @@ pub struct Builds {
     pub build_env_ref: String,
 }
 
+/// Signatures verifying a build output
 #[derive(Debug)]
 pub struct BuildSignatures {
     pub id: i64,
@@ -61,6 +76,7 @@ pub struct BuildSignatures {
     pub signature_data: Vec<u8>
 }
 
+/// Files created by a build
 #[derive(Debug)]
 pub struct Files {
     pub id: i64,
@@ -75,6 +91,7 @@ pub struct Files {
     pub symlink_target: Option<String>,
 }
 
+/// File attribute types
 #[derive(Debug)]
 pub enum FileAttrValues {
     FileId,
@@ -82,6 +99,7 @@ pub enum FileAttrValues {
     AttributeValue
 }
 
+/// Special attributes for files (eg. SELinux xattrs)
 #[derive(Debug)]
 pub struct FileAttributes {
     pub id: i64,
@@ -93,6 +111,7 @@ pub struct FileAttributes {
     pub xattr_key: FileAttrValues
 }
 
+/// The files associated with a specific entry from `Builds`
 #[derive(Debug)]
 pub struct BuildFiles {
     pub id: i64,
@@ -100,6 +119,7 @@ pub struct BuildFiles {
     pub file_id: i64
 }
 
+/// A general key:value store
 #[derive(Debug)]
 pub struct KeyVal {
     pub id: i64,
@@ -107,6 +127,7 @@ pub struct KeyVal {
     pub val_value: String
 }
 
+/// `Projects` related key:value
 #[derive(Debug)]
 pub struct ProjectKeyValues {
     pub id: i64,
@@ -114,6 +135,7 @@ pub struct ProjectKeyValues {
     pub key_val_id: i64
 }
 
+/// `Sources` related key:value
 #[derive(Debug)]
 pub struct SourceKeyValues {
     pub id: i64,
@@ -121,6 +143,7 @@ pub struct SourceKeyValues {
     pub key_val_id: i64
 }
 
+/// `Builds` related key:value
 #[derive(Debug)]
 pub struct BuildKeyValues {
     pub id: i64,
@@ -128,6 +151,7 @@ pub struct BuildKeyValues {
     pub key_val_id: i64
 }
 
+/// `Files` related key:value
 #[derive(Debug)]
 pub struct FileKeyValues {
     pub id: i64,
@@ -135,6 +159,7 @@ pub struct FileKeyValues {
     pub key_val_id: i64
 }
 
+/// Groups of projects
 #[derive(Debug)]
 pub struct Groups {
     pub id: i64,
@@ -142,6 +167,7 @@ pub struct Groups {
     pub group_type: String
 }
 
+/// Files included in a `Groups`
 #[derive(Debug)]
 pub struct GroupFiles {
     pub id: i64,
@@ -149,6 +175,7 @@ pub struct GroupFiles {
     pub file_id: i64
 }
 
+/// Groups of `Groups`
 #[derive(Debug)]
 pub struct GroupGroups {
     pub id: i64,
@@ -156,6 +183,7 @@ pub struct GroupGroups {
     pub child_group_id: i64
 }
 
+/// `Groups` related key:value
 #[derive(Debug)]
 pub struct GroupKeyValues {
     pub id: i64,
@@ -163,6 +191,11 @@ pub struct GroupKeyValues {
     pub key_val_id: i64
 }
 
+/// Requirements
+///
+/// This describes how to determine what other projects or groups to include in the set of files to
+/// be written.
+///
 #[derive(Debug)]
 pub struct Requirements {
     pub id: i64,
@@ -172,6 +205,7 @@ pub struct Requirements {
     pub req_expr: String
 }
 
+/// `Requirements` to use for specific `Groups` entries
 #[derive(Debug)]
 pub struct GroupRequirements {
     pub id: i64,
@@ -181,6 +215,17 @@ pub struct GroupRequirements {
 
 
 /// List contents of a package given by name.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `pkgname` - The name of the package to search for, exact matches only.
+///
+/// # Returns
+///
+/// * A Vector of PathBuf entries containing the full path of all of the files included
+///   in the package.
+///
 pub fn get_pkg_files_name(conn: &Connection, pkgname: &str) -> rusqlite::Result<Vec<PathBuf>> {
     let mut stmt = try!(conn.prepare("
             select files.path
@@ -203,6 +248,25 @@ pub fn get_pkg_files_name(conn: &Connection, pkgname: &str) -> rusqlite::Result<
 // How to make these queries easier to expose as a library?
 
 /// List contents of a package given by NEVRA.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `pkgname` - The name of the package
+/// * `epoch` - Epoch value, eg. 0
+/// * `version` - Version string, eg. "1.2"
+/// * `release` - Release string, eg. "1"
+/// * `arch` - Architecture string, eg. "x86_64"
+///
+/// # Returns
+///
+/// * A Vector of PathBuf entries containing the full path of all of the files included
+///   in the package version.
+///
+/// # Notes
+///
+/// This only matches the exact NEVRA.
+///
 pub fn get_pkg_files_nevra (conn: &Connection, pkgname: &str,
                                            epoch: i64,
                                            version: &str,
@@ -239,6 +303,16 @@ pub fn get_pkg_files_nevra (conn: &Connection, pkgname: &str,
 
 
 /// Find all builds that match a given project name.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `project` - The name of the project, exact matches only.
+///
+/// # Returns
+///
+/// * A Vector of [Builds](struct.Builds.html) for the matching project name.
+///
 pub fn get_builds_name(conn: &Connection, project: &str) -> rusqlite::Result<Vec<Builds>> {
     let mut stmt = try!(conn.prepare("
             select builds.*
@@ -272,6 +346,17 @@ pub fn get_builds_name(conn: &Connection, project: &str) -> rusqlite::Result<Vec
 }
 
 /// List contents of a build.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `build_id` - The id of the [Builds](struct.Builds.html) entry to reference
+///
+/// # Returns
+///
+/// * A Vector of PathBuf entries containing the full path of all of the files included
+///   in the package version.
+///
 pub fn get_build_files(conn: &Connection, build_id: i64) -> rusqlite::Result<Vec<PathBuf>> {
     let mut stmt = try!(conn.prepare("
             select files.path
@@ -290,6 +375,16 @@ pub fn get_build_files(conn: &Connection, build_id: i64) -> rusqlite::Result<Vec
 }
 
 /// List all builds containing a filename path
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `filename` - The full path of the file to match
+///
+/// # Returns
+///
+/// * A Vector of [Builds](struct.Builds.html) for the matching project name.
+///
 pub fn get_builds_filename(conn: &Connection, filename: &str) -> rusqlite::Result<Vec<Builds>> {
     let mut stmt = try!(conn.prepare("
             select builds.*
@@ -323,6 +418,16 @@ pub fn get_builds_filename(conn: &Connection, filename: &str) -> rusqlite::Resul
 }
 
 /// Find all projects that contain a given filename.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `filename` - The full path of the file to match
+///
+/// # Returns
+///
+/// * A Vector of [Projects](struct.Projects.html) for the matching filename.
+///
 pub fn get_projects_filename(conn: &Connection, filename: &str) -> rusqlite::Result<Vec<Projects>> {
     let mut stmt = try!(conn.prepare("
             select projects.*
@@ -351,6 +456,18 @@ pub fn get_projects_filename(conn: &Connection, filename: &str) -> rusqlite::Res
 }
 
 /// Find all projects matching a name
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `project` - The name of the project, glob search patterns allowed
+/// * `offset` - Number of results to skip before returning `limit`
+/// * `limit` - Maximum number of results to return
+///
+/// # Returns
+///
+/// * A Vector of [Projects](struct.Projects.html) for the matching project name/glob
+///
 pub fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Projects>> {
     let mut stmt = try!(conn.prepare("
             select projects.*
@@ -375,6 +492,16 @@ pub fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i
 }
 
 /// Find all sources matching a source id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `source_id` - The id of the [Sources](struct.Sources.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [Sources](struct.Sources.html) for the matching `source_id`
+///
 pub fn get_source_id(conn: &Connection, source_id: i64) -> rusqlite::Result<Vec<Sources>> {
     let mut stmt = try!(conn.prepare("
             select sources.*
@@ -398,6 +525,16 @@ pub fn get_source_id(conn: &Connection, source_id: i64) -> rusqlite::Result<Vec<
 }
 
 /// Get builds for a project based on project id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `project_id` - The id of the [Projects](struct.Projects.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [Builds](struct.Builds.html) for the matching `project_id`
+///
 pub fn get_builds_project_id(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<Builds>> {
     let mut stmt = try!(conn.prepare("
             select builds.*
@@ -431,7 +568,17 @@ pub fn get_builds_project_id(conn: &Connection, project_id: i64) -> rusqlite::Re
 }
 
 
-/// Get k:v data for project based on project id
+/// Get key:value data for the project based on project id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `project_id` - The id of the [Projects](struct.Projects.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [KeyVal](struct.KeyVal.html) for the matching `project_id`
+///
 pub fn get_project_kv_project_id(conn: &Connection, project_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
     let mut stmt = try!(conn.prepare("
             select key_val.*
@@ -453,7 +600,17 @@ pub fn get_project_kv_project_id(conn: &Connection, project_id: i64) -> rusqlite
     Ok(contents)
 }
 
-/// Get k:v data for sources based on id
+/// Get key:value data for the sources based on source id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `source_id` - The id of the [Sources](struct.Sources.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [KeyVal](struct.KeyVal.html) for the matching `source_id`
+///
 pub fn get_source_kv_source_id(conn: &Connection, source_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
     let mut stmt = try!(conn.prepare("
             select key_val.*
@@ -476,7 +633,17 @@ pub fn get_source_kv_source_id(conn: &Connection, source_id: i64) -> rusqlite::R
 }
 
 
-/// Get k:v data for builds based on id
+/// Get key:value data for the builds based on build id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `build_id` - The id of the [Builds](struct.Builds.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [KeyVal](struct.KeyVal.html) for the matching `build_id`
+///
 pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
     let mut stmt = try!(conn.prepare("
             select key_val.*
@@ -499,7 +666,19 @@ pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Resu
 }
 
 
-/// Find all groups matching a name
+/// Find all groups matching a group name
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group` - The name of the group, glob search patterns allowed
+/// * `offset` - Number of results to skip before returning `limit`
+/// * `limit` - Maximum number of results to return
+///
+/// # Returns
+///
+/// * A Vector of [Groups](struct.Groups.html) for the matching group name/glob
+///
 pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Groups>> {
     let mut stmt = try!(conn.prepare("
             select groups.*
@@ -521,7 +700,17 @@ pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) 
 }
 
 
-/// Get k:v data for groups based on id
+/// Get key:value data for the groups based on group id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_id` - The id of the [Groups](struct.Groups.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [KeyVal](struct.KeyVal.html) for the matching `group_id`
+///
 pub fn get_groups_kv_group_id(conn: &Connection, group_id: i64) -> rusqlite::Result<Vec<KeyVal>> {
     let mut stmt = try!(conn.prepare("
             select key_val.*
@@ -545,6 +734,16 @@ pub fn get_groups_kv_group_id(conn: &Connection, group_id: i64) -> rusqlite::Res
 
 
 /// Get group requirements
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_id` - The id of the [Groups](struct.Groups.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of [Requirements](struct.Requirements.html) for the matching `group_id`
+///
 pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::Result<Vec<Requirements>> {
     let mut stmt = try!(conn.prepare("
             select requirements.*
