@@ -3,6 +3,10 @@ name = "bdcs"
 version = "0.1.0"
 authors = ["Brian C. Lane <bcl@redhat.com>"]
 
+[[bin]]
+name = "bdcs-api-server"
+path = "src/main.rs"
+
 [dependencies]
 rusqlite = "0.*"
 getopts = "0.*"
