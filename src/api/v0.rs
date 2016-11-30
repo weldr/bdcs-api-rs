@@ -1,20 +1,41 @@
-//! BDCS API v0
+//! BDCS API handlers version 0
 //!
-//! Copyright (C) 2016
-//! Red Hat, Inc.  All rights reserved.
+// Copyright (C) 2016
+// Red Hat, Inc.  All rights reserved.
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
-//! This program is free software; you can redistribute it and/or modify
-//! it under the terms of the GNU General Public License as published by
-//! the Free Software Foundation; either version 2 of the License, or
-//! (at your option) any later version.
+//! # Overview
 //!
-//! This program is distributed in the hope that it will be useful,
-//! but WITHOUT ANY WARRANTY; without even the implied warranty of
-//! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//! GNU General Public License for more details.
+//! The API server uses the [Nickel.rs](http://nickel.rs) web framework to handle requests.  The
+//! handler functions are called by Nickel as part of its Middleware plugin system.
 //!
-//! You should have received a copy of the GNU General Public License
-//! along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//! The [bdcs::db](bdcs/db/index.html) module is used for the database operations. None of the
+//! handlers should be executing SQL on the database directly.
+//!
+//! # Versioning
+//!
+//! # REST
+//!
+//! # JSON
+//!
+//! # Authentication
+//!
+//! # TODO
+//!
+//!  * Implement generic gzip handling for all responses.
+//!  * Handle Authentication, similar to the [example here.](https://auth0.com/blog/build-an-api-in-rust-with-jwt-authentication-using-nickelrs/)
 //!
 use config::BDCSConfig;
 use flate2::Compression;
@@ -35,6 +56,10 @@ use db::{get_builds_name, get_build_files, get_projects_name, get_project_kv_pro
         get_build_kv_build_id, get_source_id, get_source_kv_source_id, get_groups_name};
 
 
+/// This is used to hold the details about the availabe output types supported by composer
+///
+/// This will eventually come from a plugin system instead of being a static list constructed
+/// by the handler.
 #[derive(RustcEncodable)]
 struct ComposeTypes {
     name: String,
@@ -42,12 +67,32 @@ struct ComposeTypes {
 }
 
 impl ComposeTypes {
+    /// Create a new ComposeTypes struct
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name of the output type. eg. 'iso'
+    /// * `enabled` - Whether or not that type is actually enabled.
+    ///
+    /// # Returns
+    ///
+    /// * A new [ComposeTypes](struct.ComposeTypes.html) struct
+    ///
     fn new<S: Into<String>>(name: S, enabled: bool) -> ComposeTypes {
         ComposeTypes { name: name.into(), enabled: enabled }
     }
 }
 
 impl ToJson for ComposeTypes {
+    /// Convert the struct to a Json::Object for output serialization
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - Reference to the [ComposeTypes](struct.ComposeTypes.html) struct
+    ///
+    /// # Returns
+    ///
+    /// * A Json::Object with the `name` and `enabled` keys set.
     fn to_json(&self) -> Json {
         let mut d = BTreeMap::new();
         d.insert("name".to_string(), self.name.to_json());
@@ -57,12 +102,21 @@ impl ToJson for ComposeTypes {
 }
 
 
-// Recipe TOML Parsing
+/// Recipe names
+///
+/// This is used to easily parse the recipe's TOML, keys that don't exist are ignored,
+/// so this only parses the name of each recipe.
+///
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct RecipeList {
     name: Option<String>,
 }
 
+/// Composer Recipe
+///
+/// This is used to parse the full recipe's TOML, and to write a JSON representation of
+/// the Recipe.
+///
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Recipe {
     name: Option<String>,
@@ -72,6 +126,16 @@ struct Recipe {
 }
 
 impl ToJson for Recipe {
+    /// Convert the Recipe to a Json::Object
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - Reference to the [Recipe](struct.Recipe.html)
+    ///
+    /// # Returns
+    ///
+    /// * A Json::Object with the Recipe data
+    ///
     fn to_json(&self) -> Json {
         let mut d = BTreeMap::new();
         d.insert("name".to_string(), self.name.to_json());
@@ -83,6 +147,10 @@ impl ToJson for Recipe {
 }
 
 
+/// Recipe Modules
+///
+/// This is used for the Recipe's `modules` section and can be serialized
+/// to/from JSON and TOML.
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Modules {
     name: Option<String>,
@@ -90,6 +158,16 @@ struct Modules {
 }
 
 impl ToJson for Modules {
+    /// Convert the Modules to a Json::Object
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - Reference to the [Modules](struct.Modules.html)
+    ///
+    /// # Returns
+    ///
+    /// * A Json::Object with the Module name and version keys set.
+    ///
     fn to_json(&self) -> Json {
         let mut d = BTreeMap::new();
         d.insert("name".to_string(), self.name.to_json());
@@ -99,6 +177,9 @@ impl ToJson for Modules {
 }
 
 
+/// Recipe Packages
+///
+/// This is used for the Recipe's `packages` section
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct Packages {
     name: Option<String>,
@@ -106,6 +187,16 @@ struct Packages {
 }
 
 impl ToJson for Packages {
+    /// Convert the Packages to a Json::Object
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - Reference to the [Packages](struct.Packages.html)
+    ///
+    /// # Returns
+    ///
+    /// * A Json::Object with the Package name and version keys set.
+    ///
     fn to_json(&self) -> Json {
         let mut d = BTreeMap::new();
         d.insert("name".to_string(), self.name.to_json());
@@ -115,15 +206,81 @@ impl ToJson for Packages {
 }
 
 
-// Composer API v0 Implementations
+/// Test the connection to the API
+///
+/// # Arguments
+///
+/// * `_req` - Unused Request structure
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Response
+///
+///  * Sends a string to the client - `API v0 test`
+///
+/// # TODO
+///
+/// * Change this to JSON and report the version number?
+///
 pub fn test_v0<'mw>(_req: &mut Request<BDCSConfig>, res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
    res.send("API v0 test")
 }
 
+
+/// Report that an API path is unimplemented
+///
+/// # Arguments
+///
+/// * `_req` - Unused Request structure
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Response
+///
+/// * HTTP Error
+///
+/// This means that it will be implemented eventually, and is a valid path.
+///
+/// # TODO
+///
+/// * Change it to a meaningful error code and JSON response
+///
 pub fn unimplemented_v0<'mw>(_req: &mut Request<BDCSConfig>, res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
    res.error(StatusCode::ImATeapot, "API Not Yet Implemented.")
 }
 
+
+/// Return the compose types and whether or not they are currently supported
+///
+/// # Arguments
+///
+/// * `_req` - Unused Request structure
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Response
+///
+/// * JSON response with 'types' set to a list of {'name':value, 'enabled': true|false} entries.
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Examples
+///
+/// ```json
+/// {"types":[{"enabled":true,"name":"iso"},{"enabled":false,"name":"disk-image"},{"enabled":false,"name":"fs-image"},{"enabled":false,"name":"ami"},{"enabled":false,"name":"tar"},{"enabled":false,"name":"live-pxe"},{"enabled":false,"name":"live-ostree"},{"enabled":false,"name":"oci"},{"enabled":false,"name":"vagrant"},{"enabled":false,"name":"qcow2"},{"enabled":false,"name":"vmdk"},{"enabled":false,"name":"vhdx"}]}
+/// ```
+///
 pub fn compose_types_v0<'mw>(_req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let mut types = Vec::new();
     types.push(ComposeTypes::new("iso", true));
@@ -146,6 +303,34 @@ pub fn compose_types_v0<'mw>(_req: &mut Request<BDCSConfig>, mut res: Response<'
     res.send(json::encode(&response).expect("Failed to serialize"))
 }
 
+
+/// Return detailed information about a list of package names
+///
+/// # Arguments
+///
+/// * `req` - Request from client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * `packages` - comma separated list of package names
+///
+/// # Response
+///
+/// * JSON response with 'dnf' set to ...
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+///
+/// # TODO
+///
+/// * Figure out how to package up all the details and output it as JSON
+///
 pub fn dnf_info_packages_v0<'mw>(req: &mut Request<BDCSConfig>, res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     // Get the build details for NM
     let packages = req.param("packages").unwrap_or("").split(",");
@@ -182,7 +367,44 @@ pub fn dnf_info_packages_v0<'mw>(req: &mut Request<BDCSConfig>, res: Response<'m
     res.send("Write This")
 }
 
-/// List all of the available projects
+
+/// Return detailed information about a list of package names
+///
+/// # Arguments
+///
+/// * `req` - Request from the client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'summary': value} entries.
+///
+/// If the client supports it, the results of this are gzipped before being sent.
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+/// * Failure to serialize the response
+///
+/// # Examples
+///
+/// ```json
+/// [{"name":"389-ds-base","summary":"389 Directory Server (base)"},{"name":"ElectricFence","summary":"A debugger which detects memory allocation violations"},{"name":"GConf2","summary":"A process-transparent configuration system"},{"name":"GeoIP","summary":"Library for country/city/organization to IP address or hostname mapping"},{"name":"ImageMagick","summary":"An X application for displaying and manipulating images"},{"name":"LibRaw","summary":"Library for reading RAW files obtained from digital photo cameras"},{"name":"ModemManager","summary":"Mobile broadband modem management service"},{"name":"MySQL-python","summary":"An interface to MySQL"},{"name":"NetworkManager","summary":"Network connection manager and user applications"},{"name":"NetworkManager-libreswan","summary":"NetworkManager VPN plug-in for libreswan"},{"name":"ORBit2","summary":"A high-performance CORBA Object Request Broker"},{"name":"OpenEXR","summary":"OpenEXR runtime libraries"},{"name":"OpenIPMI","summary":"IPMI (Intelligent Platform Management Interface) library and tools"},{"name":"PackageKit","summary":"Package management service"},{"name":"PyGreSQL","summary":"A Python client library for PostgreSQL"},{"name":"PyPAM","summary":"PAM bindings for Python"},{"name":"PyQt4","summary":"Python bindings for Qt4"},{"name":"PyYAML","summary":"YAML parser and emitter for Python"},{"name":"Red_Hat_Enterprise_Linux-Release_Notes-7-as-IN","summary":"Assamese translation of Release_Notes"},{"name":"Red_Hat_Enterprise_Linux-Release_Notes-7-bn-IN","summary":"Bengali translation of Release_Notes"}]
+/// ```
+///
+/// # TODO
+///
+/// * Change the response to be {'projects': [ ... ]}
+///
 pub fn project_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let offset: i64;
     let limit: i64;
@@ -228,7 +450,46 @@ pub fn project_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw
     res.send(json::encode(&project_list).expect("Failed to serialize"))
 }
 
- /// Get information about a project
+
+/// Return detailed information about a list of project names
+///
+/// # Arguments
+///
+/// * `req` - Request from the client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `projects` - Comma separated list of projects.
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'summary': value, ...} entries.
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+/// * Failure to serialize the response
+///
+/// # TODO
+///
+/// * Change the response to be {'projects': [ ... ]}
+///
+/// The response includes details about the project, the available builds for the project,
+/// and the sources used for the builds.
+///
+/// # Examples
+///
+/// ```json
+/// [{"builds":[{"arch":"x86_64","build_config_ref":"BUILD_CONFIG_REF","build_env_ref":"BUILD_ENV_REF","build_time":"2015-10-29T15:17:35","changelog":"- Ignore interfaces with invalid VLAN IDs. (dshea)\n  Resolves: rhbz#1274893","epoch":0,"license":"GPLv2+ and MIT","packageName":"anaconda","release":"1.el7","source_ref":"SOURCE_REF","version":"21.48.22.56"}],"description":"The anaconda package is a metapackage for the Anaconda installer.","homepage":"http://fedoraproject.org/wiki/Anaconda","name":"anaconda","summary":"Graphical system installer","upstream_vcs":"UPSTREAM_VCS"}]
+/// ```
+///
 pub fn project_info_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let offset: i64;
     let limit: i64;
@@ -338,8 +599,37 @@ pub fn project_info_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw
     res.send(json::encode(&project_info).expect("Failed to serialize"))
 }
 
-/// Fetch the list of available recipes
-/// { "recipes": ["name1", "name2", ...] }
+
+/// Return the list of available Recipes
+///
+/// # Arguments
+///
+/// * `req` - Request from the client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+///
+/// # Response
+///
+/// * JSON response with 'recipes' set to a list of names - {'recipes': ["name1", ...]}
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Examples
+///
+/// ```json
+/// {"recipes":["another","example","foo"]}
+/// ```
+///
 pub fn recipe_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let bdcs_config = req.server_data();
     let recipe_path = bdcs_config.recipe_path.to_string() + "*";
@@ -370,8 +660,42 @@ pub fn recipe_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw,
 }
 
 
-/// Return the contents of a recipe or list of recipes as JSON
-/// { "name1": { "name": "name1", ... }, ... }
+/// Return the contents of a recipe or list of recipes
+///
+/// # Arguments
+///
+/// * `req` - Request from the client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `names` - Comma separated list of recipe names to return
+///
+/// # Response
+///
+/// * JSON response with recipe contents, using the recipe name(s) as keys
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Errors
+///
+/// * 500: File Open Error
+/// * 500: Read Error
+///
+/// # Examples
+///
+/// ```json
+/// {"example":{"description":"A stunning example","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"name":"example","packages":[{"name":"tmux","version":"2.2"}]}}
+/// ```
+///
 pub fn get_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let bdcs_config = req.server_data();
 
@@ -423,6 +747,43 @@ pub fn get_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, 
 }
 
 
+/// Save a Recipe
+///
+/// # Arguments
+///
+/// * `req` - Request from the client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * Body of the request should be a JSON encoded Recipe.
+/// * `names` - The recipe name to store this recipe under
+///
+/// # Response
+///
+/// * 200: Recipe was stored successfully
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Errors
+///
+/// * 500: Error parsing JSON
+/// * 500: Too many recipe names
+/// * 500: File Open Error
+/// * 500: Write Error
+///
+/// # Examples
+///
+/// ```json
+/// {"description":"A stunning example","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"name":"example","packages":[{"name":"tmux","version":"2.2"}]}
+/// ```
+///
 pub fn post_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let bdcs_config = req.server_data();
 
@@ -464,9 +825,47 @@ pub fn post_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw,
     res.send("")
 }
 
-/// List the available groups
-/// AKA modules
-/// { "modules": [{"name": "group1", ...}, ...] }
+
+/// List the available groups (aka modules)
+///
+/// # Arguments
+///
+/// * `req` - Request from the client
+/// * `res` - Response to be modified
+///
+/// # Returns
+///
+/// * A `MiddlewareResult`
+///
+/// # Request
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+///
+/// # Response
+///
+/// * JSON response with 'modules' set to a list of {"name":value, "group_type":value}
+///
+/// If the client supports it, the results of this are gzipped before being sent.
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+/// * Failure to serialize the response
+///
+/// # Errors
+///
+/// * 500: Error parsing JSON
+/// * 500: Too many recipe names
+/// * 500: File Open Error
+/// * 500: Write Error
+///
+/// # Examples
+///
+/// ```json
+/// {"modules":[{"group_type":"rpm","name":"389-ds-base"},{"group_type":"rpm","name":"389-ds-base-libs"},{"group_type":"rpm","name":"ElectricFence"},{"group_type":"rpm","name":"ElectricFence"},{"group_type":"rpm","name":"GConf2"},{"group_type":"rpm","name":"GConf2"},{"group_type":"rpm","name":"GeoIP"},{"group_type":"rpm","name":"GeoIP"},{"group_type":"rpm","name":"ImageMagick"},{"group_type":"rpm","name":"ImageMagick"},{"group_type":"rpm","name":"ImageMagick-c++"},{"group_type":"rpm","name":"ImageMagick-c++"},{"group_type":"rpm","name":"ImageMagick-perl"},{"group_type":"rpm","name":"LibRaw"},{"group_type":"rpm","name":"LibRaw"},{"group_type":"rpm","name":"ModemManager"},{"group_type":"rpm","name":"ModemManager-glib"},{"group_type":"rpm","name":"ModemManager-glib"},{"group_type":"rpm","name":"MySQL-python"},{"group_type":"rpm","name":"NetworkManager"}]}
+/// ```
+///
 pub fn group_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
     let offset: i64;
     let limit: i64;
