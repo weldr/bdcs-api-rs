@@ -16,22 +16,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
-//! # Overview
-//!
-//! The API server uses the [Nickel.rs](http://nickel.rs) web framework to handle requests.  The
-//! handler functions are called by Nickel as part of its Middleware plugin system.
-//!
-//! The [bdcs::db](bdcs/db/index.html) module is used for the database operations. None of the
-//! handlers should be executing SQL on the database directly.
-//!
-//! # Versioning
-//!
-//! # REST
-//!
-//! # JSON
-//!
-//! # Authentication
-//!
 //! # TODO
 //!
 //!  * Implement generic gzip handling for all responses.
