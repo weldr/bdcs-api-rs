@@ -9,4 +9,5 @@ fi
 
 # Launch the BDCS API
 cd /bdcs-api-rs
-cargo run -- --host 0.0.0.0 --port 4000 /bdcs-db/metadata.db /bdcs-recipes/
+cp ./examples/recipes/* /bdcs-recipes/
+cargo run -- --host 0.0.0.0 --port 4000 /mddb/metadata.db /bdcs-recipes/

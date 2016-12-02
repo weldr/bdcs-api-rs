@@ -16,11 +16,11 @@ Build the docker image by running:
 
 To run the API it requires access to a copy of the metadata.db created by the
 [bdcs import service[(https://github.com/wiggum/bdcs) and to a directory of
-recipes. The recipes directory can be empty initially, or you can copy
-`examples/recipe-example.toml` to `example`.
+recipes. The recipes directory is initialized at runtime from the
+./examples/recipes/ directory.
 
 You can then run the API server and composer-UI code like this:
 
-`docker run -it --rm -v ~/tmp/bdcs-db/:/bdcs-db/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z bcl/bdcs-api`
+`docker run -it --rm -v ~/tmp/mddb/:/mddb/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z bcl/bdcs-api`
 
 You can then access the UI on the `http://localhost:4000`

@@ -23,7 +23,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EXPOSE 4000
 
 # Volumes for database and recipe storage.
-VOLUME /bdcs-db /bdcs-recipes
+VOLUME /mddb /bdcs-recipes
 
 ## Do the things more likely to change below here. ##
 
