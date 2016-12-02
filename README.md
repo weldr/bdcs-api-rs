@@ -21,6 +21,6 @@ recipes. The recipes directory can be empty initially, or you can copy
 
 You can then run the API server and composer-UI code like this:
 
-`docker run -it --rm -v ~/tmp/bdcs-db/:/bdcs-db/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z -p 8000:80 bcl/bdcs-api`
+`docker run -it --rm -v ~/tmp/bdcs-db/:/bdcs-db/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z bcl/bdcs-api`
 
-You can then access the UI on the `http://localhost:8000`
+You can then access the UI on the `http://localhost:4000`

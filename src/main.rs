@@ -34,7 +34,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use nickel_sqlite::{SqliteMiddleware};
 
 // Web API Framework
-use nickel::{Nickel, HttpRouter, StaticFilesHandler};
+use nickel::{Nickel, HttpRouter};
 
 use bdcs::BDCSConfig;
 // API v0 functions
@@ -54,27 +54,22 @@ fn main() {
                             .arg(Arg::with_name("port")
                                         .long("port")
                                         .value_name("PORT")
-                                        .help("Port to bind to (8000)")
+                                        .help("Port to bind to (4000)")
                                         .takes_value(true))
                             .arg(Arg::with_name("DB")
                                         .help("Path to the BDCS sqlite database")
                                         .required(true)
                                         .index(1))
-                            .arg(Arg::with_name("STATIC")
-                                        .help("Path to the static files")
-                                        .required(true)
-                                        .index(2))
                             .arg(Arg::with_name("RECIPES")
                                         .help("Path to the recipes")
                                         .required(true)
-                                        .index(3))
+                                        .index(2))
                         .get_matches();
 
     let bdcs_config = BDCSConfig {
         host: matches.value_of("host").unwrap_or("127.0.0.1").to_string(),
-        port: matches.value_of("port").unwrap_or("").parse().unwrap_or(8000),
+        port: matches.value_of("port").unwrap_or("").parse().unwrap_or(4000),
         db_path: matches.value_of("DB").unwrap().to_string(),
-        static_files: matches.value_of("STATIC").unwrap().to_string(),
         recipe_path: matches.value_of("RECIPES").unwrap().to_string()
     };
 
@@ -87,7 +82,6 @@ fn main() {
     server.utilize(SqliteMiddleware::with_pool(db_pool));
 
     server.utilize(enable_cors);
-    server.utilize(StaticFilesHandler::new(&bdcs_config.static_files));
 
     server.get("/api/v0/test", test_v0);
 

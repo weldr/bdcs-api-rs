@@ -23,6 +23,5 @@ pub struct BDCSConfig {
     pub host: String,
     pub port: u16,
     pub db_path: String,
-    pub static_files: String,
     pub recipe_path: String,
 }
