@@ -33,7 +33,7 @@ use std::path::PathBuf;
 
 
 /// High level details for upstream projects
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct Projects {
     pub id: i64,
     pub name: String,
@@ -44,7 +44,7 @@ pub struct Projects {
 }
 
 /// The location for source code used to build `Builds`
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct Sources {
     pub id: i64,
     pub project_id: i64,
@@ -54,7 +54,7 @@ pub struct Sources {
 }
 
 /// A specific build of a project
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct Builds {
     pub id: i64,
     pub source_id: i64,
@@ -68,7 +68,7 @@ pub struct Builds {
 }
 
 /// Signatures verifying a build output
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct BuildSignatures {
     pub id: i64,
     pub build_id: i64,
@@ -77,7 +77,7 @@ pub struct BuildSignatures {
 }
 
 /// Files created by a build
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct Files {
     pub id: i64,
     pub path: String,           // Could use rust's Path type?
@@ -92,7 +92,7 @@ pub struct Files {
 }
 
 /// File attribute types
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub enum FileAttrValues {
     FileId,
     AttributeType,
@@ -100,7 +100,7 @@ pub enum FileAttrValues {
 }
 
 /// Special attributes for files (eg. SELinux xattrs)
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct FileAttributes {
     pub id: i64,
     pub file_id: i64,
@@ -112,7 +112,7 @@ pub struct FileAttributes {
 }
 
 /// The files associated with a specific entry from `Builds`
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct BuildFiles {
     pub id: i64,
     pub build_id: i64,
@@ -120,7 +120,7 @@ pub struct BuildFiles {
 }
 
 /// A general key:value store
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct KeyVal {
     pub id: i64,
     pub key_value: String,
@@ -128,7 +128,7 @@ pub struct KeyVal {
 }
 
 /// `Projects` related key:value
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct ProjectKeyValues {
     pub id: i64,
     pub project_id: i64,
@@ -136,7 +136,7 @@ pub struct ProjectKeyValues {
 }
 
 /// `Sources` related key:value
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct SourceKeyValues {
     pub id: i64,
     pub source_id: i64,
@@ -144,7 +144,7 @@ pub struct SourceKeyValues {
 }
 
 /// `Builds` related key:value
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct BuildKeyValues {
     pub id: i64,
     pub build_id: i64,
@@ -152,7 +152,7 @@ pub struct BuildKeyValues {
 }
 
 /// `Files` related key:value
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct FileKeyValues {
     pub id: i64,
     pub file_id: i64,
@@ -160,7 +160,7 @@ pub struct FileKeyValues {
 }
 
 /// Groups of projects
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct Groups {
     pub id: i64,
     pub name: String,
@@ -168,7 +168,7 @@ pub struct Groups {
 }
 
 /// Files included in a `Groups`
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct GroupFiles {
     pub id: i64,
     pub group_id: i64,
@@ -176,7 +176,7 @@ pub struct GroupFiles {
 }
 
 /// Groups of `Groups`
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct GroupGroups {
     pub id: i64,
     pub parent_group_id: i64,
@@ -184,7 +184,7 @@ pub struct GroupGroups {
 }
 
 /// `Groups` related key:value
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct GroupKeyValues {
     pub id: i64,
     pub group_id: i64,
@@ -196,7 +196,7 @@ pub struct GroupKeyValues {
 /// This describes how to determine what other projects or groups to include in the set of files to
 /// be written.
 ///
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct Requirements {
     pub id: i64,
     pub req_language: String,
@@ -206,7 +206,7 @@ pub struct Requirements {
 }
 
 /// `Requirements` to use for specific `Groups` entries
-#[derive(Debug)]
+#[derive(Debug,RustcEncodable)]
 pub struct GroupRequirements {
     pub id: i64,
     pub group_id: i64,
