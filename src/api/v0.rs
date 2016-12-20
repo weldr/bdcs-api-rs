@@ -30,7 +30,7 @@ use nickel::{MediaType, Request, Response, MiddlewareResult, QueryString, JsonBo
 use nickel::status::StatusCode;
 use nickel_sqlite::SqliteRequestExtensions;
 use rustc_serialize::json::{self, ToJson, Json};
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use toml;
@@ -67,25 +67,6 @@ impl ComposeTypes {
     }
 }
 
-impl ToJson for ComposeTypes {
-    /// Convert the struct to a Json::Object for output serialization
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - Reference to the [ComposeTypes](struct.ComposeTypes.html) struct
-    ///
-    /// # Returns
-    ///
-    /// * A Json::Object with the `name` and `enabled` keys set.
-    fn to_json(&self) -> Json {
-        let mut d = BTreeMap::new();
-        d.insert("name".to_string(), self.name.to_json());
-        d.insert("enabled".to_string(), self.enabled.to_json());
-        Json::Object(d)
-    }
-}
-
-
 /// Recipe names
 ///
 /// This is used to easily parse the recipe's TOML, keys that don't exist are ignored,
@@ -109,28 +90,6 @@ struct Recipe {
     packages: Option<Vec<Packages>>
 }
 
-impl ToJson for Recipe {
-    /// Convert the Recipe to a Json::Object
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - Reference to the [Recipe](struct.Recipe.html)
-    ///
-    /// # Returns
-    ///
-    /// * A Json::Object with the Recipe data
-    ///
-    fn to_json(&self) -> Json {
-        let mut d = BTreeMap::new();
-        d.insert("name".to_string(), self.name.to_json());
-        d.insert("description".to_string(), self.description.to_json());
-        d.insert("modules".to_string(), self.modules.to_json());
-        d.insert("packages".to_string(), self.packages.to_json());
-        Json::Object(d)
-    }
-}
-
-
 /// Recipe Modules
 ///
 /// This is used for the Recipe's `modules` section and can be serialized
@@ -141,26 +100,6 @@ struct Modules {
     version: Option<String>
 }
 
-impl ToJson for Modules {
-    /// Convert the Modules to a Json::Object
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - Reference to the [Modules](struct.Modules.html)
-    ///
-    /// # Returns
-    ///
-    /// * A Json::Object with the Module name and version keys set.
-    ///
-    fn to_json(&self) -> Json {
-        let mut d = BTreeMap::new();
-        d.insert("name".to_string(), self.name.to_json());
-        d.insert("version".to_string(), self.version.to_json());
-        Json::Object(d)
-    }
-}
-
-
 /// Recipe Packages
 ///
 /// This is used for the Recipe's `packages` section
@@ -169,26 +108,6 @@ struct Packages {
     name: Option<String>,
     version: Option<String>
 }
-
-impl ToJson for Packages {
-    /// Convert the Packages to a Json::Object
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - Reference to the [Packages](struct.Packages.html)
-    ///
-    /// # Returns
-    ///
-    /// * A Json::Object with the Package name and version keys set.
-    ///
-    fn to_json(&self) -> Json {
-        let mut d = BTreeMap::new();
-        d.insert("name".to_string(), self.name.to_json());
-        d.insert("version".to_string(), self.version.to_json());
-        Json::Object(d)
-    }
-}
-
 
 /// Test the connection to the API
 ///
@@ -280,8 +199,8 @@ pub fn compose_types_v0<'mw>(_req: &mut Request<BDCSConfig>, mut res: Response<'
     types.push(ComposeTypes::new("vmdk", false));
     types.push(ComposeTypes::new("vhdx", false));
 
-    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
-    response.insert("types".to_string(), types.to_json());
+    let mut response = HashMap::new();
+    response.insert("types".to_string(), types);
 
     res.set(MediaType::Json);
     res.send(json::encode(&response).expect("Failed to serialize"))
@@ -405,10 +324,7 @@ pub fn project_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw
         Ok(projs) => {
             // SQL query could potentially return more than one, so loop.
             for p in projs {
-                let mut proj_map: BTreeMap<String, json::Json> = BTreeMap::new();
-                proj_map.insert("name".to_string(), p.name.to_json());
-                proj_map.insert("summary".to_string(), p.summary.to_json());
-                project_list.push(proj_map);
+                project_list.push(p);
             }
         }
         Err(err) => println!("Error: {}", err)
@@ -495,7 +411,7 @@ pub fn project_info_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw
             Ok(projs) => {
                 // SQL query could potentially return more than one, so loop.
                 for p in projs {
-                    let mut proj_map: BTreeMap<String, json::Json> = BTreeMap::new();
+                    let mut proj_map = HashMap::new();
                     proj_map.insert("name".to_string(), p.name.to_json());
                     proj_map.insert("summary".to_string(), p.summary.to_json());
                     proj_map.insert("description".to_string(), p.description.to_json());
@@ -519,7 +435,7 @@ pub fn project_info_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw
                     match result_3 {
                         Ok(builds) => {
                             for b in builds {
-                                let mut build_map: BTreeMap<String, json::Json> = BTreeMap::new();
+                                let mut build_map = HashMap::new();
                                 build_map.insert("epoch".to_string(), b.epoch.to_json());
                                 build_map.insert("release".to_string(), b.release.to_json());
                                 build_map.insert("arch".to_string(), b.arch.to_json());
@@ -566,7 +482,7 @@ pub fn project_info_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw
                                 }
 
 
-                                builds_list.push(Json::Object(build_map));
+                                builds_list.push(build_map);
                             }
                         }
                         Err(err) => println!("Error: {}", err)
@@ -636,8 +552,8 @@ pub fn recipe_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw,
         recipe_list.push(recipe.name);
     }
 
-    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
-    response.insert("recipes".to_string(), recipe_list.to_json());
+    let mut response = HashMap::new();
+    response.insert("recipes".to_string(), recipe_list);
 
     res.set(MediaType::Json);
     res.send(json::encode(&response).expect("Failed to serialize"))
@@ -693,7 +609,7 @@ pub fn get_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, 
     let names = req.param("names").unwrap_or("").split(",");
 
     // XXX For now the filename matches the name. Later: Better retrieval
-    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
+    let mut response = HashMap::new();
     for name in names {
         // TODO Needs to be sanitized!
         let recipe_path = bdcs_config.recipe_path.to_string() + name;
@@ -720,9 +636,7 @@ pub fn get_recipe_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, 
                 None => return res.error(StatusCode::InternalServerError, "Error parsing TOML")
             };
 
-            // XXX Is this the right way to do this?
-            let name = recipe.name.as_ref().unwrap();
-            response.insert(name.to_string(), recipe.to_json());
+            response.insert(recipe.name.clone().unwrap(), recipe);
         }
     }
 
@@ -873,10 +787,7 @@ pub fn group_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, 
             Ok(grps) => {
                 // SQL query could potentially return more than one, so loop.
                 for g in grps {
-                    let mut group_map: BTreeMap<String, json::Json> = BTreeMap::new();
-                    group_map.insert("name".to_string(), g.name.to_json());
-                    group_map.insert("group_type".to_string(), g.group_type.to_json());
-                    group_list.push(group_map);
+                    group_list.push(g);
                 }
             }
             Err(err) => println!("Error: {}", err)
@@ -884,8 +795,8 @@ pub fn group_list_v0<'mw>(req: &mut Request<BDCSConfig>, mut res: Response<'mw, 
     }
     res.set(MediaType::Json);
 
-    let mut response: BTreeMap<String, json::Json> = BTreeMap::new();
-    response.insert("modules".to_string(), group_list.to_json());
+    let mut response = HashMap::new();
+    response.insert("modules".to_string(), group_list);
 
     // TODO Make this some kind of middleware thing
     match req.origin.headers.get::<header::AcceptEncoding>() {
