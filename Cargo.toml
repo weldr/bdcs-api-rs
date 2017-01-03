@@ -8,7 +8,7 @@ name = "bdcs-api-server"
 path = "src/main.rs"
 
 [dependencies]
-rusqlite = "0.*"
+rusqlite = "0.7.*"
 getopts = "0.*"
 r2d2 = "0.*"
 r2d2_sqlite = "0.*"
