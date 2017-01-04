@@ -4,10 +4,8 @@ MAINTAINER Brian C. Lane <bcl@redhat.com>
 
 RUN dnf install -y dnf-plugins-core gnupg tar git sudo curl file gcc-c++ gcc gdb glibc-devel openssl-devel make xz sqlite-devel openssl-devel
 
-ENV RUST_VERSION 1.13.0
-
 RUN curl -sSf https://static.rust-lang.org/rustup.sh \
-  | sh -s -- --yes --disable-sudo --revision=$RUST_VERSION \
+  | sh -s -- --yes --disable-sudo --channel=nightly \
   && rustc --version && cargo --version
 
 ENV CARGO_HOME /cargo
