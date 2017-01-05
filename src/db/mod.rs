@@ -1,6 +1,6 @@
 //! BDCS Sqlite Database Functions
 //!
-// Copyright (C) 2016
+// Copyright (C) 2016-2017
 // Red Hat, Inc.  All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify

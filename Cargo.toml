@@ -1,6 +1,6 @@
 [package]
 name = "bdcs"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Brian C. Lane <bcl@redhat.com>"]
 
 [[bin]]
@@ -8,16 +8,21 @@ name = "bdcs-api-server"
 path = "src/main.rs"
 
 [dependencies]
-rusqlite = "0.7.*"
-getopts = "0.*"
+clap = "2.*"
+flate2 = "0.*"
+glob = "0.*"
+hyper = "0.*"
+lazy_static = "0.2.*"
 r2d2 = "0.*"
 r2d2_sqlite = "0.*"
-nickel = "0.*"
-nickel_sqlite = "0.*"
-hyper = "0.*"
+rocket = "0.1.*"
+rocket_codegen = "0.1.*"
+rocket_contrib = "0.1.*"
+rusqlite = "0.7.*"
+rustc-serialize = "0.3.*"
+serde = "0.8.*"
+serde_json = "0.8.*"
+serde_derive = "0.8.*"
+# Note that toml cannot be switched to serde due to rocket's use of toml with rustc-serialize
+toml = "0.2.*"
 unicase = "1.*"
-rustc-serialize = "0.*"
-flate2 = "0.*"
-clap = "2.*"
-toml = "0.*"
-glob = "0.*"

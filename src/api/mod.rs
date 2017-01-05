@@ -1,6 +1,6 @@
 //! BDCS API Server handlers
 //!
-// Copyright (C) 2016
+// Copyright (C) 2016-2017
 // Red Hat, Inc.  All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify
@@ -85,48 +85,44 @@
 //!
 //! ## Basic Auth tokens
 //!
+
+use r2d2;
+use r2d2_sqlite::SqliteConnectionManager;
+use rocket::config;
+use rocket::http::Status;
+use rocket::request::{self, Request, FromRequest};
+use rocket::outcome::Outcome::*;
+use rusqlite::Connection;
+
+
 pub mod v0;
 
+// Initialize the database pool and make it available to the handlers
+// From - https://github.com/SergioBenitez/Rocket/issues/53#issuecomment-269460216
+lazy_static! {
+    pub static ref DB_POOL: r2d2::Pool<SqliteConnectionManager> = {
+        let db_url = config::active().unwrap().get_str("db_path").unwrap_or("./metadata.db");
+        let db_mgr = SqliteConnectionManager::new(&db_url);
+        let db_pool = r2d2::Pool::new(r2d2::Config::default(), db_mgr)
+                        .expect("Unable to initialize the connection pool.");
+        db_pool
+    };
+}
 
-use config::BDCSConfig;
-use hyper::header;
-use nickel::{Request, Response, MiddlewareResult};
+pub struct DB(r2d2::PooledConnection<SqliteConnectionManager>);
 
-/// Enable CORS support
-///
-/// # Arguments
-///
-/// * `_req` - Unused Request structure
-/// * `res` - Response to me modified
-///
-/// # Returns
-///
-/// * A `MiddlewareResult`
-///
-/// See [the Mozilla page](https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS)
-/// for more details about CORS.
-///
-/// This modifies the headers so that API calls can be executed from javascript that is not running
-/// on the same host as the API server.
-///
-/// # TODO
-///
-/// * Add the Access-Control-Allow-Credentials header -- it needs an actual domain for Origin in
-///   order to work.
-///
-pub fn enable_cors<'mw>(_req: &mut Request<BDCSConfig>, mut res: Response<'mw, BDCSConfig>) -> MiddlewareResult<'mw, BDCSConfig> {
-    // Set appropriate headers
-    res.set(header::AccessControlAllowOrigin::Any);
-    res.set(header::AccessControlAllowHeaders(vec![
-        // Hyper uses the `unicase::Unicase` type to ensure comparisons are done
-        // case-insensitively. Here, we use `into()` to convert to one from a `&str`
-        // so that we don't have to import the type ourselves.
-        "Origin".into(),
-        "X-Requested-With".into(),
-        "Content-Type".into(),
-        "Accept".into(),
-    ]));
+impl DB {
+    pub fn conn(&self) -> &Connection {
+        &*self.0
+    }
+}
 
-    // Pass control to the next middleware
-    res.next_middleware()
+impl<'a, 'r> FromRequest<'a, 'r> for DB {
+    type Error = r2d2::GetTimeout;
+    fn from_request(_: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+        match DB_POOL.get() {
+            Ok(conn) => Success(DB(conn)),
+            Err(e) => Failure((Status::InternalServerError, e)),
+        }
+    }
 }

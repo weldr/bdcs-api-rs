@@ -1,6 +1,6 @@
 //! BDCS Crate
 //!
-// Copyright (C) 2016
+// Copyright (C) 2016-2017
 // Red Hat, Inc.  All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify
@@ -18,22 +18,27 @@
 //
 //! ## Overview
 //!
-//! The bdcs crate contains 3 modules. The [db](db/index.html) module for operations related to the
+//! The bdcs crate contains 2 modules. The [db](db/index.html) module for operations related to the
 //! sqlite metadata store, and the [api](api/index.html) module for handling requests to the bdcs
-//! API Server. The config module only exports the [BDCSConfig](config/struct.BDCSConfig.html)
-//! struct which is used to pass configuration data to the API handlers.
+//! API Server.
 //!
+#![feature(plugin)]
+#![feature(proc_macro)]
+#![plugin(rocket_codegen)]
 
-extern crate flate2;
 extern crate glob;
 extern crate hyper;
-#[macro_use] extern crate nickel;
-extern crate nickel_sqlite;
+#[macro_use] extern crate lazy_static;
+extern crate r2d2;
+extern crate r2d2_sqlite;
+extern crate rocket;
+#[macro_use] extern crate rocket_contrib;
 extern crate rusqlite;
 extern crate rustc_serialize;
+extern crate serde_json;
+#[macro_use] extern crate serde_derive;
 extern crate toml;
+
 
 pub mod api;
 pub mod db;
-mod config;
-pub use config::BDCSConfig;
