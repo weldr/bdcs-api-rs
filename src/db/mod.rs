@@ -33,8 +33,9 @@ use std::path::PathBuf;
 
 
 /// High level details for upstream projects
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct Projects {
+    #[serde(skip_serializing)]
     pub id: i64,
     pub name: String,
     pub summary: String,
@@ -44,9 +45,11 @@ pub struct Projects {
 }
 
 /// The location for source code used to build `Builds`
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct Sources {
+    #[serde(skip_serializing)]
     pub id: i64,
+    #[serde(skip_serializing)]
     pub project_id: i64,
     pub license: String,
     pub version: String,
@@ -54,9 +57,11 @@ pub struct Sources {
 }
 
 /// A specific build of a project
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct Builds {
+    #[serde(skip_serializing)]
     pub id: i64,
+    #[serde(skip_serializing)]
     pub source_id: i64,
     pub epoch: i64,
     pub release: String,
@@ -68,17 +73,20 @@ pub struct Builds {
 }
 
 /// Signatures verifying a build output
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct BuildSignatures {
+    #[serde(skip_serializing)]
     pub id: i64,
+    #[serde(skip_serializing)]
     pub build_id: i64,
     pub signature_type: String,
     pub signature_data: Vec<u8>
 }
 
 /// Files created by a build
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct Files {
+    #[serde(skip_serializing)]
     pub id: i64,
     pub path: String,           // Could use rust's Path type?
     pub digest: String,
@@ -92,7 +100,7 @@ pub struct Files {
 }
 
 /// File attribute types
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub enum FileAttrValues {
     FileId,
     AttributeType,
@@ -100,9 +108,11 @@ pub enum FileAttrValues {
 }
 
 /// Special attributes for files (eg. SELinux xattrs)
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct FileAttributes {
+    #[serde(skip_serializing)]
     pub id: i64,
+    #[serde(skip_serializing)]
     pub file_id: i64,
     pub attribute_type: String,
     pub attribute_value: String,
@@ -112,7 +122,7 @@ pub struct FileAttributes {
 }
 
 /// The files associated with a specific entry from `Builds`
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct BuildFiles {
     pub id: i64,
     pub build_id: i64,
@@ -120,15 +130,16 @@ pub struct BuildFiles {
 }
 
 /// A general key:value store
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct KeyVal {
+    #[serde(skip_serializing)]
     pub id: i64,
     pub key_value: String,
     pub val_value: String
 }
 
 /// `Projects` related key:value
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct ProjectKeyValues {
     pub id: i64,
     pub project_id: i64,
@@ -136,7 +147,7 @@ pub struct ProjectKeyValues {
 }
 
 /// `Sources` related key:value
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct SourceKeyValues {
     pub id: i64,
     pub source_id: i64,
@@ -144,7 +155,7 @@ pub struct SourceKeyValues {
 }
 
 /// `Builds` related key:value
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct BuildKeyValues {
     pub id: i64,
     pub build_id: i64,
@@ -152,7 +163,7 @@ pub struct BuildKeyValues {
 }
 
 /// `Files` related key:value
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct FileKeyValues {
     pub id: i64,
     pub file_id: i64,
@@ -160,15 +171,16 @@ pub struct FileKeyValues {
 }
 
 /// Groups of projects
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct Groups {
+    #[serde(skip_serializing)]
     pub id: i64,
     pub name: String,
     pub group_type: String
 }
 
 /// Files included in a `Groups`
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct GroupFiles {
     pub id: i64,
     pub group_id: i64,
@@ -176,7 +188,7 @@ pub struct GroupFiles {
 }
 
 /// Groups of `Groups`
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct GroupGroups {
     pub id: i64,
     pub parent_group_id: i64,
@@ -184,7 +196,7 @@ pub struct GroupGroups {
 }
 
 /// `Groups` related key:value
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct GroupKeyValues {
     pub id: i64,
     pub group_id: i64,
@@ -196,8 +208,9 @@ pub struct GroupKeyValues {
 /// This describes how to determine what other projects or groups to include in the set of files to
 /// be written.
 ///
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug,Serialize)]
 pub struct Requirements {
+    #[serde(skip_serializing)]
     pub id: i64,
     pub req_language: String,
     pub req_context: String,
@@ -206,7 +219,7 @@ pub struct Requirements {
 }
 
 /// `Requirements` to use for specific `Groups` entries
-#[derive(Debug,RustcEncodable)]
+#[derive(Debug)]
 pub struct GroupRequirements {
     pub id: i64,
     pub group_id: i64,
