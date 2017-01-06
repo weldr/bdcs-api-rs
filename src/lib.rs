@@ -24,6 +24,7 @@
 //!
 #![feature(plugin)]
 #![feature(proc_macro)]
+#![feature(custom_derive)]
 #![plugin(rocket_codegen)]
 
 extern crate glob;

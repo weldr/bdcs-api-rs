@@ -34,37 +34,13 @@ use toml;
 
 // bdcs database functions
 use db::*;
+use api::DB;
 
-/// This is used to hold the details about the availabe output types supported by composer
-///
-/// This will eventually come from a plugin system instead of being a static list constructed
-/// by the handler.
-#[derive(Serialize)]
-pub struct ComposeTypes {
-    name: String,
-    enabled: bool
-}
-
-impl ComposeTypes {
-    /// Create a new ComposeTypes struct
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the output type. eg. 'iso'
-    /// * `enabled` - Whether or not that type is actually enabled.
-    ///
-    /// # Returns
-    ///
-    /// * A new [ComposeTypes](struct.ComposeTypes.html) struct
-    ///
-    fn new<S: Into<String>>(name: S, enabled: bool) -> ComposeTypes {
-        ComposeTypes { name: name.into(), enabled: enabled }
-    }
-}
-
-#[derive(Serialize)]
-pub struct ComposeTypesResponse {
-    types: Vec<ComposeTypes>
+/// This is used for optional query parameters that filter the results
+#[derive(FromForm)]
+pub struct Filter {
+    offset: Option<i64>,
+    limit: Option<i64>
 }
 
 /// Recipe names
@@ -128,54 +104,6 @@ pub fn test() -> &'static str {
    "API v0 test"
 }
 
-/*
-#[get("/test")]
-fn test(db: DB) -> String {
-    let recipe_path = config::active().unwrap().get_str("recipe_path").unwrap_or("./recipes");
-    println!("{:?}", db.conn());
-
-    let mut stmt = db.conn().prepare("
-            select projects.*
-            from projects
-            where projects.name GLOB :project ORDER BY projects.id").unwrap();
-    let mut rows = stmt.query_named(&[(":project", &"*")]).unwrap();
-
-    let mut contents: Vec<String> = Vec::new();
-    while let Some(row) = rows.next() {
-        match row {
-            Ok(row) => contents.push(row.get(1)),
-            _ => ()
-        }
-    }
-
-    format!("This is a test\nrecipe_path = {}\n{:?}\n", recipe_path, contents)
-}
-
--    // Composer v0 API
--    server.get("/api/v0/isos", unimplemented_v0);
--    server.post("/api/v0/compose", unimplemented_v0);
--    server.get("/api/v0/compose/status", unimplemented_v0);
--    server.get("/api/v0/compose/status/:compose_id", unimplemented_v0);
--    server.get("/api/v0/compose/types", compose_types_v0);
--    server.get("/api/v0/compose/log/:kbytes", unimplemented_v0);
--    server.post("/api/v0/compose/cancel", unimplemented_v0);
--
--    server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
--    server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
--
--    server.get("/api/v0/projects/list", project_list_v0);
--    server.get("/api/v0/projects/info/:projects", project_info_v0);
--
--    server.get("/api/v0/module/info/:modules", unimplemented_v0);
--    server.get("/api/v0/module/list", group_list_v0);
--    server.get("/api/v0/module/list/:groups", group_list_v0);
--
--    server.get("/api/v0/recipe/list", recipe_list_v0);
--    server.get("/api/v0/recipe/:names", get_recipe_v0);
--    server.post("/api/v0/recipe/:name", post_recipe_v0);
-
-*/
-
 /// List the available isos
 ///
 /// # Returns
@@ -203,6 +131,11 @@ pub fn compose<'r>() -> &'static str {
     "Unimplemented"
 }
 
+#[post("/compose/cancel")]
+pub fn compose_cancel<'r>() -> &'static str {
+    "Unimplemented"
+}
+
 #[get("compose/status")]
 pub fn compose_status<'r>() -> &'static str {
     "Unimplemented"
@@ -213,6 +146,41 @@ pub fn compose_status_id<'r>(id: &str) -> &'static str {
     "Unimplemented"
 }
 
+#[get("compose/log/<kbytes>")]
+pub fn compose_log<'r>(kbytes: usize) -> &'static str {
+    "Unimplemented"
+}
+
+
+// /compose/types
+
+#[derive(Serialize)]
+pub struct ComposeTypes {
+    name: String,
+    enabled: bool
+}
+
+impl ComposeTypes {
+    /// Create a new ComposeTypes struct
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name of the output type. eg. 'iso'
+    /// * `enabled` - Whether or not that type is actually enabled.
+    ///
+    /// # Returns
+    ///
+    /// * A new [ComposeTypes](struct.ComposeTypes.html) struct
+    ///
+    fn new<S: Into<String>>(name: S, enabled: bool) -> ComposeTypes {
+        ComposeTypes { name: name.into(), enabled: enabled }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ComposeTypesResponse {
+    types: Vec<ComposeTypes>
+}
 
 /// Return the compose types and whether or not they are currently supported
 ///
@@ -229,7 +197,7 @@ pub fn compose_status_id<'r>(id: &str) -> &'static str {
 /// ```json
 /// {"types":[{"enabled":true,"name":"iso"},{"enabled":false,"name":"disk-image"},{"enabled":false,"name":"fs-image"},{"enabled":false,"name":"ami"},{"enabled":false,"name":"tar"},{"enabled":false,"name":"live-pxe"},{"enabled":false,"name":"live-ostree"},{"enabled":false,"name":"oci"},{"enabled":false,"name":"vagrant"},{"enabled":false,"name":"qcow2"},{"enabled":false,"name":"vmdk"},{"enabled":false,"name":"vhdx"}]}
 /// ```
-#[get("/compose/types", format="application/json")]
+#[get("/compose/types")]
 pub fn compose_types() -> JSON<ComposeTypesResponse> {
     let mut types = Vec::new();
     types.push(ComposeTypes::new("iso", true));
@@ -246,4 +214,57 @@ pub fn compose_types() -> JSON<ComposeTypesResponse> {
     types.push(ComposeTypes::new("vhdx", false));
 
     JSON(ComposeTypesResponse { types: types })
+}
+
+// /projects/list
+
+#[derive(Serialize)]
+pub struct ProjectsResponse {
+    projects: Vec<Projects>,
+    offset: i64,
+    limit: i64
+}
+
+/// Return detailed information about a list of package names filtered by limit and/or offset
+#[get("/projects/list?<filter>")]
+pub fn projects_list_filter(filter: Filter, db: DB) -> JSON<ProjectsResponse> {
+    projects_list(db, filter.offset.unwrap_or(0), filter.limit.unwrap_or(20))
+}
+
+// This catches the path when no query string was passed
+#[get("/projects/list", rank=2)]
+pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
+    projects_list(db, 0, 20)
+}
+
+/// Return detailed information about a list of package names
+///
+/// # Arguments
+///
+/// * `db` - Database pool connection
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'summary': value} entries inside {"projects":[]}
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+/// * Failure to serialize the response
+///
+/// # Examples
+///
+/// ```json
+/// {"projects":[{"name":"389-ds-base","summary":"389 Directory Server (base)"},{"name":"ElectricFence","summary":"A debugger which detects memory allocation violations"},{"name":"GConf2","summary":"A process-transparent configuration system"},{"name":"GeoIP","summary":"Library for country/city/organization to IP address or hostname mapping"},{"name":"ImageMagick","summary":"An X application for displaying and manipulating images"},{"name":"LibRaw","summary":"Library for reading RAW files obtained from digital photo cameras"},{"name":"ModemManager","summary":"Mobile broadband modem management service"},{"name":"MySQL-python","summary":"An interface to MySQL"},{"name":"NetworkManager","summary":"Network connection manager and user applications"},{"name":"NetworkManager-libreswan","summary":"NetworkManager VPN plug-in for libreswan"},{"name":"ORBit2","summary":"A high-performance CORBA Object Request Broker"},{"name":"OpenEXR","summary":"OpenEXR runtime libraries"},{"name":"OpenIPMI","summary":"IPMI (Intelligent Platform Management Interface) library and tools"},{"name":"PackageKit","summary":"Package management service"},{"name":"PyGreSQL","summary":"A Python client library for PostgreSQL"},{"name":"PyPAM","summary":"PAM bindings for Python"},{"name":"PyQt4","summary":"Python bindings for Qt4"},{"name":"PyYAML","summary":"YAML parser and emitter for Python"},{"name":"Red_Hat_Enterprise_Linux-Release_Notes-7-as-IN","summary":"Assamese translation of Release_Notes"},{"name":"Red_Hat_Enterprise_Linux-Release_Notes-7-bn-IN","summary":"Bengali translation of Release_Notes"}]}
+/// ```
+///
+fn projects_list(db: DB, offset: i64, limit: i64) -> JSON<ProjectsResponse> {
+    let result = get_projects_name(db.conn(), "*", offset, limit);
+    JSON(ProjectsResponse {
+            projects: result.unwrap_or(vec![]),
+            offset: offset,
+            limit: limit
+    })
 }

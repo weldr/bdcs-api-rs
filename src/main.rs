@@ -90,6 +90,8 @@ fn main() {
         .write_all(toml::encode_str(&rocket_toml).as_bytes()).unwrap();
 
     rocket::ignite()
-        .mount("/api/v0/", routes![v0::test, v0::compose_types])
+        .mount("/api/v0/", routes![v0::test, v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,
+                                   v0::compose_status, v0::compose_status_id, v0::compose_log,
+                                   v0::projects_list_default, v0::projects_list_filter, ])
         .launch();
 }
