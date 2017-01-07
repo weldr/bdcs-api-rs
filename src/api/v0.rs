@@ -36,6 +36,11 @@ use toml;
 use db::*;
 use api::DB;
 
+// defaults for queries that return multiple responses
+static OFFSET: i64 = 0;
+static LIMIT: i64 = 20;
+
+
 /// This is used for optional query parameters that filter the results
 #[derive(FromForm)]
 pub struct Filter {
@@ -103,6 +108,7 @@ struct Packages {
 pub fn test() -> &'static str {
    "API v0 test"
 }
+
 
 /// List the available isos
 ///
@@ -225,16 +231,16 @@ pub struct ProjectsResponse {
     limit: i64
 }
 
-/// Return detailed information about a list of package names filtered by limit and/or offset
+/// Return a summary of available projects, filtered by limit and/or offset
 #[get("/projects/list?<filter>")]
 pub fn projects_list_filter(filter: Filter, db: DB) -> JSON<ProjectsResponse> {
-    projects_list(db, filter.offset.unwrap_or(0), filter.limit.unwrap_or(20))
+    projects_list(db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 // This catches the path when no query string was passed
 #[get("/projects/list", rank=2)]
 pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
-    projects_list(db, 0, 20)
+    projects_list(db, OFFSET, LIMIT)
 }
 
 /// Return detailed information about a list of package names
@@ -257,7 +263,7 @@ pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
 /// # Examples
 ///
 /// ```json
-/// {"projects":[{"name":"389-ds-base","summary":"389 Directory Server (base)"},{"name":"ElectricFence","summary":"A debugger which detects memory allocation violations"},{"name":"GConf2","summary":"A process-transparent configuration system"},{"name":"GeoIP","summary":"Library for country/city/organization to IP address or hostname mapping"},{"name":"ImageMagick","summary":"An X application for displaying and manipulating images"},{"name":"LibRaw","summary":"Library for reading RAW files obtained from digital photo cameras"},{"name":"ModemManager","summary":"Mobile broadband modem management service"},{"name":"MySQL-python","summary":"An interface to MySQL"},{"name":"NetworkManager","summary":"Network connection manager and user applications"},{"name":"NetworkManager-libreswan","summary":"NetworkManager VPN plug-in for libreswan"},{"name":"ORBit2","summary":"A high-performance CORBA Object Request Broker"},{"name":"OpenEXR","summary":"OpenEXR runtime libraries"},{"name":"OpenIPMI","summary":"IPMI (Intelligent Platform Management Interface) library and tools"},{"name":"PackageKit","summary":"Package management service"},{"name":"PyGreSQL","summary":"A Python client library for PostgreSQL"},{"name":"PyPAM","summary":"PAM bindings for Python"},{"name":"PyQt4","summary":"Python bindings for Qt4"},{"name":"PyYAML","summary":"YAML parser and emitter for Python"},{"name":"Red_Hat_Enterprise_Linux-Release_Notes-7-as-IN","summary":"Assamese translation of Release_Notes"},{"name":"Red_Hat_Enterprise_Linux-Release_Notes-7-bn-IN","summary":"Bengali translation of Release_Notes"}]}
+/// TODO
 /// ```
 ///
 fn projects_list(db: DB, offset: i64, limit: i64) -> JSON<ProjectsResponse> {
@@ -268,3 +274,82 @@ fn projects_list(db: DB, offset: i64, limit: i64) -> JSON<ProjectsResponse> {
             limit: limit
     })
 }
+
+
+// /projects/info/<projects>
+
+#[derive(Debug,Serialize)]
+pub struct ProjectsInfoResponse {
+    projects: Vec<ProjectInfo>,
+    offset:   i64,
+    limit:    i64
+}
+
+/// Return detailed information about a list of project names filtered by limit and/or offset
+#[get("/projects/info/<projects>?<filter>")]
+pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> JSON<ProjectsInfoResponse> {
+    projects_info(projects, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+}
+
+// This catches the path when no query string was passed
+#[get("/projects/info/<projects>", rank=2)]
+pub fn projects_info_default(projects: &str, db: DB) -> JSON<ProjectsInfoResponse> {
+    projects_info(projects, db, OFFSET, LIMIT)
+}
+
+
+/// Return detailed information about a list of project names
+///
+/// # Arguments
+///
+/// * `db` - Database pool connection
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `projects` - Comma separated list of projects.
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'summary': value} entries inside {"projects":[]}
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+/// * Failure to serialize the response
+///
+///
+/// The response includes details about the project, the available builds for the project,
+/// and the sources used for the builds.
+///
+/// # Examples
+///
+/// ```json
+/// TODO
+/// ```
+///
+fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> JSON<ProjectsInfoResponse> {
+    let projects: Vec<&str> = projects.split(",").collect();
+    let result = get_projects_details(db.conn(), &projects, offset, limit);
+    JSON(ProjectsInfoResponse {
+            projects: result.unwrap_or(vec![]),
+            offset: offset,
+            limit: limit
+    })
+}
+
+
+/*
+-    server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
+-    server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
+-
+-
+-    server.get("/api/v0/module/info/:modules", unimplemented_v0);
+-    server.get("/api/v0/module/list", group_list_v0);
+-    server.get("/api/v0/module/list/:groups", group_list_v0);
+-
+-    server.get("/api/v0/recipe/list", recipe_list_v0);
+-    server.get("/api/v0/recipe/:names", get_recipe_v0);
+-    server.post("/api/v0/recipe/:name", post_recipe_v0);
+
+*/
+
+

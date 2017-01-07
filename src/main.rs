@@ -92,6 +92,7 @@ fn main() {
     rocket::ignite()
         .mount("/api/v0/", routes![v0::test, v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,
                                    v0::compose_status, v0::compose_status_id, v0::compose_log,
-                                   v0::projects_list_default, v0::projects_list_filter, ])
+                                   v0::projects_list_default, v0::projects_list_filter,
+                                   v0::projects_info_default, v0::projects_info_filter])
         .launch();
 }
