@@ -337,14 +337,132 @@ fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> JSON<Projec
 }
 
 
+// /modules/info/<modules>
+
+#[derive(Debug,Serialize)]
+pub struct ModulesInfoResponse {
+//    modules:  Vec<ModuleInfo>,
+    offset:   i64,
+    limit:    i64
+}
+
+/// Return detailed information about a list of module names filtered by limit and/or offset
+#[get("/modules/info/<modules>?<filter>")]
+pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> JSON<ModulesInfoResponse> {
+    modules_info(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+}
+
+// This catches the path when no query string was passed
+#[get("/modules/info/<modules>", rank=2)]
+pub fn modules_info_default(modules: &str, db: DB) -> JSON<ModulesInfoResponse> {
+    modules_info(modules, db, OFFSET, LIMIT)
+}
+
+/// Return detailed information about a list of module names
+///
+/// # Arguments
+///
+/// * `db` - Database pool connection
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `modules` - Comma separated list of modules.
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'summary': value} entries inside {"modules":[]}
+///
+/// # Panics
+///
+/// * Failure to get a database connection
+/// * Failure to serialize the response
+///
+///
+/// # Examples
+///
+/// ```json
+/// TODO
+/// ```
+///
+fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> JSON<ModulesInfoResponse> {
+    let modules: Vec<&str> = modules.split(",").collect();
+//    let result = get_modules_details(db.conn(), &projects, offset, limit);
+    JSON(ModulesInfoResponse {
+//            modules: result.unwrap_or(vec![]),
+            offset: offset,
+            limit: limit
+    })
+}
+
+// /modules/list/<modules>
+
+#[derive(Debug,Serialize)]
+pub struct ModulesListResponse {
+    modules: Vec<Groups>,
+    offset:  i64,
+    limit:   i64
+}
+
+/// Return the name and group type for a list of module names filtered by limit and/or offset
+#[get("/modules/list/<modules>?<filter>")]
+pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> JSON<ModulesListResponse> {
+    modules_list(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+}
+
+// This catches the path when no query string was passed
+#[get("/modules/list/<modules>", rank=2)]
+pub fn modules_list_default(modules: &str, db: DB) -> JSON<ModulesListResponse> {
+    modules_list(modules, db, OFFSET, LIMIT)
+}
+
+// This catches the path when no modules are passed
+#[get("/modules/list/?<filter>")]
+pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> JSON<ModulesListResponse> {
+    modules_list("*", db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+}
+
+#[get("/modules/list/", rank=2)]
+pub fn modules_list_noargs_default(db: DB) -> JSON<ModulesListResponse> {
+    modules_list("*", db, OFFSET, LIMIT)
+}
+
+/// List the available modules and their type
+///
+/// # Arguments
+///
+/// * `db` - Database pool connection
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `modules` - Comma separated list of modules.
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'group_type': value} entries inside {"modules":[]}
+///
+/// # Examples
+///
+/// ```json
+/// TODO
+/// ```
+///
+fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> JSON<ModulesListResponse> {
+    if modules.len() == 0 {
+        modules = "*";
+    }
+    let modules: Vec<&str> = modules.split(",").collect();
+    let mut result = get_groups_vec(db.conn(), &modules, offset, limit)
+                     .unwrap_or(vec![]);
+    result.sort();
+    result.dedup();
+    JSON(ModulesListResponse {
+            modules: result,
+            offset: offset,
+            limit: limit
+    })
+}
+
 /*
 -    server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
 -    server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
--
--
--    server.get("/api/v0/module/info/:modules", unimplemented_v0);
--    server.get("/api/v0/module/list", group_list_v0);
--    server.get("/api/v0/module/list/:groups", group_list_v0);
 -
 -    server.get("/api/v0/recipe/list", recipe_list_v0);
 -    server.get("/api/v0/recipe/:names", get_recipe_v0);

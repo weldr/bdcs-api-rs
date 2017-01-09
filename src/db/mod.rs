@@ -173,7 +173,7 @@ pub struct FileKeyValues {
 }
 
 /// Groups of projects
-#[derive(Debug,Serialize)]
+#[derive(Debug,Serialize,Eq,PartialEq,Ord,PartialOrd)]
 pub struct Groups {
     #[serde(skip_serializing)]
     pub id: i64,
@@ -711,6 +711,30 @@ pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) 
                     });
     }
     Ok(contents)
+}
+
+/// Find all groups matching a vector of group names
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group` - The name of the group, glob search patterns allowed
+/// * `offset` - Number of results to skip before returning `limit`
+/// * `limit` - Maximum number of results to return
+///
+/// # Returns
+///
+/// * A Vector of [Groups](struct.Groups.html) for the matching group names
+///
+pub fn get_groups_vec(conn: &Connection, groups: &[&str], offset: i64, limit: i64) -> rusqlite::Result<Vec<Groups>> {
+    let mut results = Vec::new();
+    for group_name in groups {
+        match get_groups_name(conn, group_name, offset, limit) {
+            Ok(r) => results.extend(r),
+            Err(_) => {}
+        }
+    }
+    Ok(results)
 }
 
 
