@@ -510,8 +510,8 @@ pub struct RecipesInfoResponse {
 /// This is used to parse the full recipe's TOML, and to write a JSON representation of
 /// the Recipe.
 ///
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize)]
-struct Recipe {
+#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
+pub struct Recipe {
     name: String,
     description: Option<String>,
     modules: Option<Vec<Modules>>,
@@ -522,7 +522,7 @@ struct Recipe {
 ///
 /// This is used for the Recipe's `modules` section and can be serialized
 /// to/from JSON and TOML.
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize)]
+#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
 struct Modules {
     name: String,
     version: Option<String>
@@ -531,7 +531,7 @@ struct Modules {
 /// Recipe Packages
 ///
 /// This is used for the Recipe's `packages` section
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize)]
+#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
 struct Packages {
     name: String,
     version: Option<String>
@@ -555,7 +555,7 @@ pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
 ///
 /// * `offset` - Number of results to skip before returning results. Default is 0.
 /// * `limit` - Maximum number of results to return. It may return less. Default is 20.
-/// * `names` - Comma separated list of recipe names to return
+/// * `recipe_names` - Comma separated list of recipe names to return
 ///
 /// # Response
 ///
@@ -573,7 +573,7 @@ pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
 /// TODO
 /// ```
 ///
-fn recipes_info(mut recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfoResponse> {
+fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfoResponse> {
     // TODO This should be a per-user path
     let recipe_path = config::active()
                           .unwrap()
@@ -601,15 +601,60 @@ fn recipes_info(mut recipe_names: &str, offset: i64, limit: i64) -> JSON<Recipes
     })
 }
 
+/// Save a new Recipe
+///
+/// # Arguments
+///
+/// * `recipe` - Recipe to save, in JSON format
+///
+/// # Response
+///
+/// * JSON response with recipe contents, using the recipe name(s) as keys
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+///
+/// The body of the POST should be a valid Recipe in JSON format. If it cannot be parsed an
+/// error 400 will be returned.
+///
+/// # Examples
+///
+/// ```json
+/// {"name":"http-server","description":"An example http server","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
+/// ```
+///
+#[derive(Debug, Serialize)]
+pub struct RecipesNewResponse {
+    status: String
+}
+
+#[post("/recipes/new/", format="application/json", data="<recipe>")]
+pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
+    // TODO This should be a per-user path
+    let recipe_path = config::active()
+                          .unwrap()
+                          .get_str("recipe_path")
+                          .unwrap_or("/var/tmp/recipes/");
+
+    let recipe_toml = toml::encode::<Recipe>(&recipe);
+
+    let path = format!("{}{}.toml", recipe_path, recipe.name.clone().replace(" ", "-"));
+    let _ = File::create(&path)
+                .unwrap()
+                .write_all(toml::encode_str(&recipe_toml).as_bytes());
+
+    // TODO Return error information
+    JSON(RecipesNewResponse {
+            status: "OK".to_string()
+    })
+}
+
 
 /*
 -    server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
 -    server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
--
--    server.get("/api/v0/recipe/list", recipe_list_v0);
--    server.get("/api/v0/recipe/:names", get_recipe_v0);
--    server.post("/api/v0/recipe/:name", post_recipe_v0);
-
 */
 
 
