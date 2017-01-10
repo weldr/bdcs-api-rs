@@ -96,6 +96,8 @@ fn main() {
                                    v0::projects_info_default, v0::projects_info_filter,
                                    v0::modules_info_default, v0::modules_info_filter,
                                    v0::modules_list_default, v0::modules_list_filter,
-                                   v0::modules_list_noargs_default, v0::modules_list_noargs_filter])
+                                   v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
+                                   v0::recipes_list_default, v0::recipes_list_filter,
+                                   v0::recipes_info_default, v0::recipes_info_filter])
         .launch();
 }

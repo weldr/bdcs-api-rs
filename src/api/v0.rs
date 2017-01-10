@@ -26,6 +26,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use glob::glob;
+use rocket::config;
 use rocket::http::Status;
 use rocket::request::FromParam;
 use rocket_contrib::JSON;
@@ -46,48 +47,6 @@ static LIMIT: i64 = 20;
 pub struct Filter {
     offset: Option<i64>,
     limit: Option<i64>
-}
-
-/// Recipe names
-///
-/// This is used to easily parse the recipe's TOML, keys that don't exist are ignored,
-/// so this only parses the name of each recipe.
-///
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-struct RecipeList {
-    name: Option<String>,
-}
-
-/// Composer Recipe
-///
-/// This is used to parse the full recipe's TOML, and to write a JSON representation of
-/// the Recipe.
-///
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-struct Recipe {
-    name: Option<String>,
-    description: Option<String>,
-    modules: Option<Vec<Modules>>,
-    packages: Option<Vec<Packages>>
-}
-
-/// Recipe Modules
-///
-/// This is used for the Recipe's `modules` section and can be serialized
-/// to/from JSON and TOML.
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-struct Modules {
-    name: Option<String>,
-    version: Option<String>
-}
-
-/// Recipe Packages
-///
-/// This is used for the Recipe's `packages` section
-#[derive(Debug, RustcDecodable, RustcEncodable)]
-struct Packages {
-    name: Option<String>,
-    version: Option<String>
 }
 
 /// Test the connection to the API
@@ -459,6 +418,189 @@ fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> JSON<Modu
             limit: limit
     })
 }
+
+
+// recipe related functions
+
+// TODO These should go into a versioned recipe module
+
+// NOTE We have to use rustc-serialize here because the toml package is also used by rocket
+// and has already been imported using rustc-serialize. If rocket switches to using toml with
+// serde then we can change.
+
+// TODO some of the lower level operations here should be in a recipe library
+
+// /recipes/list
+
+#[derive(Debug, Serialize)]
+pub struct RecipesListResponse {
+    recipes: Vec<String>,
+    offset:  i64,
+    limit:   i64
+}
+
+/// Return a list of the available recipes
+#[get("/recipes/list?<filter>")]
+pub fn recipes_list_filter(filter: Filter) -> JSON<RecipesListResponse> {
+    recipes_list(filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+}
+
+#[get("/recipes/list", rank=2)]
+pub fn recipes_list_default() -> JSON<RecipesListResponse> {
+    recipes_list(OFFSET, LIMIT)
+}
+
+/// Return the list of available Recipes
+///
+/// # Arguments
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+///
+/// # Response
+///
+/// * JSON response with a list of recipe names - {'recipes': ["name1", ...]}
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Examples
+///
+/// ```json
+/// {"recipes":["another","example","foo"]}
+/// ```
+///
+fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
+    // TODO This should be a per-user path
+    let recipes_path = config::active()
+                           .unwrap()
+                           .get_str("recipe_path")
+                           .unwrap_or("/var/tmp/recipes/");
+    let recipes_glob = recipes_path.to_string() + "*.toml";
+
+    let mut result = Vec::new();
+    for path in glob(&recipes_glob).unwrap().filter_map(Result::ok) {
+        // Parse the TOML recipe into a Recipe struct
+        let mut input = String::new();
+        let _ = File::open(path)
+                    .unwrap()
+                    .read_to_string(&mut input);
+        let recipe: Recipe = toml::decode_str(&input).unwrap();
+        result.push(recipe.name);
+    }
+    JSON(RecipesListResponse {
+            recipes: result,
+            offset: offset,
+            limit: limit
+    })
+}
+
+// /recipes/info/<names>
+
+#[derive(Debug, Serialize)]
+pub struct RecipesInfoResponse {
+    recipes: HashMap<String, Recipe>,
+    offset:  i64,
+    limit:   i64
+}
+
+/// Composer Recipe
+///
+/// This is used to parse the full recipe's TOML, and to write a JSON representation of
+/// the Recipe.
+///
+#[derive(Debug, RustcDecodable, RustcEncodable, Serialize)]
+struct Recipe {
+    name: String,
+    description: Option<String>,
+    modules: Option<Vec<Modules>>,
+    packages: Option<Vec<Packages>>
+}
+
+/// Recipe Modules
+///
+/// This is used for the Recipe's `modules` section and can be serialized
+/// to/from JSON and TOML.
+#[derive(Debug, RustcDecodable, RustcEncodable, Serialize)]
+struct Modules {
+    name: String,
+    version: Option<String>
+}
+
+/// Recipe Packages
+///
+/// This is used for the Recipe's `packages` section
+#[derive(Debug, RustcDecodable, RustcEncodable, Serialize)]
+struct Packages {
+    name: String,
+    version: Option<String>
+}
+
+
+/// Return a list of the available recipes
+#[get("/recipes/info/<recipes>?<filter>")]
+pub fn recipes_info_filter(recipes: &str, filter: Filter) -> JSON<RecipesInfoResponse> {
+    recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+}
+
+#[get("/recipes/info/<recipes>", rank=2)]
+pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
+    recipes_info(recipes, OFFSET, LIMIT)
+}
+
+/// Return the contents of a recipe or list of recipes
+///
+/// # Arguments
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `names` - Comma separated list of recipe names to return
+///
+/// # Response
+///
+/// * JSON response with recipe contents, using the recipe name(s) as keys
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Errors
+///
+/// # Examples
+///
+/// ```json
+/// TODO
+/// ```
+///
+fn recipes_info(mut recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfoResponse> {
+    // TODO This should be a per-user path
+    let recipe_path = config::active()
+                          .unwrap()
+                          .get_str("recipe_path")
+                          .unwrap_or("/var/tmp/recipes/");
+
+    let mut result: HashMap<String, Recipe> = HashMap::new();
+    for name in recipe_names.split(",") {
+        // TODO Filesystem Path needs to be sanitized!
+        let path = format!("{}{}.toml", recipe_path, name.replace(" ", "-"));
+
+        // Parse the TOML recipe into a Recipe struct
+        let mut input = String::new();
+        let _ = File::open(path)
+                    .unwrap()
+                    .read_to_string(&mut input);
+        let recipe: Recipe = toml::decode_str(&input).unwrap();
+        result.insert(recipe.name.clone(), recipe);
+
+    }
+    JSON(RecipesInfoResponse {
+        recipes: result,
+        offset:  offset,
+        limit:   limit
+    })
+}
+
 
 /*
 -    server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
