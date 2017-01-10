@@ -26,14 +26,20 @@ extern crate clap;
 extern crate rocket;
 extern crate rusqlite;
 extern crate rustc_serialize;
+#[macro_use] extern crate slog;
+extern crate slog_json;
+#[macro_use] extern crate slog_scope;
+extern crate slog_stream;
+extern crate slog_term;
 extern crate toml;
 
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 use bdcs::api::v0;
 use clap::{Arg, App};
+use slog::DrainExt;
 
 /// Configuration file used by Rocket
 #[derive(RustcEncodable)]
@@ -46,7 +52,8 @@ struct RocketConfig {
     address: String,
     port: usize,
     db_path: String,
-    recipe_path: String
+    recipe_path: String,
+    log_path: String
 }
 
 
@@ -64,6 +71,11 @@ fn main() {
                                         .value_name("PORT")
                                         .help("Port to bind to (4000)")
                                         .takes_value(true))
+                            .arg(Arg::with_name("log")
+                                        .long("log")
+                                        .value_name("LOGFILE")
+                                        .help("Path to JSON  logfile")
+                                        .takes_value(true))
                             .arg(Arg::with_name("DB")
                                         .help("Path to the BDCS sqlite database")
                                         .required(true)
@@ -80,7 +92,8 @@ fn main() {
             address: matches.value_of("host").unwrap_or("127.0.0.1").to_string(),
             port: matches.value_of("port").unwrap_or("").parse().unwrap_or(4000),
             db_path: matches.value_of("DB").unwrap().to_string(),
-            recipe_path: matches.value_of("RECIPES").unwrap().to_string()
+            recipe_path: matches.value_of("RECIPES").unwrap().to_string(),
+            log_path: matches.value_of("log").unwrap_or("/var/log/bdcs-api.log").to_string()
         }
     };
 
@@ -88,6 +101,20 @@ fn main() {
     let rocket_toml = toml::encode(&rocket_config);
     File::create("Rocket.toml").unwrap()
         .write_all(toml::encode_str(&rocket_toml).as_bytes()).unwrap();
+
+    // Setup logging
+    let term_drain = slog_term::streamer().build();
+    let log_file = OpenOptions::new()
+                       .create(true)
+                       .append(true)
+                       .open(&rocket_config.global.log_path)
+                       .expect("Error opening logfile for writing.");
+    let file_drain = slog_stream::stream(log_file, slog_json::default());
+    let log = slog::Logger::root(slog::duplicate(term_drain, file_drain).fuse(), o!());
+    slog_scope::set_global_logger(log);
+
+    // TODO How to update this version from Cargo.toml at build time?
+    info!(format!("BDCS API v{} started", env!("CARGO_PKG_VERSION")));
 
     rocket::ignite()
         .mount("/api/v0/", routes![v0::test, v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,

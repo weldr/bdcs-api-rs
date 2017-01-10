@@ -38,6 +38,8 @@ extern crate rusqlite;
 extern crate rustc_serialize;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
+#[macro_use] extern crate slog;
+#[macro_use] extern crate slog_scope;
 extern crate toml;
 
 

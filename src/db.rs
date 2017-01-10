@@ -862,7 +862,6 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str], offset: i64, l
     for project_name in projects {
         match get_projects_name(conn, project_name, offset, limit) {
             Ok(r) => for proj in r {
-                println!("name = {}", proj.name);
                 // Get the build and source details first
                 let mut build_list = Vec::new();
                 match get_builds_project_id(conn, proj.id) {
