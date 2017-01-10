@@ -43,3 +43,4 @@ extern crate toml;
 
 pub mod api;
 pub mod db;
+pub mod recipe;

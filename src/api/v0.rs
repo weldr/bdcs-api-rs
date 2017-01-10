@@ -22,19 +22,14 @@
 //!  * Handle Authentication, similar to the [example here.](https://auth0.com/blog/build-an-api-in-rust-with-jwt-authentication-using-nickelrs/)
 //!
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::prelude::*;
 
-use glob::glob;
 use rocket::config;
 use rocket::http::Status;
-use rocket::request::FromParam;
 use rocket_contrib::JSON;
-use rustc_serialize::json::{self, ToJson, Json};
-use toml;
 
 // bdcs database functions
 use db::*;
+use recipe::{self, Recipe};
 use api::DB;
 
 // defaults for queries that return multiple responses
@@ -477,18 +472,8 @@ fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
                            .unwrap()
                            .get_str("recipe_path")
                            .unwrap_or("/var/tmp/recipes/");
-    let recipes_glob = recipes_path.to_string() + "*.toml";
 
-    let mut result = Vec::new();
-    for path in glob(&recipes_glob).unwrap().filter_map(Result::ok) {
-        // Parse the TOML recipe into a Recipe struct
-        let mut input = String::new();
-        let _ = File::open(path)
-                    .unwrap()
-                    .read_to_string(&mut input);
-        let recipe: Recipe = toml::decode_str(&input).unwrap();
-        result.push(recipe.name);
-    }
+    let result = recipe::list(&recipes_path).unwrap_or(vec![]);
     JSON(RecipesListResponse {
             recipes: result,
             offset: offset,
@@ -504,39 +489,6 @@ pub struct RecipesInfoResponse {
     offset:  i64,
     limit:   i64
 }
-
-/// Composer Recipe
-///
-/// This is used to parse the full recipe's TOML, and to write a JSON representation of
-/// the Recipe.
-///
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
-pub struct Recipe {
-    name: String,
-    description: Option<String>,
-    modules: Option<Vec<Modules>>,
-    packages: Option<Vec<Packages>>
-}
-
-/// Recipe Modules
-///
-/// This is used for the Recipe's `modules` section and can be serialized
-/// to/from JSON and TOML.
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
-struct Modules {
-    name: String,
-    version: Option<String>
-}
-
-/// Recipe Packages
-///
-/// This is used for the Recipe's `packages` section
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
-struct Packages {
-    name: String,
-    version: Option<String>
-}
-
 
 /// Return a list of the available recipes
 #[get("/recipes/info/<recipes>?<filter>")]
@@ -584,15 +536,9 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
     for name in recipe_names.split(",") {
         // TODO Filesystem Path needs to be sanitized!
         let path = format!("{}{}.toml", recipe_path, name.replace(" ", "-"));
-
-        // Parse the TOML recipe into a Recipe struct
-        let mut input = String::new();
-        let _ = File::open(path)
-                    .unwrap()
-                    .read_to_string(&mut input);
-        let recipe: Recipe = toml::decode_str(&input).unwrap();
-        result.insert(recipe.name.clone(), recipe);
-
+        let _ = recipe::read(&path).map(|recipe| {
+            result.insert(recipe.name.clone(), recipe);
+        });
     }
     JSON(RecipesInfoResponse {
         recipes: result,
@@ -627,7 +573,7 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
 ///
 #[derive(Debug, Serialize)]
 pub struct RecipesNewResponse {
-    status: String
+    status: bool
 }
 
 #[post("/recipes/new/", format="application/json", data="<recipe>")]
@@ -638,16 +584,11 @@ pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
                           .get_str("recipe_path")
                           .unwrap_or("/var/tmp/recipes/");
 
-    let recipe_toml = toml::encode::<Recipe>(&recipe);
-
-    let path = format!("{}{}.toml", recipe_path, recipe.name.clone().replace(" ", "-"));
-    let _ = File::create(&path)
-                .unwrap()
-                .write_all(toml::encode_str(&recipe_toml).as_bytes());
+    let status = recipe::write(&recipe_path, &recipe).unwrap_or(false);
 
     // TODO Return error information
     JSON(RecipesNewResponse {
-            status: "OK".to_string()
+            status: status
     })
 }
 
