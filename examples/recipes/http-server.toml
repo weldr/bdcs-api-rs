@@ -1,0 +1,14 @@
+description = "An example http server"
+name = "http-server"
+
+[[modules]]
+name = "fm-httpd"
+version = "23.*"
+
+[[modules]]
+name = "fm-php"
+version = "11.6.*"
+
+[[packages]]
+name = "tmux"
+version = "2.2"

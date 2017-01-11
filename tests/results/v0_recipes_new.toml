@@ -1,0 +1,14 @@
+description = "A test recipe"
+name = "recipe-test"
+
+[[modules]]
+name = "fm-httpd"
+version = "23.*"
+
+[[modules]]
+name = "fm-php"
+version = "11.6.*"
+
+[[packages]]
+name = "tmux"
+version = "2.2"
