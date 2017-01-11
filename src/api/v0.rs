@@ -60,6 +60,7 @@ pub struct Filter {
 ///
 #[get("/test")]
 pub fn test() -> &'static str {
+    info!("/test");
    "API v0 test"
 }
 
@@ -159,6 +160,7 @@ pub struct ComposeTypesResponse {
 /// ```
 #[get("/compose/types")]
 pub fn compose_types() -> JSON<ComposeTypesResponse> {
+    info!("/compose/types");
     let mut types = Vec::new();
     types.push(ComposeTypes::new("iso", true));
     types.push(ComposeTypes::new("disk-image", false));
@@ -221,6 +223,7 @@ pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
 /// ```
 ///
 fn projects_list(db: DB, offset: i64, limit: i64) -> JSON<ProjectsResponse> {
+    info!("/projects/list"; "offset" => offset, "limit" => limit);
     let result = get_projects_name(db.conn(), "*", offset, limit);
     JSON(ProjectsResponse {
             projects: result.unwrap_or(vec![]),
@@ -281,6 +284,7 @@ pub fn projects_info_default(projects: &str, db: DB) -> JSON<ProjectsInfoRespons
 /// ```
 ///
 fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> JSON<ProjectsInfoResponse> {
+    info!("/projects/info/"; "projects" => projects, "offset" => offset, "limit" => limit);
     let projects: Vec<&str> = projects.split(",").collect();
     let result = get_projects_details(db.conn(), &projects, offset, limit);
     JSON(ProjectsInfoResponse {
@@ -338,6 +342,7 @@ pub fn modules_info_default(modules: &str, db: DB) -> JSON<ModulesInfoResponse> 
 /// ```
 ///
 fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> JSON<ModulesInfoResponse> {
+    info!("/modules/info/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
 //    let result = get_modules_details(db.conn(), &projects, offset, limit);
     JSON(ModulesInfoResponse {
@@ -402,6 +407,7 @@ fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> JSON<Modu
     if modules.len() == 0 {
         modules = "*";
     }
+    info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
     let mut result = get_groups_vec(db.conn(), &modules, offset, limit)
                      .unwrap_or(vec![]);
@@ -467,6 +473,7 @@ pub fn recipes_list_default() -> JSON<RecipesListResponse> {
 /// ```
 ///
 fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
+    info!("/recipes/list"; "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipes_path = config::active()
                            .unwrap()
@@ -526,6 +533,7 @@ pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
 /// ```
 ///
 fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfoResponse> {
+    info!("/recipes/info/"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipe_path = config::active()
                           .unwrap()
@@ -578,6 +586,7 @@ pub struct RecipesNewResponse {
 
 #[post("/recipes/new/", format="application/json", data="<recipe>")]
 pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
+    info!("/recipes/new/"; "recipe.name" => recipe.name);
     // TODO This should be a per-user path
     let recipe_path = config::active()
                           .unwrap()
@@ -591,11 +600,3 @@ pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
             status: status
     })
 }
-
-
-/*
--    server.get("/api/v0/dnf/transaction/:packages", unimplemented_v0);
--    server.get("/api/v0/dnf/info/:packages", dnf_info_packages_v0);
-*/
-
-

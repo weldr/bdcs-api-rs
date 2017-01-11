@@ -42,12 +42,12 @@ use clap::{Arg, App};
 use slog::DrainExt;
 
 /// Configuration file used by Rocket
-#[derive(RustcEncodable)]
+#[derive(Debug, RustcEncodable)]
 struct RocketToml {
     global: RocketConfig
 }
 
-#[derive(RustcEncodable)]
+#[derive(Debug, RustcEncodable)]
 struct RocketConfig {
     address: String,
     port: usize,
@@ -115,6 +115,7 @@ fn main() {
 
     // TODO How to update this version from Cargo.toml at build time?
     info!(format!("BDCS API v{} started", env!("CARGO_PKG_VERSION")));
+    info!("Config:"; "rocket_config" => format!("{:?}", rocket_config));
 
     rocket::ignite()
         .mount("/api/v0/", routes![v0::test, v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,
