@@ -16,7 +16,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
-//! Note: This requires sqlite-devel, and openssl-devel on the host in order to build
+//! Note: This requires the nightly Rust compiler and the following
+//! packages on the host:
+//!
+//! * sqlite-devel
+//! * openssl-devel
+//!
+//! # Overview
+//!
+//! What's it do?
+//!
+//! # Arguments
+//!
+//! * `--host` - IP to bind to, defaults to `127.0.0.1`
+//! * `--port` - Port to use, defaults to `4000`
+//! * `--log` - Path to logfile, which uses the slog JSON format. Defaults to `/var/log/bdcs-api.log`
+//! * `DB` - path to the metadata sqlite database created by the Haskell bdcs utility.
+//! * `RECIPES` - Path to the directory holding the TOML formatted recipes.
+//!
 #![feature(plugin)]
 #![feature(proc_macro)]
 #![plugin(rocket_codegen)]

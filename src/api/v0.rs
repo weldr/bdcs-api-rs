@@ -16,7 +16,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
-//! # TODO
+//! # Overview
+//!
+//! This module provides version 0 of the BDCS API handlers. They are used for things such as
+//! listing projects, retrieving detailed information on projects and modules, manipulating recipe
+//! files, etc.
+//!
+//! ## TODO
 //!
 //!  * Implement generic gzip handling for all responses.
 //!  * Handle Authentication, similar to the [example here.](https://auth0.com/blog/build-an-api-in-rust-with-jwt-authentication-using-nickelrs/)
@@ -38,11 +44,16 @@ static LIMIT: i64 = 20;
 
 
 /// This is used for optional query parameters that filter the results
+///
+/// Pass it to the handler as `filter: Filter` and it will (or won't) contain the offset and limit
+/// arguments passed to the request.
+///
 #[derive(FromForm)]
 pub struct Filter {
     offset: Option<i64>,
     limit: Option<i64>
 }
+
 
 /// Test the connection to the API
 ///
@@ -73,7 +84,7 @@ pub fn test() -> &'static str {
 ///
 /// # Response
 ///
-/// * HTTP Error
+/// * 'Unimplemented' string
 ///
 /// This means that it will be implemented eventually, and is a valid path.
 ///
@@ -87,26 +98,109 @@ pub fn isos<'r>() -> &'static str {
 }
 
 
+/// Start a compose
+///
+/// # Returns
+///
+/// * Unimplemented
+///
+/// # Response
+///
+/// * 'Unimplemented' string
+///
+/// This means that it will be implemented eventually, and is a valid path.
+///
+/// # TODO
+///
+/// * Change it to a meaningful error code and JSON response
+/// * Return an id that can be used for cancel and status
+///
 #[post("/compose")]
 pub fn compose<'r>() -> &'static str {
     "Unimplemented"
 }
 
+/// Cancel a compose
+///
+/// # Returns
+///
+/// * Unimplemented
+///
+/// # Response
+///
+/// * 'Unimplemented' string
+///
+/// This means that it will be implemented eventually, and is a valid path.
+///
+/// # TODO
+///
+/// * Change it to a meaningful error code and JSON response
+/// * Pass it an id of a running compose
+///
 #[post("/compose/cancel")]
 pub fn compose_cancel<'r>() -> &'static str {
     "Unimplemented"
 }
 
+/// Get the status of all composes
+///
+/// # Returns
+///
+/// * Unimplemented
+///
+/// # Response
+///
+/// * 'Unimplemented' string
+///
+/// This means that it will be implemented eventually, and is a valid path.
+///
+/// # TODO
+///
+/// * Change it to a meaningful error code and JSON response
+///
 #[get("compose/status")]
 pub fn compose_status<'r>() -> &'static str {
     "Unimplemented"
 }
 
+/// Get the status of a specific compose
+///
+/// # Returns
+///
+/// * Unimplemented
+///
+/// # Response
+///
+/// * 'Unimplemented' string
+///
+/// This means that it will be implemented eventually, and is a valid path.
+///
+/// # TODO
+///
+/// * Change it to a meaningful error code and JSON response
+///
 #[get("compose/status/<id>")]
 pub fn compose_status_id<'r>(id: &str) -> &'static str {
     "Unimplemented"
 }
 
+/// Get the logs from a running compose
+///
+/// # Returns
+///
+/// * Unimplemented
+///
+/// # Response
+///
+/// * 'Unimplemented' string
+///
+/// This means that it will be implemented eventually, and is a valid path.
+///
+/// # TODO
+///
+/// * Change it to a meaningful error code and JSON response
+/// * Pass it the id of a running compose
+///
 #[get("compose/log/<kbytes>")]
 pub fn compose_log<'r>(kbytes: usize) -> &'static str {
     "Unimplemented"
@@ -115,6 +209,7 @@ pub fn compose_log<'r>(kbytes: usize) -> &'static str {
 
 // /compose/types
 
+/// Structure to hold the types of composes and whether or not they are actually available.
 #[derive(Serialize)]
 pub struct ComposeTypes {
     name: String,
@@ -138,6 +233,7 @@ impl ComposeTypes {
     }
 }
 
+/// Hold the JSON response for /compose/types
 #[derive(Serialize)]
 pub struct ComposeTypesResponse {
     types: Vec<ComposeTypes>
@@ -178,8 +274,10 @@ pub fn compose_types() -> JSON<ComposeTypesResponse> {
     JSON(ComposeTypesResponse { types: types })
 }
 
+
 // /projects/list
 
+/// Hold the JSON response for /projects/list
 #[derive(Serialize)]
 pub struct ProjectsResponse {
     projects: Vec<Projects>,
@@ -187,19 +285,20 @@ pub struct ProjectsResponse {
     limit: i64
 }
 
-/// Return a summary of available projects, filtered by limit and/or offset
+/// Handler for `/projects/list` with offset and limit arguments.
 #[get("/projects/list?<filter>")]
 pub fn projects_list_filter(filter: Filter, db: DB) -> JSON<ProjectsResponse> {
     projects_list(db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
-// This catches the path when no query string was passed
+
+/// Handler for `/projects/list` without any arguments.
 #[get("/projects/list", rank=2)]
 pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
     projects_list(db, OFFSET, LIMIT)
 }
 
-/// Return detailed information about a list of package names
+/// Return a summary of available projects, filtered by limit and/or offset
 ///
 /// # Arguments
 ///
@@ -235,6 +334,7 @@ fn projects_list(db: DB, offset: i64, limit: i64) -> JSON<ProjectsResponse> {
 
 // /projects/info/<projects>
 
+/// Hold the JSON response for /projects/info/
 #[derive(Debug,Serialize)]
 pub struct ProjectsInfoResponse {
     projects: Vec<ProjectInfo>,
@@ -242,20 +342,21 @@ pub struct ProjectsInfoResponse {
     limit:    i64
 }
 
-/// Return detailed information about a list of project names filtered by limit and/or offset
+/// Handler for `/projects/info/` with offset and limit arguments.
 #[get("/projects/info/<projects>?<filter>")]
 pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> JSON<ProjectsInfoResponse> {
     projects_info(projects, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 // This catches the path when no query string was passed
+/// Handler for `/projects/list` without arguments.
 #[get("/projects/info/<projects>", rank=2)]
 pub fn projects_info_default(projects: &str, db: DB) -> JSON<ProjectsInfoResponse> {
     projects_info(projects, db, OFFSET, LIMIT)
 }
 
 
-/// Return detailed information about a list of project names
+/// Return detailed information about a list of project names filtered by limit and/or offset
 ///
 /// # Arguments
 ///
@@ -297,6 +398,7 @@ fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> JSON<Projec
 
 // /modules/info/<modules>
 
+/// Hold the JSON response for /modules/info/
 #[derive(Debug,Serialize)]
 pub struct ModulesInfoResponse {
 //    modules:  Vec<ModuleInfo>,
@@ -304,19 +406,19 @@ pub struct ModulesInfoResponse {
     limit:    i64
 }
 
-/// Return detailed information about a list of module names filtered by limit and/or offset
+/// Handler for `/modules/info/` with offset and limit arguments.
 #[get("/modules/info/<modules>?<filter>")]
 pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> JSON<ModulesInfoResponse> {
     modules_info(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
-// This catches the path when no query string was passed
+/// Handler for `/modules/info/` without arguments.
 #[get("/modules/info/<modules>", rank=2)]
 pub fn modules_info_default(modules: &str, db: DB) -> JSON<ModulesInfoResponse> {
     modules_info(modules, db, OFFSET, LIMIT)
 }
 
-/// Return detailed information about a list of module names
+/// Return detailed information about a list of module names filtered by limit and/or offset
 ///
 /// # Arguments
 ///
@@ -354,6 +456,7 @@ fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> JSON<ModulesI
 
 // /modules/list/<modules>
 
+/// Hold the JSON response for /modules/list/
 #[derive(Debug,Serialize)]
 pub struct ModulesListResponse {
     modules: Vec<Groups>,
@@ -361,30 +464,31 @@ pub struct ModulesListResponse {
     limit:   i64
 }
 
-/// Return the name and group type for a list of module names filtered by limit and/or offset
+/// Handler for `/modules/list/` with module names, offset, and limit arguments.
 #[get("/modules/list/<modules>?<filter>")]
 pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> JSON<ModulesListResponse> {
     modules_list(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
-// This catches the path when no query string was passed
+/// Handler for `/modules/list/` without arguments.
 #[get("/modules/list/<modules>", rank=2)]
 pub fn modules_list_default(modules: &str, db: DB) -> JSON<ModulesListResponse> {
     modules_list(modules, db, OFFSET, LIMIT)
 }
 
-// This catches the path when no modules are passed
+/// Handler for `/modules/list/` without module names, but with offset and limit arguments.
 #[get("/modules/list/?<filter>")]
 pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> JSON<ModulesListResponse> {
     modules_list("*", db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
+/// Handler for `/modules/info/` without arguments.
 #[get("/modules/list/", rank=2)]
 pub fn modules_list_noargs_default(db: DB) -> JSON<ModulesListResponse> {
     modules_list("*", db, OFFSET, LIMIT)
 }
 
-/// List the available modules and their type
+/// Return the name and group type for a list of module names filtered by limit and/or offset
 ///
 /// # Arguments
 ///
@@ -433,6 +537,7 @@ fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> JSON<Modu
 
 // /recipes/list
 
+/// Hold the JSON response for /recipes/list
 #[derive(Debug, Serialize)]
 pub struct RecipesListResponse {
     recipes: Vec<String>,
@@ -440,12 +545,13 @@ pub struct RecipesListResponse {
     limit:   i64
 }
 
-/// Return a list of the available recipes
+/// Handler for `/recipes/list/` with offset and limit arguments.
 #[get("/recipes/list?<filter>")]
 pub fn recipes_list_filter(filter: Filter) -> JSON<RecipesListResponse> {
     recipes_list(filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
+/// Handler for `/recipes/list/` without arguments.
 #[get("/recipes/list", rank=2)]
 pub fn recipes_list_default() -> JSON<RecipesListResponse> {
     recipes_list(OFFSET, LIMIT)
@@ -488,8 +594,10 @@ fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
     })
 }
 
+
 // /recipes/info/<names>
 
+/// Hold the JSON response for /recipes/info/
 #[derive(Debug, Serialize)]
 pub struct RecipesInfoResponse {
     recipes: HashMap<String, Recipe>,
@@ -497,12 +605,13 @@ pub struct RecipesInfoResponse {
     limit:   i64
 }
 
-/// Return a list of the available recipes
+/// Handler for `/recipes/info/` with offset and limit arguments.
 #[get("/recipes/info/<recipes>?<filter>")]
 pub fn recipes_info_filter(recipes: &str, filter: Filter) -> JSON<RecipesInfoResponse> {
     recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
+/// Handler for `/recipes/info/` without arguments.
 #[get("/recipes/info/<recipes>", rank=2)]
 pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
     recipes_info(recipes, OFFSET, LIMIT)
@@ -555,6 +664,12 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
     })
 }
 
+/// Hold the JSON response for /recipes/info/
+#[derive(Debug, Serialize)]
+pub struct RecipesNewResponse {
+    status: bool
+}
+
 /// Save a new Recipe
 ///
 /// # Arguments
@@ -578,12 +693,6 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
 /// ```json
 /// {"name":"http-server","description":"An example http server","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
 /// ```
-///
-#[derive(Debug, Serialize)]
-pub struct RecipesNewResponse {
-    status: bool
-}
-
 #[post("/recipes/new/", format="application/json", data="<recipe>")]
 pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
     info!("/recipes/new/"; "recipe.name" => recipe.name);

@@ -15,7 +15,12 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+//!
+//! ## Overview
+//!
+//! Composer recipes are stored as TOML formatted files. This module provides functions for
+//! listing, reading, and writing them.
+//!
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -62,6 +67,7 @@ pub struct Recipe {
 ///
 /// This is used for the Recipe's `modules` section and can be serialized
 /// to/from JSON and TOML.
+///
 #[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
 pub struct Modules {
     pub name: String,
@@ -71,6 +77,7 @@ pub struct Modules {
 /// Recipe Packages
 ///
 /// This is used for the Recipe's `packages` section
+///
 #[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize)]
 pub struct Packages {
     pub name: String,
@@ -87,6 +94,11 @@ pub struct Packages {
 /// # Return
 ///
 /// * A Vector of Strings Result
+///
+/// This will read all of the files ending in .toml from the directory path
+/// and return a vector of just the recipe names.
+///
+/// TODO Make this a lazy iterator
 ///
 pub fn list(path: &str) -> Result<Vec<String>, RecipeError> {
     let recipes_glob = path.to_string() + "*.toml";
@@ -113,6 +125,7 @@ pub fn list(path: &str) -> Result<Vec<String>, RecipeError> {
 /// # Returns
 ///
 /// * A Recipe Result.
+///
 pub fn read(path: &str) -> Result<Recipe, RecipeError> {
         let mut input = String::new();
         let _ = try!(File::open(path))
@@ -129,7 +142,7 @@ pub fn read(path: &str) -> Result<Recipe, RecipeError> {
 ///
 /// # Returns
 ///
-/// * a Result
+/// * a bool Result
 ///
 pub fn write(path: &str, recipe: &Recipe) -> Result<bool, RecipeError> {
     let recipe_toml = toml::encode::<Recipe>(&recipe);

@@ -1,26 +1,24 @@
 //! BDCS Sqlite Database Functions
 //!
-// Copyright (C) 2016-2017
-// Red Hat, Inc.  All rights reserved.
+// Copyright (C) 2016-2017 Red Hat, Inc.  All rights reserved.
 //
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
+// This program is free software; you can redistribute it and/or modify it under the terms of the
+// GNU General Public License as published by the Free Software Foundation; either version 2 of the
+// License, or (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
+// the GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// You should have received a copy of the GNU General Public License along with this program.  If
+// not, see <http://www.gnu.org/licenses/>.
 //!
 //! ## BDCS database structs
 //!
-//! These structs are a 1:1 mapping of the sqlite tables used in the
-//! bdcs sqlite database. The Int type maps to i64, Blob to Vec<u8>,
-//! and everything else to String.
+//! These structs are a 1:1 mapping of the sqlite tables used in the bdcs sqlite database. The Int
+//! type maps to i64, Blob to Vec<u8>, and everything else to String.
+//!
+//! When serializing the structures the id fields are excluded from the results.
 //!
 //! ## TODO
 //!

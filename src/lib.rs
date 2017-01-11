@@ -18,9 +18,7 @@
 //
 //! ## Overview
 //!
-//! The bdcs crate contains 2 modules. The [db](db/index.html) module for operations related to the
-//! sqlite metadata store, and the [api](api/index.html) module for handling requests to the bdcs
-//! API Server.
+//! The bdcs crate is the library used by the bdcs-api-server.
 //!
 #![feature(plugin)]
 #![feature(proc_macro)]
