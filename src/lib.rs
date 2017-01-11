@@ -44,3 +44,27 @@ extern crate toml;
 pub mod api;
 pub mod db;
 pub mod recipe;
+
+/// Configuration file used by Rocket
+#[derive(Debug, RustcEncodable)]
+pub struct RocketToml {
+    pub global: RocketConfig
+}
+
+#[derive(Debug, RustcEncodable)]
+pub struct RocketConfig {
+    pub address: String,
+    pub port: usize,
+    pub db_path: String,
+    pub recipe_path: String,
+    pub log_path: String
+}
+
+/// Unit tests for bdcs
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(true, true);
+    }
+}

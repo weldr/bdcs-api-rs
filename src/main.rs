@@ -54,24 +54,10 @@ extern crate toml;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
+use bdcs::{RocketToml, RocketConfig};
 use bdcs::api::v0;
 use clap::{Arg, App};
 use slog::DrainExt;
-
-/// Configuration file used by Rocket
-#[derive(Debug, RustcEncodable)]
-struct RocketToml {
-    global: RocketConfig
-}
-
-#[derive(Debug, RustcEncodable)]
-struct RocketConfig {
-    address: String,
-    port: usize,
-    db_path: String,
-    recipe_path: String,
-    log_path: String
-}
 
 
 /// Process Command Line Arguments and Serve the http API

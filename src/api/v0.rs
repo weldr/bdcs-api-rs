@@ -586,7 +586,10 @@ fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
                            .get_str("recipe_path")
                            .unwrap_or("/var/tmp/recipes/");
 
-    let result = recipe::list(&recipes_path).unwrap_or(vec![]);
+    let mut result = recipe::list(&recipes_path).unwrap_or(vec![]);
+    result.sort();
+    result.dedup();
+    result.truncate(limit as usize);
     JSON(RecipesListResponse {
             recipes: result,
             offset: offset,
@@ -600,7 +603,7 @@ fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
 /// Hold the JSON response for /recipes/info/
 #[derive(Debug, Serialize)]
 pub struct RecipesInfoResponse {
-    recipes: HashMap<String, Recipe>,
+    recipes: Vec<Recipe>,
     offset:  i64,
     limit:   i64
 }
@@ -649,14 +652,17 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
                           .get_str("recipe_path")
                           .unwrap_or("/var/tmp/recipes/");
 
-    let mut result: HashMap<String, Recipe> = HashMap::new();
-    for name in recipe_names.split(",") {
+    let mut result = Vec::new();
+    for name in recipe_names.split(",").take(limit as usize) {
         // TODO Filesystem Path needs to be sanitized!
         let path = format!("{}{}.toml", recipe_path, name.replace(" ", "-"));
         let _ = recipe::read(&path).map(|recipe| {
-            result.insert(recipe.name.clone(), recipe);
+            result.push(recipe);
         });
     }
+    result.sort();
+    result.dedup();
+    result.truncate(limit as usize);
     JSON(RecipesInfoResponse {
         recipes: result,
         offset:  offset,
@@ -664,7 +670,7 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
     })
 }
 
-/// Hold the JSON response for /recipes/info/
+/// Hold the JSON response for /recipes/new/
 #[derive(Debug, Serialize)]
 pub struct RecipesNewResponse {
     status: bool
