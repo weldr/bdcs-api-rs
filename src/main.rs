@@ -35,7 +35,6 @@
 //! * `RECIPES` - Path to the directory holding the TOML formatted recipes.
 //!
 #![feature(plugin)]
-#![feature(proc_macro)]
 #![plugin(rocket_codegen)]
 
 extern crate bdcs;
@@ -55,7 +54,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 use bdcs::{RocketToml, RocketConfig};
-use bdcs::api::v0;
+use bdcs::api::{v0, mock};
 use clap::{Arg, App};
 use slog::DrainExt;
 
@@ -77,7 +76,12 @@ fn main() {
                             .arg(Arg::with_name("log")
                                         .long("log")
                                         .value_name("LOGFILE")
-                                        .help("Path to JSON  logfile")
+                                        .help("Path to JSON logfile")
+                                        .takes_value(true))
+                            .arg(Arg::with_name("mockfiles")
+                                        .long("mockfiles")
+                                        .value_name("MOCKFILES")
+                                        .help("Path to JSON files used for /api/mock/ paths")
                                         .takes_value(true))
                             .arg(Arg::with_name("DB")
                                         .help("Path to the BDCS sqlite database")
@@ -96,7 +100,9 @@ fn main() {
             port: matches.value_of("port").unwrap_or("").parse().unwrap_or(4000),
             db_path: matches.value_of("DB").unwrap().to_string(),
             recipe_path: matches.value_of("RECIPES").unwrap().to_string(),
-            log_path: matches.value_of("log").unwrap_or("/var/log/bdcs-api.log").to_string()
+            log_path: matches.value_of("log").unwrap_or("/var/log/bdcs-api.log").to_string(),
+            mockfiles_path: matches.value_of("mockfiles").unwrap_or("/var/tmp/bdcs-mockfiles/").to_string()
+
         }
     };
 
@@ -131,5 +137,8 @@ fn main() {
                                    v0::recipes_list_default, v0::recipes_list_filter,
                                    v0::recipes_info_default, v0::recipes_info_filter,
                                    v0::recipes_new])
+        .mount("/api/mock/", routes![mock::static_route, mock::static_route_filter,
+                                     mock::static_route_param, mock::static_route_param_filter,
+                                     mock::static_route_action, mock::static_route_action_filter])
         .launch();
 }

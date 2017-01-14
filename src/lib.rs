@@ -57,7 +57,8 @@ pub struct RocketConfig {
     pub port: usize,
     pub db_path: String,
     pub recipe_path: String,
-    pub log_path: String
+    pub log_path: String,
+    pub mockfiles_path: String
 }
 
 /// Unit tests for bdcs

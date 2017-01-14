@@ -96,6 +96,12 @@ use rusqlite::Connection;
 
 
 pub mod v0;
+pub mod mock;
+
+// defaults for queries that return multiple responses
+pub static OFFSET: i64 = 0;
+pub static LIMIT: i64 = 20;
+
 
 // Initialize the database pool and make it available to the handlers
 // From - https://github.com/SergioBenitez/Rocket/issues/53#issuecomment-269460216
@@ -126,3 +132,17 @@ impl<'a, 'r> FromRequest<'a, 'r> for DB {
         }
     }
 }
+
+/// This is used for optional query parameters that filter the results
+///
+/// Pass it to the handler as `filter: Filter` and it will (or won't) contain the offset and limit
+/// arguments passed to the request.
+///
+#[derive(Debug, Serialize, FromForm)]
+pub struct Filter {
+    pub offset: Option<i64>,
+    pub limit: Option<i64>
+}
+
+
+

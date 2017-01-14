@@ -36,23 +36,7 @@ use rocket_contrib::JSON;
 // bdcs database functions
 use db::*;
 use recipe::{self, Recipe};
-use api::DB;
-
-// defaults for queries that return multiple responses
-static OFFSET: i64 = 0;
-static LIMIT: i64 = 20;
-
-
-/// This is used for optional query parameters that filter the results
-///
-/// Pass it to the handler as `filter: Filter` and it will (or won't) contain the offset and limit
-/// arguments passed to the request.
-///
-#[derive(FromForm)]
-pub struct Filter {
-    offset: Option<i64>,
-    limit: Option<i64>
-}
+use api::{DB, Filter, OFFSET, LIMIT};
 
 
 /// Test the connection to the API
