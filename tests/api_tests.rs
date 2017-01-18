@@ -48,7 +48,9 @@ fn write_config() {
             port: 4000,
             db_path: "./metadata.db".to_string(),
             recipe_path: "/var/tmp/recipes/".to_string(),
-            log_path: "/var/log/bdcs-api.log".to_string()
+            log_path: "/var/log/bdcs-api.log".to_string(),
+            mockfiles_path: "./tests/results/v0/".to_string()
+
         }
     };
 
@@ -93,7 +95,7 @@ fn v0_isos() {
 
 #[test]
 fn v0_compose_types() {
-    let expected = include_str!("results/v0_compose_types.json");
+    let expected = include_str!("results/v0/compose-types.json");
 
     write_config();
 
@@ -109,8 +111,8 @@ fn v0_compose_types() {
 
 #[test]
 fn v0_projects_list() {
-    let expected_default = include_str!("results/v0_projects_list_default.json");
-    let expected_filter = include_str!("results/v0_projects_list_filter.json");
+    let expected_default = include_str!("results/v0/projects-list.json");
+    let expected_filter = include_str!("results/v0/projects-list-filter.json");
 
     write_config();
 
@@ -136,8 +138,8 @@ fn v0_projects_list() {
 #[ignore]
 #[test]
 fn v0_modules_info() {
-    let expected_default = include_str!("results/v0_modules_info_default.json");
-    let expected_filter = include_str!("results/v0_modules_info_filter.json");
+    let expected_default = include_str!("results/v0/modules-info.json");
+    let expected_filter = include_str!("results/v0/modules-info-filter.json");
 
     write_config();
 
@@ -161,8 +163,8 @@ fn v0_modules_info() {
 
 #[test]
 fn v0_modules_list_noargs() {
-    let expected_default = include_str!("results/v0_modules_list_noargs_default.json");
-    let expected_filter = include_str!("results/v0_modules_list_noargs_filter.json");
+    let expected_default = include_str!("results/v0/modules-list.json");
+    let expected_filter = include_str!("results/v0/modules-list-filter.json");
 
     write_config();
 
@@ -185,36 +187,11 @@ fn v0_modules_list_noargs() {
 }
 
 #[test]
-fn v0_modules_list() {
-    let expected_default = include_str!("results/v0_modules_list_default.json");
-    let expected_filter = include_str!("results/v0_modules_list_filter.json");
-
-    write_config();
-
-    // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::modules_list_default, v0::modules_list_filter]);
-
-    let mut req = MockRequest::new(Method::Get, "/modules/list/http,nfs");
-    let mut response = req.dispatch_with(&rocket);
-
-    assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some(expected_default.to_string()));
-
-    let mut req = MockRequest::new(Method::Get, "/modules/list/http,nfs?limit=2");
-    let mut response = req.dispatch_with(&rocket);
-
-    assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some(expected_filter.to_string()));
-}
-
-#[test]
 fn v0_recipes_list() {
     // TODO Copy ./examples/recipes/ to a temporary directory
 
-    let expected_default = include_str!("results/v0_recipes_list_default.json");
-    let expected_filter = include_str!("results/v0_recipes_list_filter.json");
+    let expected_default = include_str!("results/v0/recipes-list.json");
+    let expected_filter = include_str!("results/v0/recipes-list-filter.json");
 
     write_config();
 
@@ -240,8 +217,8 @@ fn v0_recipes_list() {
 fn v0_recipes_info() {
     // TODO Copy ./examples/recipes/ to a temporary directory
 
-    let expected_default = include_str!("results/v0_recipes_info_default.json");
-    let expected_filter = include_str!("results/v0_recipes_info_filter.json");
+    let expected_default = include_str!("results/v0/recipes-info.json");
+    let expected_filter = include_str!("results/v0/recipes-info-filter.json");
 
     write_config();
 
@@ -265,8 +242,8 @@ fn v0_recipes_info() {
 
 #[test]
 fn v0_recipes_new() {
-    let recipe_json = include_str!("results/v0_recipes_new.json");
-    let recipe_toml = include_str!("results/v0_recipes_new.toml");
+    let recipe_json = include_str!("results/v0/recipes-new.json");
+    let recipe_toml = include_str!("results/v0/recipes-new.toml");
 
     write_config();
 
