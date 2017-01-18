@@ -77,8 +77,8 @@ pub fn test() -> CORS<&'static str> {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("/isos")]
-pub fn isos<'r>() -> &'static str {
-    "Unimplemented"
+pub fn isos<'r>() -> CORS<&'static str> {
+    CORS("Unimplemented")
 }
 
 
@@ -100,8 +100,8 @@ pub fn isos<'r>() -> &'static str {
 /// * Return an id that can be used for cancel and status
 ///
 #[post("/compose")]
-pub fn compose<'r>() -> &'static str {
-    "Unimplemented"
+pub fn compose<'r>() -> CORS<&'static str> {
+    CORS("Unimplemented")
 }
 
 /// Cancel a compose
@@ -122,8 +122,8 @@ pub fn compose<'r>() -> &'static str {
 /// * Pass it an id of a running compose
 ///
 #[post("/compose/cancel")]
-pub fn compose_cancel<'r>() -> &'static str {
-    "Unimplemented"
+pub fn compose_cancel<'r>() -> CORS<&'static str> {
+    CORS("Unimplemented")
 }
 
 /// Get the status of all composes
@@ -143,8 +143,8 @@ pub fn compose_cancel<'r>() -> &'static str {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("compose/status")]
-pub fn compose_status<'r>() -> &'static str {
-    "Unimplemented"
+pub fn compose_status<'r>() -> CORS<&'static str> {
+    CORS("Unimplemented")
 }
 
 /// Get the status of a specific compose
@@ -164,8 +164,8 @@ pub fn compose_status<'r>() -> &'static str {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("compose/status/<id>")]
-pub fn compose_status_id<'r>(id: &str) -> &'static str {
-    "Unimplemented"
+pub fn compose_status_id<'r>(id: &str) -> CORS<&'static str> {
+    CORS("Unimplemented")
 }
 
 /// Get the logs from a running compose
@@ -186,8 +186,8 @@ pub fn compose_status_id<'r>(id: &str) -> &'static str {
 /// * Pass it the id of a running compose
 ///
 #[get("compose/log/<kbytes>")]
-pub fn compose_log<'r>(kbytes: usize) -> &'static str {
-    "Unimplemented"
+pub fn compose_log<'r>(kbytes: usize) -> CORS<&'static str> {
+    CORS("Unimplemented")
 }
 
 
@@ -239,7 +239,7 @@ pub struct ComposeTypesResponse {
 /// {"types":[{"enabled":true,"name":"iso"},{"enabled":false,"name":"disk-image"},{"enabled":false,"name":"fs-image"},{"enabled":false,"name":"ami"},{"enabled":false,"name":"tar"},{"enabled":false,"name":"live-pxe"},{"enabled":false,"name":"live-ostree"},{"enabled":false,"name":"oci"},{"enabled":false,"name":"vagrant"},{"enabled":false,"name":"qcow2"},{"enabled":false,"name":"vmdk"},{"enabled":false,"name":"vhdx"}]}
 /// ```
 #[get("/compose/types")]
-pub fn compose_types() -> JSON<ComposeTypesResponse> {
+pub fn compose_types() -> CORS<JSON<ComposeTypesResponse>> {
     info!("/compose/types");
     let mut types = Vec::new();
     types.push(ComposeTypes::new("iso", true));
@@ -255,7 +255,7 @@ pub fn compose_types() -> JSON<ComposeTypesResponse> {
     types.push(ComposeTypes::new("vmdk", false));
     types.push(ComposeTypes::new("vhdx", false));
 
-    JSON(ComposeTypesResponse { types: types })
+    CORS(JSON(ComposeTypesResponse { types: types }))
 }
 
 
@@ -271,14 +271,14 @@ pub struct ProjectsResponse {
 
 /// Handler for `/projects/list` with offset and limit arguments.
 #[get("/projects/list?<filter>")]
-pub fn projects_list_filter(filter: Filter, db: DB) -> JSON<ProjectsResponse> {
+pub fn projects_list_filter(filter: Filter, db: DB) -> CORS<JSON<ProjectsResponse>> {
     projects_list(db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 
 /// Handler for `/projects/list` without any arguments.
 #[get("/projects/list", rank=2)]
-pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
+pub fn projects_list_default(db: DB) -> CORS<JSON<ProjectsResponse>> {
     projects_list(db, OFFSET, LIMIT)
 }
 
@@ -305,14 +305,14 @@ pub fn projects_list_default(db: DB) -> JSON<ProjectsResponse> {
 /// TODO
 /// ```
 ///
-fn projects_list(db: DB, offset: i64, limit: i64) -> JSON<ProjectsResponse> {
+fn projects_list(db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
     info!("/projects/list"; "offset" => offset, "limit" => limit);
     let result = get_projects_name(db.conn(), "*", offset, limit);
-    JSON(ProjectsResponse {
+    CORS(JSON(ProjectsResponse {
             projects: result.unwrap_or(vec![]),
             offset: offset,
             limit: limit
-    })
+    }))
 }
 
 
@@ -328,14 +328,14 @@ pub struct ProjectsInfoResponse {
 
 /// Handler for `/projects/info/` with offset and limit arguments.
 #[get("/projects/info/<projects>?<filter>")]
-pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> JSON<ProjectsInfoResponse> {
+pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> CORS<JSON<ProjectsInfoResponse>> {
     projects_info(projects, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 // This catches the path when no query string was passed
 /// Handler for `/projects/list` without arguments.
 #[get("/projects/info/<projects>", rank=2)]
-pub fn projects_info_default(projects: &str, db: DB) -> JSON<ProjectsInfoResponse> {
+pub fn projects_info_default(projects: &str, db: DB) -> CORS<JSON<ProjectsInfoResponse>> {
     projects_info(projects, db, OFFSET, LIMIT)
 }
 
@@ -368,15 +368,15 @@ pub fn projects_info_default(projects: &str, db: DB) -> JSON<ProjectsInfoRespons
 /// TODO
 /// ```
 ///
-fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> JSON<ProjectsInfoResponse> {
+fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
     info!("/projects/info/"; "projects" => projects, "offset" => offset, "limit" => limit);
     let projects: Vec<&str> = projects.split(",").collect();
     let result = get_projects_details(db.conn(), &projects, offset, limit);
-    JSON(ProjectsInfoResponse {
+    CORS(JSON(ProjectsInfoResponse {
             projects: result.unwrap_or(vec![]),
             offset: offset,
             limit: limit
-    })
+    }))
 }
 
 
@@ -392,13 +392,13 @@ pub struct ModulesInfoResponse {
 
 /// Handler for `/modules/info/` with offset and limit arguments.
 #[get("/modules/info/<modules>?<filter>")]
-pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> JSON<ModulesInfoResponse> {
+pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<ModulesInfoResponse>> {
     modules_info(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/info/` without arguments.
 #[get("/modules/info/<modules>", rank=2)]
-pub fn modules_info_default(modules: &str, db: DB) -> JSON<ModulesInfoResponse> {
+pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoResponse>> {
     modules_info(modules, db, OFFSET, LIMIT)
 }
 
@@ -427,15 +427,15 @@ pub fn modules_info_default(modules: &str, db: DB) -> JSON<ModulesInfoResponse> 
 /// TODO
 /// ```
 ///
-fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> JSON<ModulesInfoResponse> {
+fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
 //    let result = get_modules_details(db.conn(), &projects, offset, limit);
-    JSON(ModulesInfoResponse {
+    CORS(JSON(ModulesInfoResponse {
 //            modules: result.unwrap_or(vec![]),
             offset: offset,
             limit: limit
-    })
+    }))
 }
 
 // /modules/list/<modules>
@@ -450,25 +450,25 @@ pub struct ModulesListResponse {
 
 /// Handler for `/modules/list/` with module names, offset, and limit arguments.
 #[get("/modules/list/<modules>?<filter>")]
-pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> JSON<ModulesListResponse> {
+pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/list/` without arguments.
 #[get("/modules/list/<modules>", rank=2)]
-pub fn modules_list_default(modules: &str, db: DB) -> JSON<ModulesListResponse> {
+pub fn modules_list_default(modules: &str, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list(modules, db, OFFSET, LIMIT)
 }
 
 /// Handler for `/modules/list/` without module names, but with offset and limit arguments.
 #[get("/modules/list/?<filter>")]
-pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> JSON<ModulesListResponse> {
+pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/info/` without arguments.
 #[get("/modules/list/", rank=2)]
-pub fn modules_list_noargs_default(db: DB) -> JSON<ModulesListResponse> {
+pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, OFFSET, LIMIT)
 }
 
@@ -491,7 +491,7 @@ pub fn modules_list_noargs_default(db: DB) -> JSON<ModulesListResponse> {
 /// TODO
 /// ```
 ///
-fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> JSON<ModulesListResponse> {
+fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
     if modules.len() == 0 {
         modules = "*";
     }
@@ -501,11 +501,11 @@ fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> JSON<Modu
                      .unwrap_or(vec![]);
     result.sort();
     result.dedup();
-    JSON(ModulesListResponse {
+    CORS(JSON(ModulesListResponse {
             modules: result,
             offset: offset,
             limit: limit
-    })
+    }))
 }
 
 
@@ -531,13 +531,13 @@ pub struct RecipesListResponse {
 
 /// Handler for `/recipes/list/` with offset and limit arguments.
 #[get("/recipes/list?<filter>")]
-pub fn recipes_list_filter(filter: Filter) -> JSON<RecipesListResponse> {
+pub fn recipes_list_filter(filter: Filter) -> CORS<JSON<RecipesListResponse>> {
     recipes_list(filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/recipes/list/` without arguments.
 #[get("/recipes/list", rank=2)]
-pub fn recipes_list_default() -> JSON<RecipesListResponse> {
+pub fn recipes_list_default() -> CORS<JSON<RecipesListResponse>> {
     recipes_list(OFFSET, LIMIT)
 }
 
@@ -562,7 +562,7 @@ pub fn recipes_list_default() -> JSON<RecipesListResponse> {
 /// {"recipes":["another","example","foo"]}
 /// ```
 ///
-fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
+fn recipes_list(offset: i64, limit: i64) -> CORS<JSON<RecipesListResponse>> {
     info!("/recipes/list"; "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipes_path = config::active()
@@ -574,11 +574,11 @@ fn recipes_list(offset: i64, limit: i64) -> JSON<RecipesListResponse> {
     result.sort();
     result.dedup();
     result.truncate(limit as usize);
-    JSON(RecipesListResponse {
+    CORS(JSON(RecipesListResponse {
             recipes: result,
             offset: offset,
             limit: limit
-    })
+    }))
 }
 
 
@@ -594,13 +594,13 @@ pub struct RecipesInfoResponse {
 
 /// Handler for `/recipes/info/` with offset and limit arguments.
 #[get("/recipes/info/<recipes>?<filter>")]
-pub fn recipes_info_filter(recipes: &str, filter: Filter) -> JSON<RecipesInfoResponse> {
+pub fn recipes_info_filter(recipes: &str, filter: Filter) -> CORS<JSON<RecipesInfoResponse>> {
     recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/recipes/info/` without arguments.
 #[get("/recipes/info/<recipes>", rank=2)]
-pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
+pub fn recipes_info_default(recipes: &str) -> CORS<JSON<RecipesInfoResponse>> {
     recipes_info(recipes, OFFSET, LIMIT)
 }
 
@@ -628,7 +628,7 @@ pub fn recipes_info_default(recipes: &str) -> JSON<RecipesInfoResponse> {
 /// TODO
 /// ```
 ///
-fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfoResponse> {
+fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> CORS<JSON<RecipesInfoResponse>> {
     info!("/recipes/info/"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipe_path = config::active()
@@ -647,11 +647,11 @@ fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> JSON<RecipesInfo
     result.sort();
     result.dedup();
     result.truncate(limit as usize);
-    JSON(RecipesInfoResponse {
+    CORS(JSON(RecipesInfoResponse {
         recipes: result,
         offset:  offset,
         limit:   limit
-    })
+    }))
 }
 
 /// Hold the JSON response for /recipes/new/
@@ -684,7 +684,7 @@ pub struct RecipesNewResponse {
 /// {"name":"http-server","description":"An example http server","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
 /// ```
 #[post("/recipes/new/", format="application/json", data="<recipe>")]
-pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
+pub fn recipes_new(recipe: JSON<Recipe>) -> CORS<JSON<RecipesNewResponse>> {
     info!("/recipes/new/"; "recipe.name" => recipe.name);
     // TODO This should be a per-user path
     let recipe_path = config::active()
@@ -695,7 +695,7 @@ pub fn recipes_new(recipe: JSON<Recipe>) -> JSON<RecipesNewResponse> {
     let status = recipe::write(&recipe_path, &recipe).unwrap_or(false);
 
     // TODO Return error information
-    JSON(RecipesNewResponse {
+    CORS(JSON(RecipesNewResponse {
             status: status
-    })
+    }))
 }

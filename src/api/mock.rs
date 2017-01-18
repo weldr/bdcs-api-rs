@@ -48,7 +48,7 @@ use rocket_contrib::JSON;
 use rocket::response::NamedFile;
 use serde_json::{self, Value};
 
-use api::{Filter, OFFSET, LIMIT};
+use api::{CORS, Filter, OFFSET, LIMIT};
 
 
 /// A nice little macro to create simple Maps. Really convenient for
@@ -88,37 +88,37 @@ macro_rules! json_map {
 
 /// Handler for a bare route with offset and/or limit
 #[get("/<route>?<filter>")]
-pub fn static_route_filter(route: &str, filter: Filter) -> Option<NamedFile> {
+pub fn static_route_filter(route: &str, filter: Filter) -> CORS<Option<NamedFile>> {
     static_json(route, None, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for a bare route with no filtering
 #[get("/<route>", rank=2)]
-pub fn static_route(route: &str) -> Option<NamedFile> {
+pub fn static_route(route: &str) -> CORS<Option<NamedFile>> {
     static_json(route, None, OFFSET, LIMIT)
 }
 
 /// Handler for a route with a single parameter and offset and/or limit
 #[get("/<route>/<param>?<filter>")]
-pub fn static_route_param_filter(route: &str, param: &str, filter: Filter) -> Option<NamedFile> {
+pub fn static_route_param_filter(route: &str, param: &str, filter: Filter) -> CORS<Option<NamedFile>> {
     static_json(route, Some(param), filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for a route with a single parameter and no filtering
 #[get("/<route>/<param>", rank=2)]
-pub fn static_route_param(route: &str, param: &str) -> Option<NamedFile> {
+pub fn static_route_param(route: &str, param: &str) -> CORS<Option<NamedFile>> {
     static_json(route, Some(param), OFFSET, LIMIT)
 }
 
 /// Handler for a route with an action, a parameter and offset/limit
 #[get("/<route>/<action>/<param>?<filter>")]
-pub fn static_route_action_filter(route: &str, action: &str, param: &str, filter: Filter) -> JSON<Value> {
+pub fn static_route_action_filter(route: &str, action: &str, param: &str, filter: Filter) -> CORS<JSON<Value>> {
     filter_json(route, action, param, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for a route with an action, a parameter and no filtering
 #[get("/<route>/<action>/<param>", rank=2)]
-pub fn static_route_action(route: &str, action: &str, param: &str) -> JSON<Value> {
+pub fn static_route_action(route: &str, action: &str, param: &str) -> CORS<JSON<Value>> {
     filter_json(route, action, param, OFFSET, LIMIT)
 }
 
@@ -141,7 +141,7 @@ pub fn static_route_action(route: &str, action: &str, param: &str) -> JSON<Value
 /// The filtering arguments, offset and limit, are ignored. Any offset or limit in the file
 /// are returned as-is.
 ///
-fn static_json(route: &str, param: Option<&str>, offset: i64, limit: i64) -> Option<NamedFile> {
+fn static_json(route: &str, param: Option<&str>, offset: i64, limit: i64) -> CORS<Option<NamedFile>> {
     info!("mock request"; "route" => route, "param" => param, "offset" => offset, "limit" => limit);
 
     let mock_path = config::active()
@@ -154,7 +154,7 @@ fn static_json(route: &str, param: Option<&str>, offset: i64, limit: i64) -> Opt
         None => "".to_string()
     };
     let file = format!("{}{}.json", route, param);
-    NamedFile::open(Path::new(mock_path).join(file)).ok()
+    CORS(NamedFile::open(Path::new(mock_path).join(file)).ok())
 }
 
 /// Filter the contents of a static json file based on the action and parameter passed to the API
@@ -194,7 +194,7 @@ fn static_json(route: &str, param: Option<&str>, offset: i64, limit: i64) -> Opt
 /// {"modules":[{"name": "http-server", ...}, {"name": "nfs-server", ...}]}
 /// ```
 ///
-fn filter_json(route: &str, action: &str, param: &str, offset: i64, limit: i64) -> JSON<Value> {
+fn filter_json(route: &str, action: &str, param: &str, offset: i64, limit: i64) -> CORS<JSON<Value>> {
     info!("mock request"; "route" => route, "action" => route, "param" => param, "offset" => offset, "limit" => limit);
     let mock_path = config::active()
                            .unwrap()
@@ -217,21 +217,21 @@ fn filter_json(route: &str, action: &str, param: &str, offset: i64, limit: i64) 
                 for item in json_array {
                     if item.find("name").unwrap_or(&Value::String("".to_string())) == &Value::String(param.to_string()) {
                         info!("Found it!"; "json" => format!("{:?}", item));
-                        return JSON(Value::Object(json_map! { route => item.clone(),
+                        return CORS(JSON(Value::Object(json_map! { route => item.clone(),
                                     "offset" => Value::I64(offset),
-                                    "limit" => Value::I64(limit) }));
+                                    "limit" => Value::I64(limit) })));
                     }
                 }
             }
         } else {
             // Not an array, just return it
-            return JSON(Value::Object(json_map! { route => api_route.clone(),
+            return CORS(JSON(Value::Object(json_map! { route => api_route.clone(),
                         "offset" => Value::I64(offset),
-                        "limit" => Value::I64(limit) }));
+                        "limit" => Value::I64(limit) })));
         }
     }
     // Nothing to return
-    JSON(Value::Object(json_map! { route => Value::Null,
+    CORS(JSON(Value::Object(json_map! { route => Value::Null,
               "offset" => Value::I64(offset),
-              "limit" => Value::I64(limit) }))
+              "limit" => Value::I64(limit) })))
 }
