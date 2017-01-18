@@ -36,7 +36,7 @@ use rocket_contrib::JSON;
 // bdcs database functions
 use db::*;
 use recipe::{self, Recipe};
-use api::{DB, Filter, OFFSET, LIMIT};
+use api::{CORS, DB, Filter, OFFSET, LIMIT};
 
 
 /// Test the connection to the API
@@ -54,9 +54,9 @@ use api::{DB, Filter, OFFSET, LIMIT};
 /// * Change this to JSON and report the version number?
 ///
 #[get("/test")]
-pub fn test() -> &'static str {
+pub fn test() -> CORS<&'static str> {
     info!("/test");
-   "API v0 test"
+   CORS("API v0 test")
 }
 
 

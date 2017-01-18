@@ -90,7 +90,9 @@ use r2d2;
 use r2d2_sqlite::SqliteConnectionManager;
 use rocket::config;
 use rocket::http::Status;
+use rocket::http::hyper::header;
 use rocket::request::{self, Request, FromRequest};
+use rocket::response::{self, Responder, Response};
 use rocket::outcome::Outcome::*;
 use rusqlite::Connection;
 
@@ -144,5 +146,32 @@ pub struct Filter {
     pub limit: Option<i64>
 }
 
+/// Response wrapper that adds CORS headers to the response
+///
+/// Based on the JSON response from Rocket's contrib library.
+#[derive(Debug)]
+pub struct CORS<R>(pub R);
 
+impl<'r, R: Responder<'r>> CORS<R> {
+    /// Return the wrapped type
+    pub fn unwrap(self) -> R {
+        self.0
+    }
+}
 
+impl<'r, R: Responder<'r>> Responder<'r> for CORS<R> {
+    fn respond(self) -> response::Result<'r> {
+        Response::build_from(try!(self.0.respond()))
+            .header(header::AccessControlAllowOrigin::Any)
+            .header(header::AccessControlAllowHeaders(vec![
+                // Hyper uses the `unicase::Unicase` type to ensure comparisons are done
+                // case-insensitively. Here, we use `into()` to convert to one from a `&str`
+                // so that we don't have to import the type ourselves.
+                "Origin".into(),
+                "X-Requested-With".into(),
+                "Content-Type".into(),
+                "Accept".into(),
+            ]))
+            .ok()
+    }
+}
