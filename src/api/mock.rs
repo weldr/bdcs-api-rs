@@ -217,7 +217,7 @@ fn filter_json(route: &str, action: &str, param: &str, offset: i64, limit: i64) 
                 for item in json_array {
                     if item.find("name").unwrap_or(&Value::String("".to_string())) == &Value::String(param.to_string()) {
                         info!("Found it!"; "json" => format!("{:?}", item));
-                        return CORS(JSON(Value::Object(json_map! { route => item.clone(),
+                        return CORS(JSON(Value::Object(json_map! { route => Value::Array(vec![item.clone()]),
                                     "offset" => Value::I64(offset),
                                     "limit" => Value::I64(limit) })));
                     }
