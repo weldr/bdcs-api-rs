@@ -41,7 +41,7 @@ recipes. The recipes directory is initialized at runtime from the
 Create `~/tmp/mdd/` and copy metadata.db into it, and create an empty
 `~/tmp/recipes/` directory. You can then run the API server like this:
 
-`docker run -it --rm -v ~/tmp/mddb/:/mddb/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z -p 3000:4000 wiggum/bdcs-api`
+`docker run -it --rm -v ~/tmp/mddb/:/mddb/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z -p 4000:4000 wiggum/bdcs-api`
 
 You can then access the UI at `http://localhost:3000`, try `http://localhost:3000/api/v0/test` to
 make sure you get a response like `API v0 test` from the server.
