@@ -1,20 +1,5 @@
 //! BDCS API Server
 //!
-// Copyright (C) 2016
-// Red Hat, Inc.  All rights reserved.
-//
-// This program is free software; you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //!
 //! Note: This requires the nightly Rust compiler and the following
 //! packages on the host:
@@ -34,6 +19,24 @@
 //! * `DB` - path to the metadata sqlite database created by the Haskell bdcs utility.
 //! * `RECIPES` - Path to the directory holding the TOML formatted recipes.
 //!
+
+// Copyright (C) 2016-2017 Red Hat, Inc.
+//
+// This file is part of bdcs-api-server.
+//
+// bdcs-api-server is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// bdcs-api-server is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
+
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
 

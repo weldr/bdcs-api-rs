@@ -2,6 +2,7 @@
 name = "bdcs"
 version = "0.2.0"
 authors = ["Brian C. Lane <bcl@redhat.com>"]
+license = "GPL-3.0"
 
 [[bin]]
 name = "bdcs-api-server"
