@@ -385,7 +385,7 @@ fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<P
 /// Hold the JSON response for /modules/info/
 #[derive(Debug,Serialize)]
 pub struct ModulesInfoResponse {
-//    modules:  Vec<ModuleInfo>,
+    modules:  Vec<GroupDeps>,
     offset:   i64,
     limit:    i64
 }
@@ -430,9 +430,9 @@ pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoRespo
 fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
-//    let result = get_modules_details(db.conn(), &projects, offset, limit);
+    let result = get_groups_deps_vec(db.conn(), &modules, offset, limit);
     CORS(JSON(ModulesInfoResponse {
-//            modules: result.unwrap_or(vec![]),
+            modules: result.unwrap_or(vec![]),
             offset: offset,
             limit: limit
     }))

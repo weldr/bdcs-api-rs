@@ -146,14 +146,14 @@ fn v0_modules_info() {
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![v0::modules_info_default, v0::modules_info_filter]);
 
-    let mut req = MockRequest::new(Method::Get, "/modules/info/http");
+    let mut req = MockRequest::new(Method::Get, "/modules/info/lorax");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/modules/info/http,nfs?limit=2");
+    let mut req = MockRequest::new(Method::Get, "/modules/info/lorax?limit=10");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);

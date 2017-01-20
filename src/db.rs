@@ -221,7 +221,6 @@ pub struct Requirements {
 /// `Requirements` to use for specific `Groups` entries
 #[derive(Debug)]
 pub struct GroupRequirements {
-    pub id: i64,
     pub group_id: i64,
     pub req_id: i64
 }
@@ -801,6 +800,84 @@ pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::
                     });
     }
     Ok(contents)
+}
+
+/// Get project dependencies for a group
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group` - The name of a group
+///
+/// # Returns
+///
+/// * A Vector of [Projects](struct.Projects.html) for the group dependencies
+///
+/// NOTE - This is currently a kludge. The format of the data is correct, but it
+/// uses a naieve algorithm for the dependencies: It looks up the requirement's req_expr
+/// as a project name. If it doesn't find it, it skips it. Meaning things like libc.so.6(GLIBC_2.0)
+/// will not be included.
+///
+/// The group name does *not* support GLOBS. If you need to search for a glob pattern, first do a
+/// [get_groups_name](fn.get_groups_name.html) and then pass them to [get_groups_deps_vec](fn.get_groups_deps_vec.html)
+///
+pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Projects>> {
+    let mut stmt = try!(conn.prepare("
+            select distinct projects.*
+            from projects, group_requirements, groups, requirements
+            on projects.name == requirements.req_expr and requirements.id == group_requirements.req_id
+                and group_requirements.group_id == groups.id
+            where groups.name == :group ORDER BY projects.name LIMIT :limit OFFSET :offset"));
+    let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Projects {
+                        id: row.get(0),
+                        name: row.get(1),
+                        summary: row.get(2),
+                        description: row.get(3),
+                        homepage: row.get(4),
+                        upstream_vcs: row.get(5)
+                    });
+    }
+    Ok(contents)
+}
+
+/// Group project dependencies
+///
+#[derive(Debug, Serialize)]
+pub struct GroupDeps {
+    name: String,
+    projects: Vec<Projects>
+}
+
+/// Find project dependencies for all groups matching a vector of group names
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group` - The name of the group, glob search patterns allowed
+/// * `offset` - Number of results to skip before returning `limit`
+/// * `limit` - Maximum number of results to return
+///
+/// # Returns
+///
+/// * A Vector of [GroupDeps](struct.GroupDeps.html) for the matching group names
+///
+pub fn get_groups_deps_vec(conn: &Connection, groups: &[&str], offset: i64, limit: i64) -> rusqlite::Result<Vec<GroupDeps>> {
+    let mut results = Vec::new();
+    for group_name in groups {
+        match get_group_deps(conn, group_name, offset, limit) {
+            Ok(r) => results.push(GroupDeps {
+                                      name: group_name.to_string(),
+                                      projects: r}),
+            Err(_) => {}
+        }
+    }
+    Ok(results)
 }
 
 
