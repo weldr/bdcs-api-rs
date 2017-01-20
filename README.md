@@ -38,12 +38,12 @@ To run the API it requires access to a copy of the metadata.db created by the
 recipes. The recipes directory is initialized at runtime from the
 ./examples/recipes/ directory.
 
-Create `~/tmp/mdd/` and copy metadata.db into it, and create an empty
+Create `~/tmp/mddb/` and copy metadata.db into it, and create an empty
 `~/tmp/recipes/` directory. You can then run the API server like this:
 
 `docker run -it --rm -v ~/tmp/mddb/:/mddb/:Z -v ~/tmp/recipes/:/bdcs-recipes/:Z -p 4000:4000 wiggum/bdcs-api`
 
-You can then access the UI at `http://localhost:3000`, try `http://localhost:3000/api/v0/test` to
+You can then access the UI at `http://localhost:4000`, try `http://localhost:4000/api/v0/test` to
 make sure you get a response like `API v0 test` from the server.
 
 If you want to use a local directory named mock-api for the `/api/mock/`
