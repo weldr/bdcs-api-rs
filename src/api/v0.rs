@@ -660,6 +660,15 @@ pub struct RecipesNewResponse {
     status: bool
 }
 
+/// The CORS system 'protects' the client via an OPTIONS request to make sure it is allowed
+// Rocket has a collision with Diesel so uses route instead
+//#[options("/recipes/new/")]
+#[route(OPTIONS, "/recipes/new/")]
+pub fn options_recipes_new() -> CORS<&'static str> {
+    CORS("")
+}
+
+
 /// Save a new Recipe
 ///
 /// # Arguments

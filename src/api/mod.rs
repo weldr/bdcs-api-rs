@@ -91,6 +91,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use rocket::config;
 use rocket::http::Status;
 use rocket::http::hyper::header;
+use rocket::http::hyper::Method;
 use rocket::request::{self, Request, FromRequest};
 use rocket::response::{self, Responder, Response};
 use rocket::outcome::Outcome::*;
@@ -163,6 +164,8 @@ impl<'r, R: Responder<'r>> Responder<'r> for CORS<R> {
     fn respond(self) -> response::Result<'r> {
         Response::build_from(try!(self.0.respond()))
             .header(header::AccessControlAllowOrigin::Any)
+            .header(header::AccessControlAllowMethods(vec![
+                Method::Get, Method::Post, Method::Options]))
             .header(header::AccessControlAllowHeaders(vec![
                 // Hyper uses the `unicase::Unicase` type to ensure comparisons are done
                 // case-insensitively. Here, we use `into()` to convert to one from a `&str`
