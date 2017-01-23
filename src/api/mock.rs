@@ -195,7 +195,7 @@ fn static_json(route: &str, param: Option<&str>, offset: i64, limit: i64) -> COR
 /// ```
 ///
 fn filter_json(route: &str, action: &str, param: &str, offset: i64, limit: i64) -> CORS<JSON<Value>> {
-    info!("mock request"; "route" => route, "action" => route, "param" => param, "offset" => offset, "limit" => limit);
+    info!("mock request"; "route" => route, "action" => action, "param" => param, "offset" => offset, "limit" => limit);
     let mock_path = config::active()
                            .unwrap()
                            .get_str("mockfiles_path")
