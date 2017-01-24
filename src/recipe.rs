@@ -23,7 +23,7 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
 
@@ -150,7 +150,12 @@ pub fn write(path: &str, recipe: &Recipe) -> Result<bool, RecipeError> {
     let recipe_toml = toml::encode::<Recipe>(&recipe);
 
     let path = format!("{}{}.toml", path, recipe.name.clone().replace(" ", "-"));
-    let _ = try!(File::create(&path))
-                .write_all(toml::encode_str(&recipe_toml).as_bytes());
+
+    let _ = try!(OpenOptions::new()
+                 .write(true)
+                 .truncate(true)
+                 .create(true)
+                 .open(&path))
+            .write_all(toml::encode_str(&recipe_toml).as_bytes());
     Ok(true)
 }
