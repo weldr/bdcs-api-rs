@@ -2,8 +2,8 @@
 //!
 //! # Overview
 //!
-//! The API server uses the [Nickel.rs](http://nickel.rs) web framework to handle requests.  The
-//! handler functions are called by Nickel as part of its Middleware plugin system.
+//! The API server uses the [Rocket.rs](http://rocket.rs) web framework to handle requests.  The
+//! handler functions are called by Rocket to handle requests for specific mountpoints.
 //!
 //! The [bdcs::db](bdcs/db/index.html) module is used for the database operations. None of the
 //! handlers should be executing SQL on the database directly.
@@ -100,6 +100,7 @@ use rusqlite::Connection;
 
 pub mod v0;
 pub mod mock;
+pub mod docs;
 
 // defaults for queries that return multiple responses
 pub static OFFSET: i64 = 0;

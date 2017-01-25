@@ -18,4 +18,4 @@ VOLUME /mddb /bdcs-recipes /mockfiles
 ## Do the things more likely to change below here. ##
 ## Run rustup update to pick up the latest nightly ##
 COPY . /bdcs-api-rs/
-RUN cd /bdcs-api-rs/ && rustup update && cargo build
+RUN cd /bdcs-api-rs/ && rustup update && cargo build && cargo doc
