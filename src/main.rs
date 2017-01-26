@@ -9,7 +9,10 @@
 //!
 //! # Overview
 //!
-//! What's it do?
+//! ## BDCS API
+//!
+//! See the documentation on the [bdcs](../bdcs/index.html) crate for details about the library and the
+//! API that this service provides.
 //!
 //! # Arguments
 //!

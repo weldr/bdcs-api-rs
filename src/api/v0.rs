@@ -272,6 +272,9 @@ pub struct ProjectsResponse {
 }
 
 /// Handler for `/projects/list` with offset and limit arguments.
+///
+/// This calls [projects_list](fn.projects_list.html) with the optional `offset` and/or `limit`
+/// values.
 #[get("/projects/list?<filter>")]
 pub fn projects_list_filter(filter: Filter, db: DB) -> CORS<JSON<ProjectsResponse>> {
     projects_list(db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
@@ -279,6 +282,8 @@ pub fn projects_list_filter(filter: Filter, db: DB) -> CORS<JSON<ProjectsRespons
 
 
 /// Handler for `/projects/list` without any arguments.
+///
+/// This calls [projects_list](fn.projects_list.html) with the default `offset` and `limit` values.
 #[get("/projects/list", rank=2)]
 pub fn projects_list_default(db: DB) -> CORS<JSON<ProjectsResponse>> {
     projects_list(db, OFFSET, LIMIT)
@@ -307,7 +312,7 @@ pub fn projects_list_default(db: DB) -> CORS<JSON<ProjectsResponse>> {
 /// TODO
 /// ```
 ///
-fn projects_list(db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
+pub fn projects_list(db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
     info!("/projects/list"; "offset" => offset, "limit" => limit);
     let result = get_projects_name(db.conn(), "*", offset, limit);
     CORS(JSON(ProjectsResponse {
@@ -329,13 +334,17 @@ pub struct ProjectsInfoResponse {
 }
 
 /// Handler for `/projects/info/` with offset and limit arguments.
+///
+/// This calls [projects_info](fn.projects_info.html) with the optional `offset` and/or `limit`
+/// values.
 #[get("/projects/info/<projects>?<filter>")]
 pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> CORS<JSON<ProjectsInfoResponse>> {
     projects_info(projects, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
-// This catches the path when no query string was passed
 /// Handler for `/projects/list` without arguments.
+///
+/// This calls [projects_info](fn.projects_info.html) with the default `offset` and `limit` values.
 #[get("/projects/info/<projects>", rank=2)]
 pub fn projects_info_default(projects: &str, db: DB) -> CORS<JSON<ProjectsInfoResponse>> {
     projects_info(projects, db, OFFSET, LIMIT)
@@ -370,7 +379,7 @@ pub fn projects_info_default(projects: &str, db: DB) -> CORS<JSON<ProjectsInfoRe
 /// TODO
 /// ```
 ///
-fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
+pub fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
     info!("/projects/info/"; "projects" => projects, "offset" => offset, "limit" => limit);
     let projects: Vec<&str> = projects.split(",").collect();
     let result = get_projects_details(db.conn(), &projects, offset, limit);
@@ -393,12 +402,17 @@ pub struct ModulesInfoResponse {
 }
 
 /// Handler for `/modules/info/` with offset and limit arguments.
+///
+/// This calls [modules_info](fn.modules_info.html) with the optional `offset` and/or `limit`
+/// values.
 #[get("/modules/info/<modules>?<filter>")]
 pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<ModulesInfoResponse>> {
     modules_info(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/info/` without arguments.
+///
+/// This calls [modules_info](fn.modules_info.html) with the default `offset` and `limit` values.
 #[get("/modules/info/<modules>", rank=2)]
 pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoResponse>> {
     modules_info(modules, db, OFFSET, LIMIT)
@@ -429,7 +443,7 @@ pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoRespo
 /// TODO
 /// ```
 ///
-fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
+pub fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
     let result = get_groups_deps_vec(db.conn(), &modules, offset, limit);
@@ -451,24 +465,35 @@ pub struct ModulesListResponse {
 }
 
 /// Handler for `/modules/list/` with module names, offset, and limit arguments.
+///
+/// This calls [modules_list](fn.modules_list.html) with the optional `offset` and/or `limit`
+/// values.
 #[get("/modules/list/<modules>?<filter>")]
 pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/list/` without arguments.
+///
+/// This calls [modules_list](fn.modules_list.html) with the default `offset` and `limit` values.
 #[get("/modules/list/<modules>", rank=2)]
 pub fn modules_list_default(modules: &str, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list(modules, db, OFFSET, LIMIT)
 }
 
 /// Handler for `/modules/list/` without module names, but with offset and limit arguments.
+///
+/// This calls [modules_list](fn.modules_list.html) with a wildcard name, `*`, and the optional
+/// `offset` and/or `limit` values.
 #[get("/modules/list/?<filter>")]
 pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/info/` without arguments.
+///
+/// This calls [modules_list](fn.modules_list.html) with a wildcard name, `*`, and the default
+/// `offset` and `limit` values.
 #[get("/modules/list/", rank=2)]
 pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, OFFSET, LIMIT)
@@ -493,7 +518,7 @@ pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
 /// TODO
 /// ```
 ///
-fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
+pub fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
     if modules.len() == 0 {
         modules = "*";
     }
@@ -519,8 +544,6 @@ fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON
 // and has already been imported using rustc-serialize. If rocket switches to using toml with
 // serde then we can change.
 
-// TODO some of the lower level operations here should be in a recipe library
-
 // /recipes/list
 
 /// Hold the JSON response for /recipes/list
@@ -532,12 +555,17 @@ pub struct RecipesListResponse {
 }
 
 /// Handler for `/recipes/list/` with offset and limit arguments.
+///
+/// This calls [recipes_list](fn.recipes_list.html) with the optional `offset` and/or `limit`
+/// values.
 #[get("/recipes/list?<filter>")]
 pub fn recipes_list_filter(filter: Filter) -> CORS<JSON<RecipesListResponse>> {
     recipes_list(filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/recipes/list/` without arguments.
+///
+/// This calls [recipes_list](fn.recipes_list.html) with the default `offset` and `limit` values.
 #[get("/recipes/list", rank=2)]
 pub fn recipes_list_default() -> CORS<JSON<RecipesListResponse>> {
     recipes_list(OFFSET, LIMIT)
@@ -561,10 +589,10 @@ pub fn recipes_list_default() -> CORS<JSON<RecipesListResponse>> {
 /// # Examples
 ///
 /// ```json
-/// {"recipes":["another","example","foo"]}
+/// {"recipes":["nfs-server","http-server","email-server"]}
 /// ```
 ///
-fn recipes_list(offset: i64, limit: i64) -> CORS<JSON<RecipesListResponse>> {
+pub fn recipes_list(offset: i64, limit: i64) -> CORS<JSON<RecipesListResponse>> {
     info!("/recipes/list"; "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipes_path = config::active()
@@ -595,12 +623,17 @@ pub struct RecipesInfoResponse {
 }
 
 /// Handler for `/recipes/info/` with offset and limit arguments.
+///
+/// This calls [recipes_info](fn.recipes_info.html) with the optional `offset` and/or `limit`
+/// values.
 #[get("/recipes/info/<recipes>?<filter>")]
 pub fn recipes_info_filter(recipes: &str, filter: Filter) -> CORS<JSON<RecipesInfoResponse>> {
     recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/recipes/info/` without arguments.
+///
+/// This calls [recipes_info](fn.recipes_info.html) with the default `offset` and `limit` values.
 #[get("/recipes/info/<recipes>", rank=2)]
 pub fn recipes_info_default(recipes: &str) -> CORS<JSON<RecipesInfoResponse>> {
     recipes_info(recipes, OFFSET, LIMIT)
@@ -630,7 +663,7 @@ pub fn recipes_info_default(recipes: &str) -> CORS<JSON<RecipesInfoResponse>> {
 /// TODO
 /// ```
 ///
-fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> CORS<JSON<RecipesInfoResponse>> {
+pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> CORS<JSON<RecipesInfoResponse>> {
     info!("/recipes/info/"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipe_path = config::active()
@@ -663,6 +696,8 @@ pub struct RecipesNewResponse {
 }
 
 /// The CORS system 'protects' the client via an OPTIONS request to make sure it is allowed
+///
+/// This returns an empty response, with the CORS headers set by [CORS](struct.CORS.html).
 // Rocket has a collision with Diesel so uses route instead
 //#[options("/recipes/new/")]
 #[route(OPTIONS, "/recipes/new/")]
@@ -671,6 +706,7 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 }
 
 
+/// Handler for `/recipes/new`
 /// Save a new Recipe
 ///
 /// # Arguments
