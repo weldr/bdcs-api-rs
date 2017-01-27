@@ -696,25 +696,22 @@ pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Resu
 ///
 pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Groups>> {
     let mut stmt = try!(conn.prepare("
-            select groups.*, key_val.val_value
-            from groups, group_key_values, key_val
-            on group_key_values.group_id == groups.id
-                and key_val.id == group_key_values.key_val_id
-            where key_val.key_value == 'name' and key_val.val_value GLOB :group ORDER BY groups.name LIMIT :limit OFFSET :offset"));
+            select groups.*
+            from groups
+            where groups.name GLOB :group ORDER BY groups.id LIMIT :limit OFFSET :offset"));
     let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
 
     let mut contents = Vec::new();
     while let Some(row) = rows.next() {
         let row = try!(row);
 
-        // Split the NEVRA to get the group name (NOTE replaced by better SQL query)
-//        let name_string: String = row.get(1);
-//        let name = name_string.rsplitn(3, '-').last().unwrap_or(&name_string);
+        let name_string: String = row.get(1);
+        let name = name_string.rsplitn(3, '-').last().unwrap_or(&name_string);
 
         // Sure would be nice not to use indexes here!
         contents.push(Groups {
                         id: row.get(0),
-                        name: row.get(3),
+                        name: name.to_string(),
                         group_type: row.get(2),
                     });
     }
