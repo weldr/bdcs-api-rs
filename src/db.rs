@@ -838,7 +838,7 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
             from projects, group_requirements, groups, requirements
             on projects.name == requirements.req_expr and requirements.id == group_requirements.req_id
                 and group_requirements.group_id == groups.id
-            where groups.name LIKE :group || '%' ORDER BY projects.name LIMIT :limit OFFSET :offset"));
+            where groups.name == :group ORDER BY projects.name LIMIT :limit OFFSET :offset"));
     let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
 
     let mut contents = Vec::new();
