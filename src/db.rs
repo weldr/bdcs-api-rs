@@ -704,14 +704,10 @@ pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) 
     let mut contents = Vec::new();
     while let Some(row) = rows.next() {
         let row = try!(row);
-
-        let name_string: String = row.get(1);
-        let name = name_string.rsplitn(3, '-').last().unwrap_or(&name_string);
-
         // Sure would be nice not to use indexes here!
         contents.push(Groups {
                         id: row.get(0),
-                        name: name.to_string(),
+                        name: row.get(1),
                         group_type: row.get(2),
                     });
     }
