@@ -1,1 +1,1 @@
-{"modules":[{"name":"ModemManager-glib","group_type":"rpm"},{"name":"MySQL-python","group_type":"rpm"}],"offset":15,"limit":2}
+{"modules":[{"name":"ModemManager","group_type":"rpm"},{"name":"ModemManager-glib","group_type":"rpm"}],"offset":15,"limit":2}
