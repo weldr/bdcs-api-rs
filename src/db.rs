@@ -37,7 +37,7 @@ use rusqlite::{self, Connection};
 
 
 /// High level details for upstream projects
-#[derive(Debug,Serialize)]
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Projects {
     #[serde(skip_serializing)]
     pub id: i64,
@@ -852,10 +852,10 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
 
 /// Group project dependencies
 ///
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct GroupDeps {
-    name: String,
-    projects: Vec<Projects>
+    pub name: String,
+    pub projects: Vec<Projects>
 }
 
 /// Find project dependencies for all groups matching a vector of group names

@@ -279,3 +279,20 @@ fn v0_recipes_new() {
     // Cleanup the test file
     let _ = remove_file(&recipe_path);
 }
+
+#[test]
+fn v0_recipes_depsolve() {
+    let expected = include_str!("results/v0/recipes-depsolve.json");
+
+    write_config();
+
+    // Mount the API and run a request against it
+    let rocket = rocket::ignite().mount("/", routes![v0::recipes_depsolve]);
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/example");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected.to_string()));
+}

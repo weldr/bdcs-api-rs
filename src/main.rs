@@ -142,7 +142,8 @@ fn main() {
                                    v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
                                    v0::recipes_list_default, v0::recipes_list_filter,
                                    v0::recipes_info_default, v0::recipes_info_filter,
-                                   v0::options_recipes_new, v0::recipes_new])
+                                   v0::options_recipes_new, v0::recipes_new,
+                                   v0::recipes_depsolve])
         .mount("/api/mock/", routes![mock::static_route, mock::static_route_filter,
                                      mock::static_route_param, mock::static_route_param_filter,
                                      mock::static_route_action, mock::static_route_action_filter])

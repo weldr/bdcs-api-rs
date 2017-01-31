@@ -746,3 +746,97 @@ pub fn recipes_new(recipe: JSON<Recipe>) -> CORS<JSON<RecipesNewResponse>> {
             status: status
     }))
 }
+
+
+/// A Recipe and its dependencies
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RecipeDeps {
+    recipe: Recipe,
+    modules: Vec<GroupDeps>,
+}
+
+
+/// Hold the JSON response for /recipes/depsolve/
+#[derive(Debug, Serialize)]
+pub struct RecipesDepsolveResponse {
+    recipes: Vec<RecipeDeps>
+}
+
+/// Return the contents of a recipe and its dependencies
+///
+/// # Arguments
+///
+/// * `recipe_names` - Comma separated list of recipe names to return
+///
+/// # Response
+///
+/// * JSON response like: {"recipes": [{"recipe": {RECIPE}, "modules": [DEPS]}]}
+///   Where RECIPE is the same JSON you would get from a /recipes/info/ query
+///   and DEPS are the same as what you would get from a /modules/info/ query.
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// # Errors
+///
+/// # Examples
+///
+/// ```json
+/// TODO
+/// ```
+///
+#[get("/recipes/depsolve/<recipe_names>")]
+pub fn recipes_depsolve(recipe_names: &str, db: DB) -> CORS<JSON<RecipesDepsolveResponse>> {
+    info!("/recipes/depsolve/"; "recipe_names" => recipe_names);
+    // TODO This should be a per-user path
+    let recipe_path = config::active()
+                          .unwrap()
+                          .get_str("recipe_path")
+                          .unwrap_or("/var/tmp/recipes/");
+
+    let mut result = Vec::new();
+    for name in recipe_names.split(",") {
+        // TODO Filesystem Path needs to be sanitized!
+        let path = format!("{}{}.toml", recipe_path, name.replace(" ", "-"));
+        let _ = recipe::read(&path).map(|recipe| {
+            let mut modules = Vec::new();
+            for module in recipe.clone().modules.unwrap_or(vec![]) {
+                match get_group_deps(db.conn(), &module.name, 0, i64::max_value()) {
+                    Ok(mut r) => {
+                        r.sort();
+                        r.dedup();
+                        modules.push(GroupDeps {
+                                         name: module.name.clone(),
+                                         projects: r})
+                    }
+                    Err(_) => {}
+                }
+            }
+
+            for package in recipe.clone().packages.unwrap_or(vec![]) {
+                match get_group_deps(db.conn(), &package.name, 0, i64::max_value()) {
+                    Ok(mut r) => {
+                        r.sort();
+                        r.dedup();
+                        modules.push(GroupDeps {
+                                         name: package.name.clone(),
+                                         projects: r})
+                    }
+                    Err(_) => {}
+                }
+            }
+            modules.sort();
+            modules.dedup();
+
+            result.push(RecipeDeps {
+                            recipe: recipe,
+                            modules: modules
+            });
+        });
+    }
+    result.sort();
+    CORS(JSON(RecipesDepsolveResponse {
+            recipes: result
+    }))
+}

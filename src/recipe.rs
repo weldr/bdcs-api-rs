@@ -23,6 +23,7 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::clone::Clone;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
@@ -57,7 +58,7 @@ impl From<glob::PatternError> for RecipeError {
 /// This is used to parse the full recipe's TOML, and to write a JSON representation of
 /// the Recipe.
 ///
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Recipe {
     pub name: String,
     pub description: Option<String>,
@@ -70,7 +71,7 @@ pub struct Recipe {
 /// This is used for the Recipe's `modules` section and can be serialized
 /// to/from JSON and TOML.
 ///
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Modules {
     pub name: String,
     pub version: Option<String>
@@ -80,7 +81,7 @@ pub struct Modules {
 ///
 /// This is used for the Recipe's `packages` section
 ///
-#[derive(Debug, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Packages {
     pub name: String,
     pub version: Option<String>
