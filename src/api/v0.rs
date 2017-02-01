@@ -803,26 +803,14 @@ pub fn recipes_depsolve(recipe_names: &str, db: DB) -> CORS<JSON<RecipesDepsolve
             let mut modules = Vec::new();
             for module in recipe.clone().modules.unwrap_or(vec![]) {
                 match get_group_deps(db.conn(), &module.name, 0, i64::max_value()) {
-                    Ok(mut r) => {
-                        r.sort();
-                        r.dedup();
-                        modules.push(GroupDeps {
-                                         name: module.name.clone(),
-                                         projects: r})
-                    }
+                    Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
             }
 
             for package in recipe.clone().packages.unwrap_or(vec![]) {
                 match get_group_deps(db.conn(), &package.name, 0, i64::max_value()) {
-                    Ok(mut r) => {
-                        r.sort();
-                        r.dedup();
-                        modules.push(GroupDeps {
-                                         name: package.name.clone(),
-                                         projects: r})
-                    }
+                    Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
             }

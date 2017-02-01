@@ -2,11 +2,11 @@ description = "An example http server"
 name = "http-server"
 
 [[modules]]
-name = "fm-httpd"
+name = "httpd"
 version = "23.*"
 
 [[modules]]
-name = "fm-php"
+name = "php"
 version = "11.6.*"
 
 [[packages]]

@@ -806,6 +806,18 @@ pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::
     Ok(contents)
 }
 
+/// Group project dependencies
+///
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct GroupDeps {
+    pub name: String,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    pub homepage: Option<String>,
+    pub upstream_vcs: Option<String>,
+    pub projects: Vec<Projects>
+}
+
 /// Get project dependencies for a group
 ///
 /// # Arguments
@@ -825,7 +837,34 @@ pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::
 /// The group name does *not* support GLOBS. If you need to search for a glob pattern, first do a
 /// [get_groups_name](fn.get_groups_name.html) and then pass them to [get_groups_deps_vec](fn.get_groups_deps_vec.html)
 ///
-pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Projects>> {
+pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<GroupDeps> {
+    let summary;
+    let description;
+    let homepage;
+    let upstream_vcs;
+
+    // If the group has a projects entry get extra details for it
+    let d = match get_projects_name(conn, group, 0, 1) {
+        Ok(mut r) => r.pop(),
+        Err(_) => None
+    };
+    match d {
+        Some(r) => {
+            summary = Some(r.summary);
+            description = Some(r.description);
+            homepage = r.homepage;
+            upstream_vcs = Some(r.upstream_vcs);
+        },
+        None => {
+            // No projects entry for for the group
+            summary = None;
+            description = None;
+            homepage = None;
+            upstream_vcs = None;
+        }
+    }
+
+    // Get the dependencies for the group
     let mut stmt = try!(conn.prepare("
             select distinct projects.*
             from projects, group_requirements, groups, requirements
@@ -834,11 +873,11 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
             where groups.name == :group ORDER BY projects.name LIMIT :limit OFFSET :offset"));
     let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
 
-    let mut contents = Vec::new();
+    let mut group_deps = Vec::new();
     while let Some(row) = rows.next() {
         let row = try!(row);
         // Sure would be nice not to use indexes here!
-        contents.push(Projects {
+        group_deps.push(Projects {
                         id: row.get(0),
                         name: row.get(1),
                         summary: row.get(2),
@@ -847,15 +886,16 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
                         upstream_vcs: row.get(5)
                     });
     }
-    Ok(contents)
-}
+    group_deps.sort();
+    group_deps.dedup();
 
-/// Group project dependencies
-///
-#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
-pub struct GroupDeps {
-    pub name: String,
-    pub projects: Vec<Projects>
+    Ok(GroupDeps {
+           name:     group.to_string(),
+           summary:      summary,
+           description:  description,
+           homepage:     homepage,
+           upstream_vcs: upstream_vcs,
+           projects:     group_deps})
 }
 
 /// Find project dependencies for all groups matching a vector of group names
@@ -875,9 +915,7 @@ pub fn get_groups_deps_vec(conn: &Connection, groups: &[&str], offset: i64, limi
     let mut results = Vec::new();
     for group_name in groups {
         match get_group_deps(conn, group_name, offset, limit) {
-            Ok(r) => results.push(GroupDeps {
-                                      name: group_name.to_string(),
-                                      projects: r}),
+            Ok(r) => results.push(r),
             Err(_) => {}
         }
     }
