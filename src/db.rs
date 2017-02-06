@@ -139,7 +139,8 @@ pub struct KeyVal {
     #[serde(skip_serializing)]
     pub id: i64,
     pub key_value: String,
-    pub val_value: String
+    pub val_value: String,
+    pub ext_value: Option<String>
 }
 
 /// `Projects` related key:value
@@ -610,6 +611,7 @@ pub fn get_project_kv_project_id(conn: &Connection, project_id: i64) -> rusqlite
                         id: row.get(0),
                         key_value: row.get(1),
                         val_value: row.get(2),
+                        ext_value: row.get(3),
                     });
     }
     Ok(contents)
@@ -642,6 +644,7 @@ pub fn get_source_kv_source_id(conn: &Connection, source_id: i64) -> rusqlite::R
                         id: row.get(0),
                         key_value: row.get(1),
                         val_value: row.get(2),
+                        ext_value: row.get(3),
                     });
     }
     Ok(contents)
@@ -675,6 +678,7 @@ pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Resu
                         id: row.get(0),
                         key_value: row.get(1),
                         val_value: row.get(2),
+                        ext_value: row.get(3),
                     });
     }
     Ok(contents)
@@ -766,6 +770,7 @@ pub fn get_groups_kv_group_id(conn: &Connection, group_id: i64) -> rusqlite::Res
                         id: row.get(0),
                         key_value: row.get(1),
                         val_value: row.get(2),
+                        ext_value: row.get(3),
                     });
     }
     Ok(contents)
