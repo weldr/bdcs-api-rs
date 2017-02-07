@@ -144,7 +144,7 @@ pub fn compose_cancel<'r>() -> CORS<&'static str> {
 ///
 /// * Change it to a meaningful error code and JSON response
 ///
-#[get("compose/status")]
+#[get("/compose/status")]
 pub fn compose_status<'r>() -> CORS<&'static str> {
     CORS("Unimplemented")
 }
@@ -165,7 +165,7 @@ pub fn compose_status<'r>() -> CORS<&'static str> {
 ///
 /// * Change it to a meaningful error code and JSON response
 ///
-#[get("compose/status/<id>")]
+#[get("/compose/status/<id>")]
 pub fn compose_status_id<'r>(id: &str) -> CORS<&'static str> {
     CORS("Unimplemented")
 }
@@ -187,7 +187,7 @@ pub fn compose_status_id<'r>(id: &str) -> CORS<&'static str> {
 /// * Change it to a meaningful error code and JSON response
 /// * Pass it the id of a running compose
 ///
-#[get("compose/log/<kbytes>")]
+#[get("/compose/log/<kbytes>")]
 pub fn compose_log<'r>(kbytes: usize) -> CORS<&'static str> {
     CORS("Unimplemented")
 }
@@ -485,7 +485,7 @@ pub fn modules_list_default(modules: &str, db: DB) -> CORS<JSON<ModulesListRespo
 ///
 /// This calls [modules_list](fn.modules_list.html) with a wildcard name, `*`, and the optional
 /// `offset` and/or `limit` values.
-#[get("/modules/list/?<filter>")]
+#[get("/modules/list?<filter>")]
 pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
@@ -494,7 +494,7 @@ pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> CORS<JSON<ModulesLi
 ///
 /// This calls [modules_list](fn.modules_list.html) with a wildcard name, `*`, and the default
 /// `offset` and `limit` values.
-#[get("/modules/list/", rank=2)]
+#[get("/modules/list", rank=2)]
 pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, OFFSET, LIMIT)
 }
@@ -700,7 +700,7 @@ pub struct RecipesNewResponse {
 /// This returns an empty response, with the CORS headers set by [CORS](struct.CORS.html).
 // Rocket has a collision with Diesel so uses route instead
 //#[options("/recipes/new/")]
-#[route(OPTIONS, "/recipes/new/")]
+#[route(OPTIONS, "/recipes/new")]
 pub fn options_recipes_new() -> CORS<&'static str> {
     CORS("")
 }
@@ -730,7 +730,7 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 /// ```json
 /// {"name":"http-server","description":"An example http server","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
 /// ```
-#[post("/recipes/new/", format="application/json", data="<recipe>")]
+#[post("/recipes/new", format="application/json", data="<recipe>")]
 pub fn recipes_new(recipe: JSON<Recipe>) -> CORS<JSON<RecipesNewResponse>> {
     info!("/recipes/new/"; "recipe.name" => recipe.name);
     // TODO This should be a per-user path
