@@ -86,12 +86,12 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
+use hyper::method::Method;
 use r2d2;
 use r2d2_sqlite::SqliteConnectionManager;
 use rocket::config;
 use rocket::http::Status;
 use rocket::http::hyper::header;
-use rocket::http::hyper::Method;
 use rocket::request::{self, Request, FromRequest};
 use rocket::response::{self, Responder, Response};
 use rocket::outcome::Outcome::*;
