@@ -23,7 +23,6 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 #![feature(plugin)]
-#![feature(proc_macro)]
 #![feature(custom_derive)]
 #![plugin(rocket_codegen)]
 
