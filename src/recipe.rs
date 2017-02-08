@@ -112,7 +112,7 @@ pub fn list(path: &str) -> Result<Vec<String>, RecipeError> {
         let mut input = String::new();
         let _ = try!(File::open(path))
                     .read_to_string(&mut input);
-        let recipe: Recipe = try!(toml::decode_str(&input).ok_or(RecipeError::ParseTOML));
+        let recipe: Recipe = try!(toml::from_str(&input).or(Err(RecipeError::ParseTOML)));
         result.push(recipe.name);
     }
     Ok(result)
@@ -133,7 +133,7 @@ pub fn read(path: &str) -> Result<Recipe, RecipeError> {
         let mut input = String::new();
         let _ = try!(File::open(path))
                     .read_to_string(&mut input);
-        toml::decode_str::<Recipe>(&input).ok_or(RecipeError::ParseTOML)
+        toml::from_str::<Recipe>(&input).or(Err(RecipeError::ParseTOML))
 }
 
 
@@ -148,7 +148,7 @@ pub fn read(path: &str) -> Result<Recipe, RecipeError> {
 /// * a bool Result
 ///
 pub fn write(path: &str, recipe: &Recipe) -> Result<bool, RecipeError> {
-    let recipe_toml = toml::encode::<Recipe>(&recipe);
+    let recipe_toml = try!(toml::to_string(&recipe).or(Err(RecipeError::ParseTOML)));
 
     let path = format!("{}{}.toml", path, recipe.name.clone().replace(" ", "-"));
 
@@ -157,6 +157,6 @@ pub fn write(path: &str, recipe: &Recipe) -> Result<bool, RecipeError> {
                  .truncate(true)
                  .create(true)
                  .open(&path))
-            .write_all(toml::encode_str(&recipe_toml).as_bytes());
+            .write_all(recipe_toml.as_bytes());
     Ok(true)
 }
