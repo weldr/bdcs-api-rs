@@ -61,6 +61,7 @@ use std::io::Write;
 
 use bdcs::{RocketToml, RocketConfig};
 use bdcs::api::{v0, mock, docs};
+use bdcs::db::DBPool;
 use clap::{Arg, App};
 use slog::DrainExt;
 
@@ -128,7 +129,6 @@ fn main() {
     let log = slog::Logger::root(slog::duplicate(term_drain, file_drain).fuse(), o!());
     slog_scope::set_global_logger(log);
 
-    // TODO How to update this version from Cargo.toml at build time?
     info!(format!("BDCS API v{} started", env!("CARGO_PKG_VERSION")));
     info!("Config:"; "rocket_config" => format!("{:?}", rocket_config));
 
@@ -148,5 +148,6 @@ fn main() {
                                      mock::static_route_param, mock::static_route_param_filter,
                                      mock::static_route_action, mock::static_route_action_filter])
         .mount("/api/docs/", routes![docs::index, docs::files])
+        .manage(DBPool::new(&rocket_config.global.db_path))
         .launch();
 }

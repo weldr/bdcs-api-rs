@@ -29,16 +29,13 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
-use rocket::config;
-use rocket::http::Status;
+use rocket::{config, State};
 use rocket_contrib::JSON;
 
 // bdcs database functions
 use db::*;
 use recipe::{self, Recipe};
-use api::{CORS, DB, Filter, OFFSET, LIMIT};
+use api::{CORS, Filter, OFFSET, LIMIT};
 
 
 /// Test the connection to the API
@@ -276,7 +273,7 @@ pub struct ProjectsResponse {
 /// This calls [projects_list](fn.projects_list.html) with the optional `offset` and/or `limit`
 /// values.
 #[get("/projects/list?<filter>")]
-pub fn projects_list_filter(filter: Filter, db: DB) -> CORS<JSON<ProjectsResponse>> {
+pub fn projects_list_filter(filter: Filter, db: State<DBPool>) -> CORS<JSON<ProjectsResponse>> {
     projects_list(db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
@@ -285,7 +282,7 @@ pub fn projects_list_filter(filter: Filter, db: DB) -> CORS<JSON<ProjectsRespons
 ///
 /// This calls [projects_list](fn.projects_list.html) with the default `offset` and `limit` values.
 #[get("/projects/list", rank=2)]
-pub fn projects_list_default(db: DB) -> CORS<JSON<ProjectsResponse>> {
+pub fn projects_list_default(db: State<DBPool>) -> CORS<JSON<ProjectsResponse>> {
     projects_list(db, OFFSET, LIMIT)
 }
 
@@ -293,7 +290,7 @@ pub fn projects_list_default(db: DB) -> CORS<JSON<ProjectsResponse>> {
 ///
 /// # Arguments
 ///
-/// * `db` - Database pool connection
+/// * `db` - Database pool
 /// * `offset` - Number of results to skip before returning results. Default is 0.
 /// * `limit` - Maximum number of results to return. It may return less. Default is 20.
 ///
@@ -312,9 +309,9 @@ pub fn projects_list_default(db: DB) -> CORS<JSON<ProjectsResponse>> {
 /// TODO
 /// ```
 ///
-pub fn projects_list(db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
+pub fn projects_list(db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
     info!("/projects/list"; "offset" => offset, "limit" => limit);
-    let result = get_projects_name(db.conn(), "*", offset, limit);
+    let result = get_projects_name(&db.conn(), "*", offset, limit);
     CORS(JSON(ProjectsResponse {
             projects: result.unwrap_or(vec![]),
             offset: offset,
@@ -338,7 +335,7 @@ pub struct ProjectsInfoResponse {
 /// This calls [projects_info](fn.projects_info.html) with the optional `offset` and/or `limit`
 /// values.
 #[get("/projects/info/<projects>?<filter>")]
-pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> CORS<JSON<ProjectsInfoResponse>> {
+pub fn projects_info_filter(projects: &str, filter: Filter, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
     projects_info(projects, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
@@ -346,7 +343,7 @@ pub fn projects_info_filter(projects: &str, filter: Filter, db: DB) -> CORS<JSON
 ///
 /// This calls [projects_info](fn.projects_info.html) with the default `offset` and `limit` values.
 #[get("/projects/info/<projects>", rank=2)]
-pub fn projects_info_default(projects: &str, db: DB) -> CORS<JSON<ProjectsInfoResponse>> {
+pub fn projects_info_default(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
     projects_info(projects, db, OFFSET, LIMIT)
 }
 
@@ -355,7 +352,7 @@ pub fn projects_info_default(projects: &str, db: DB) -> CORS<JSON<ProjectsInfoRe
 ///
 /// # Arguments
 ///
-/// * `db` - Database pool connection
+/// * `db` - Database pool
 /// * `offset` - Number of results to skip before returning results. Default is 0.
 /// * `limit` - Maximum number of results to return. It may return less. Default is 20.
 /// * `projects` - Comma separated list of projects.
@@ -379,10 +376,10 @@ pub fn projects_info_default(projects: &str, db: DB) -> CORS<JSON<ProjectsInfoRe
 /// TODO
 /// ```
 ///
-pub fn projects_info(projects: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
+pub fn projects_info(projects: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
     info!("/projects/info/"; "projects" => projects, "offset" => offset, "limit" => limit);
     let projects: Vec<&str> = projects.split(",").collect();
-    let result = get_projects_details(db.conn(), &projects, offset, limit);
+    let result = get_projects_details(&db.conn(), &projects, offset, limit);
     CORS(JSON(ProjectsInfoResponse {
             projects: result.unwrap_or(vec![]),
             offset: offset,
@@ -406,7 +403,7 @@ pub struct ModulesInfoResponse {
 /// This calls [modules_info](fn.modules_info.html) with the optional `offset` and/or `limit`
 /// values.
 #[get("/modules/info/<modules>?<filter>")]
-pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<ModulesInfoResponse>> {
+pub fn modules_info_filter(modules: &str, filter: Filter, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
     modules_info(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
@@ -414,7 +411,7 @@ pub fn modules_info_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<M
 ///
 /// This calls [modules_info](fn.modules_info.html) with the default `offset` and `limit` values.
 #[get("/modules/info/<modules>", rank=2)]
-pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoResponse>> {
+pub fn modules_info_default(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
     modules_info(modules, db, OFFSET, LIMIT)
 }
 
@@ -422,7 +419,7 @@ pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoRespo
 ///
 /// # Arguments
 ///
-/// * `db` - Database pool connection
+/// * `db` - Database pool
 /// * `offset` - Number of results to skip before returning results. Default is 0.
 /// * `limit` - Maximum number of results to return. It may return less. Default is 20.
 /// * `modules` - Comma separated list of modules.
@@ -443,10 +440,10 @@ pub fn modules_info_default(modules: &str, db: DB) -> CORS<JSON<ModulesInfoRespo
 /// TODO
 /// ```
 ///
-pub fn modules_info(modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
+pub fn modules_info(modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
-    let result = get_groups_deps_vec(db.conn(), &modules, offset, limit);
+    let result = get_groups_deps_vec(&db.conn(), &modules, offset, limit);
     CORS(JSON(ModulesInfoResponse {
             modules: result.unwrap_or(vec![]),
             offset: offset,
@@ -469,7 +466,7 @@ pub struct ModulesListResponse {
 /// This calls [modules_list](fn.modules_list.html) with the optional `offset` and/or `limit`
 /// values.
 #[get("/modules/list/<modules>?<filter>")]
-pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
+pub fn modules_list_filter(modules: &str, filter: Filter, db: State<DBPool>) -> CORS<JSON<ModulesListResponse>> {
     modules_list(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
@@ -477,7 +474,7 @@ pub fn modules_list_filter(modules: &str, filter: Filter, db: DB) -> CORS<JSON<M
 ///
 /// This calls [modules_list](fn.modules_list.html) with the default `offset` and `limit` values.
 #[get("/modules/list/<modules>", rank=2)]
-pub fn modules_list_default(modules: &str, db: DB) -> CORS<JSON<ModulesListResponse>> {
+pub fn modules_list_default(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesListResponse>> {
     modules_list(modules, db, OFFSET, LIMIT)
 }
 
@@ -486,7 +483,7 @@ pub fn modules_list_default(modules: &str, db: DB) -> CORS<JSON<ModulesListRespo
 /// This calls [modules_list](fn.modules_list.html) with a wildcard name, `*`, and the optional
 /// `offset` and/or `limit` values.
 #[get("/modules/list?<filter>")]
-pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> CORS<JSON<ModulesListResponse>> {
+pub fn modules_list_noargs_filter(filter: Filter, db: State<DBPool>) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
@@ -495,7 +492,7 @@ pub fn modules_list_noargs_filter(filter: Filter, db: DB) -> CORS<JSON<ModulesLi
 /// This calls [modules_list](fn.modules_list.html) with a wildcard name, `*`, and the default
 /// `offset` and `limit` values.
 #[get("/modules/list", rank=2)]
-pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
+pub fn modules_list_noargs_default(db: State<DBPool>) -> CORS<JSON<ModulesListResponse>> {
     modules_list("*", db, OFFSET, LIMIT)
 }
 
@@ -503,7 +500,7 @@ pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
 ///
 /// # Arguments
 ///
-/// * `db` - Database pool connection
+/// * `db` - Database pool
 /// * `offset` - Number of results to skip before returning results. Default is 0.
 /// * `limit` - Maximum number of results to return. It may return less. Default is 20.
 /// * `modules` - Comma separated list of modules.
@@ -518,13 +515,13 @@ pub fn modules_list_noargs_default(db: DB) -> CORS<JSON<ModulesListResponse>> {
 /// TODO
 /// ```
 ///
-pub fn modules_list(mut modules: &str, db: DB, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
+pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
     if modules.len() == 0 {
         modules = "*";
     }
     info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
-    let mut result = get_groups_vec(db.conn(), &modules, offset, limit)
+    let mut result = get_groups_vec(&db.conn(), &modules, offset, limit)
                      .unwrap_or(vec![]);
     result.sort();
     result.dedup();
@@ -787,7 +784,7 @@ pub struct RecipesDepsolveResponse {
 /// ```
 ///
 #[get("/recipes/depsolve/<recipe_names>")]
-pub fn recipes_depsolve(recipe_names: &str, db: DB) -> CORS<JSON<RecipesDepsolveResponse>> {
+pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>) -> CORS<JSON<RecipesDepsolveResponse>> {
     info!("/recipes/depsolve/"; "recipe_names" => recipe_names);
     // TODO This should be a per-user path
     let recipe_path = config::active()
@@ -802,14 +799,14 @@ pub fn recipes_depsolve(recipe_names: &str, db: DB) -> CORS<JSON<RecipesDepsolve
         let _ = recipe::read(&path).map(|recipe| {
             let mut modules = Vec::new();
             for module in recipe.clone().modules.unwrap_or(vec![]) {
-                match get_group_deps(db.conn(), &module.name, 0, i64::max_value()) {
+                match get_group_deps(&db.conn(), &module.name, 0, i64::max_value()) {
                     Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
             }
 
             for package in recipe.clone().packages.unwrap_or(vec![]) {
-                match get_group_deps(db.conn(), &package.name, 0, i64::max_value()) {
+                match get_group_deps(&db.conn(), &package.name, 0, i64::max_value()) {
                     Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
