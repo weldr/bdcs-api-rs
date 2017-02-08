@@ -58,7 +58,7 @@ impl From<glob::PatternError> for RecipeError {
 /// This is used to parse the full recipe's TOML, and to write a JSON representation of
 /// the Recipe.
 ///
-#[derive(Debug, Clone, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Recipe {
     pub name: String,
     pub description: Option<String>,
@@ -71,7 +71,7 @@ pub struct Recipe {
 /// This is used for the Recipe's `modules` section and can be serialized
 /// to/from JSON and TOML.
 ///
-#[derive(Debug, Clone, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Modules {
     pub name: String,
     pub version: Option<String>
@@ -81,7 +81,7 @@ pub struct Modules {
 ///
 /// This is used for the Recipe's `packages` section
 ///
-#[derive(Debug, Clone, RustcDecodable, RustcEncodable, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Packages {
     pub name: String,
     pub version: Option<String>
