@@ -34,7 +34,7 @@ use rocket_contrib::JSON;
 
 // bdcs database functions
 use db::*;
-use recipe::{self, Recipe};
+use recipe::{self, RecipeRepo, Recipe};
 use api::{CORS, Filter, OFFSET, LIMIT};
 
 
@@ -556,16 +556,16 @@ pub struct RecipesListResponse {
 /// This calls [recipes_list](fn.recipes_list.html) with the optional `offset` and/or `limit`
 /// values.
 #[get("/recipes/list?<filter>")]
-pub fn recipes_list_filter(filter: Filter) -> CORS<JSON<RecipesListResponse>> {
-    recipes_list(filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+pub fn recipes_list_filter(filter: Filter, repo: State<RecipeRepo>) -> CORS<JSON<RecipesListResponse>> {
+    recipes_list(filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT), repo)
 }
 
 /// Handler for `/recipes/list/` without arguments.
 ///
 /// This calls [recipes_list](fn.recipes_list.html) with the default `offset` and `limit` values.
 #[get("/recipes/list", rank=2)]
-pub fn recipes_list_default() -> CORS<JSON<RecipesListResponse>> {
-    recipes_list(OFFSET, LIMIT)
+pub fn recipes_list_default(repo: State<RecipeRepo>) -> CORS<JSON<RecipesListResponse>> {
+    recipes_list(OFFSET, LIMIT, repo)
 }
 
 /// Return the list of available Recipes
@@ -589,7 +589,7 @@ pub fn recipes_list_default() -> CORS<JSON<RecipesListResponse>> {
 /// {"recipes":["nfs-server","http-server","email-server"]}
 /// ```
 ///
-pub fn recipes_list(offset: i64, limit: i64) -> CORS<JSON<RecipesListResponse>> {
+pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesListResponse>> {
     info!("/recipes/list"; "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipes_path = config::active()
@@ -624,16 +624,16 @@ pub struct RecipesInfoResponse {
 /// This calls [recipes_info](fn.recipes_info.html) with the optional `offset` and/or `limit`
 /// values.
 #[get("/recipes/info/<recipes>?<filter>")]
-pub fn recipes_info_filter(recipes: &str, filter: Filter) -> CORS<JSON<RecipesInfoResponse>> {
-    recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
+pub fn recipes_info_filter(recipes: &str, filter: Filter, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
+    recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT), repo)
 }
 
 /// Handler for `/recipes/info/` without arguments.
 ///
 /// This calls [recipes_info](fn.recipes_info.html) with the default `offset` and `limit` values.
 #[get("/recipes/info/<recipes>", rank=2)]
-pub fn recipes_info_default(recipes: &str) -> CORS<JSON<RecipesInfoResponse>> {
-    recipes_info(recipes, OFFSET, LIMIT)
+pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
+    recipes_info(recipes, OFFSET, LIMIT, repo)
 }
 
 /// Return the contents of a recipe or list of recipes
@@ -660,7 +660,7 @@ pub fn recipes_info_default(recipes: &str) -> CORS<JSON<RecipesInfoResponse>> {
 /// TODO
 /// ```
 ///
-pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64) -> CORS<JSON<RecipesInfoResponse>> {
+pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
     info!("/recipes/info/"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
     // TODO This should be a per-user path
     let recipe_path = config::active()
@@ -728,7 +728,7 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 /// {"name":"http-server","description":"An example http server","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
 /// ```
 #[post("/recipes/new", format="application/json", data="<recipe>")]
-pub fn recipes_new(recipe: JSON<Recipe>) -> CORS<JSON<RecipesNewResponse>> {
+pub fn recipes_new(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
     info!("/recipes/new/"; "recipe.name" => recipe.name);
     // TODO This should be a per-user path
     let recipe_path = config::active()
@@ -784,7 +784,7 @@ pub struct RecipesDepsolveResponse {
 /// ```
 ///
 #[get("/recipes/depsolve/<recipe_names>")]
-pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>) -> CORS<JSON<RecipesDepsolveResponse>> {
+pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesDepsolveResponse>> {
     info!("/recipes/depsolve/"; "recipe_names" => recipe_names);
     // TODO This should be a per-user path
     let recipe_path = config::active()

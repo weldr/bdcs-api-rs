@@ -24,18 +24,38 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::clone::Clone;
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, create_dir_all};
 use std::io;
 use std::io::prelude::*;
+use std::path::Path;
+use std::sync::{Mutex, MutexGuard};
 
+use git2::{self, Branch, BranchType, Commit, DiffFormat, DiffOptions, ObjectType, Pathspec, Repository};
+use git2::TreeBuilder;
 use glob::{self, glob};
 use toml;
+
+
+/// Recipe git repo, used with Rocket's managed state system
+pub struct RecipeRepo(Mutex<Repository>);
+impl RecipeRepo {
+    pub fn new(repo_path: &str) -> RecipeRepo {
+        // Open an existing repo or create a new one
+        let repo = init_repo(repo_path).unwrap();
+        RecipeRepo(Mutex::new(repo))
+    }
+
+    pub fn repo(&self) -> MutexGuard<Repository> {
+        self.0.lock().unwrap()
+    }
+}
 
 
 /// Recipe Errors
 #[derive(Debug)]
 pub enum RecipeError {
     Io(io::Error),
+    Git2(git2::Error),
     Glob(glob::PatternError),
     ParseTOML
 }
@@ -43,6 +63,12 @@ pub enum RecipeError {
 impl From<io::Error> for RecipeError {
     fn from(err: io::Error) -> RecipeError {
         RecipeError::Io(err)
+    }
+}
+
+impl From<git2::Error> for RecipeError {
+    fn from(err: git2::Error) -> RecipeError {
+        RecipeError::Git2(err)
     }
 }
 
@@ -87,6 +113,264 @@ pub struct Packages {
     pub version: Option<String>
 }
 
+
+/// Initialize the Recipe's git repo
+///
+/// # Arguments
+///
+/// * `path` - path to recipe directory
+///
+/// # Return
+///
+/// * A Result with a Repository or a RecipeError
+///
+/// A bare git repo will be created in ./git/ at the specified path.
+/// If a repo already exists it will be opened and returned.
+///
+pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
+    let repo_path = Path::new(path).join("git");
+
+    if repo_path.exists() {
+        Ok(try!(Repository::open(&repo_path)))
+    } else {
+        try!(create_dir_all(&repo_path));
+        Ok(try!(Repository::init_bare(&repo_path)))
+    }
+}
+
+/// Add a file to a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `file` - Path to the file to add
+/// * `branch` - Name of the branch to add the file to
+///
+/// # Return
+///
+/// * Result with () or a RecipeError
+///
+/// This assumes that the file name is the same as the recipe name.
+///
+pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<(), RecipeError> {
+
+    Ok(())
+}
+
+/// Add directory to a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `path` - Path to the directory to add
+/// * `branch` - Name of the branch to add the directory contents to
+///
+/// # Return
+///
+/// * Result with () or a RecipeError
+///
+/// This will add all the files in the directory, without recursing into any directories.
+/// This assumes that the file names are the same as the recipe names.
+///
+pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), RecipeError> {
+
+    Ok(())
+}
+
+/// Write a recipe to a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name to write to (just the name, no path)
+/// * `contents` - An array of bytes to write
+/// * `branch` - Name of the branch to add to
+///
+/// # Return
+///
+/// * Result with () or a RecipeError
+///
+/// This is used to create a new file, or to write new contents to an existing file.
+///
+pub fn write_recipe(repo: &Repository, name: &str, recipe: &Recipe, branch: &str) -> Result<(), RecipeError> {
+
+    Ok(())
+}
+
+/// Rename a recipe file
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name_orig` - Original Recipe name
+/// * `name_new` - New Recipe name
+/// * `branch` - Name of the branch to add to
+///
+/// # Return
+///
+/// * Result with () or a RecipeError
+///
+pub fn rename_recipe(repo: &Repository, name_orig: &str, name_new: &str, branch: &str) -> Result<(), RecipeError> {
+
+    Ok(())
+}
+
+/// Delete a recipe from a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name to write to
+/// * `branch` - Name of the branch to add to
+///
+/// # Return
+///
+/// * Result with () or a RecipeError
+///
+pub fn delete_recipe(repo: &Repository, name: &str, branch: &str) -> Result<(), RecipeError> {
+
+    Ok(())
+}
+
+/// Read a recipe from a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name to read
+/// * `commit` - Commit to read from, or None for HEAD
+///
+/// # Return
+///
+/// * An Option with the array of bytes or None, or a RecipeError
+///
+pub fn read_recipe(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -> Result<Recipe, RecipeError> {
+    Ok(Recipe {
+        name: "placeholder".to_string(),
+        description: None,
+        modules: None,
+        packages: None
+    })
+}
+
+/// List the files in a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `branch` - Name of the branch to list
+/// * `commit` - Commit to read from, or None for HEAD
+///
+/// # Return
+///
+/// * A Vector of Strings or a RecipeError
+///
+pub fn list_recipes(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
+
+    Ok(vec!["placeholder".to_string()])
+}
+
+/// Recipe Changes
+///
+/// Details about a change to a recipe
+///
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RecipeChange {
+    pub name: String,
+    pub branch: String,
+    pub commit: String,
+    pub summary: String
+}
+
+/// List the commits for a recipe in a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name
+/// * `branch` - Name of the branch to list
+///
+/// # Return
+///
+/// * A Vector of RecipeChange or a RecipeError
+///
+/// If the name is None all changes for the branch will be returned.
+///
+pub fn list_commits(repo: &Repository, name: Option<&str>, branch: &str) -> Result<Vec<RecipeChange>, RecipeError> {
+
+    Ok(vec![RecipeChange {
+        name: "placeholder".to_string(),
+        branch: "empty".to_string(),
+        commit: "empty".to_string(),
+        summary: "empty".to_string(),
+    }])
+}
+
+pub struct RecipeDiff {
+    from: String,
+    to: String,
+    diff: Vec<String>
+}
+
+/// Diff two commits for a recipe
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name
+/// * `branch` - Name of the branch
+/// * `old_commit` - Older commit to use
+/// * `new_commit` - New commit to use
+///
+/// # Return
+///
+/// * RecipeDiff or a RecipeError
+///
+/// If new_commit is None HEAD will be used.
+///
+pub fn recipe_changes(repo: &Repository,
+                      name: &str,
+                      branch: &str,
+                      old_commit: &str,
+                      new_commit: Option<&str>) -> Result<RecipeDiff, RecipeError> {
+
+    Ok(RecipeDiff {
+        from: "placeholder".to_string(),
+        to: "empty".to_string(),
+        diff: vec![]
+    })
+}
+
+/// Diff two recipes
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `branch` - Name of the branch
+/// * `name_1` - First Recipe name
+/// * `name_2` - Second Recipe name
+/// * `commit_1` - Commit for name_1
+/// * `commit_2` - Commit for name_2
+///
+/// # Return
+///
+/// * RecipeDiff or a RecipeError
+///
+/// If commit_1 or commit_2 (or both) are None then HEAD will be used.
+///
+pub fn recipes_changes(repo: &Repository,
+                       branch: &str,
+                       name_1: &str,
+                       name_2: &str,
+                       commit_1: Option<&str>,
+                       commit_2: Option<&str>) -> Result<RecipeDiff, RecipeError> {
+
+    Ok(RecipeDiff {
+        from: "placeholder".to_string(),
+        to: "empty".to_string(),
+        diff: vec![]
+    })
+}
 
 /// Return a list of the recipe names
 ///

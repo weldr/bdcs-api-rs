@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 clap = "2.*"
 flate2 = "0.*"
+git2 = "0.6.*"
 glob = "0.*"
 hyper = "0.10.*"
 lazy_static = "0.2.*"

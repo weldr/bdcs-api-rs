@@ -26,6 +26,7 @@
 #![feature(custom_derive)]
 #![plugin(rocket_codegen)]
 
+extern crate git2;
 extern crate glob;
 extern crate hyper;
 extern crate r2d2;
