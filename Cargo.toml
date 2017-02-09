@@ -8,6 +8,10 @@ license = "GPL-3.0"
 name = "bdcs-api-server"
 path = "src/main.rs"
 
+[[bin]]
+name = "depclose"
+path = "src/bin/depclose.rs"
+
 [dependencies]
 clap = "2.*"
 flate2 = "0.*"
