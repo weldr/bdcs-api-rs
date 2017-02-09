@@ -1,5 +1,5 @@
-description = "A test recipe"
 name = "recipe-test"
+description = "A test recipe"
 
 [[modules]]
 name = "fm-httpd"

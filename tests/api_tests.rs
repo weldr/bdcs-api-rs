@@ -28,9 +28,14 @@ use std::path::Path;
 
 use bdcs::{RocketToml, RocketConfig};
 use bdcs::api::v0;
+use bdcs::db::DBPool;
+use bdcs::recipe::RecipeRepo;
 use rocket::config;
 use rocket::http::{ContentType, Method, Status};
 use rocket::testing::MockRequest;
+
+const DB_PATH: &'static str = "./metadata.db";
+const RECIPE_PATH: &'static str = "/var/tmp/recipes/";
 
 
 /// Write Rocket.toml
@@ -48,8 +53,8 @@ fn write_config() {
         global: RocketConfig {
             address: "127.0.0.1".to_string(),
             port: 4000,
-            db_path: "./metadata.db".to_string(),
-            recipe_path: "/var/tmp/recipes/".to_string(),
+            db_path: DB_PATH.to_string(),
+            recipe_path: RECIPE_PATH.to_string(),
             log_path: "/var/log/bdcs-api.log".to_string(),
             mockfiles_path: "./tests/results/v0/".to_string()
 
@@ -57,9 +62,9 @@ fn write_config() {
     };
 
     // Write out a Rocket.toml config with [global] settings
-    let rocket_toml = toml::encode(&rocket_config);
+    let rocket_toml = toml::to_string(&rocket_config).unwrap();
     File::create("Rocket.toml").unwrap()
-        .write_all(toml::encode_str(&rocket_toml).as_bytes()).unwrap();
+        .write_all(rocket_toml.as_bytes()).unwrap();
 }
 
 #[test]
@@ -119,7 +124,9 @@ fn v0_projects_list() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::projects_list_default, v0::projects_list_filter]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::projects_list_default, v0::projects_list_filter])
+                         .manage(DBPool::new(DB_PATH));
 
     let mut req = MockRequest::new(Method::Get, "/projects/list");
     let mut response = req.dispatch_with(&rocket);
@@ -146,7 +153,9 @@ fn v0_modules_info() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::modules_info_default, v0::modules_info_filter]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::modules_info_default, v0::modules_info_filter])
+                         .manage(DBPool::new(DB_PATH));
 
     let mut req = MockRequest::new(Method::Get, "/modules/info/lorax");
     let mut response = req.dispatch_with(&rocket);
@@ -171,7 +180,9 @@ fn v0_modules_list_noargs() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::modules_list_noargs_default, v0::modules_list_noargs_filter]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::modules_list_noargs_default, v0::modules_list_noargs_filter])
+                         .manage(DBPool::new(DB_PATH));
 
     let mut req = MockRequest::new(Method::Get, "/modules/list");
     let mut response = req.dispatch_with(&rocket);
@@ -198,7 +209,9 @@ fn v0_recipes_list() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::recipes_list_default, v0::recipes_list_filter]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::recipes_list_default, v0::recipes_list_filter])
+                         .manage(RecipeRepo::new(RECIPE_PATH));
 
     let mut req = MockRequest::new(Method::Get, "/recipes/list/");
     let mut response = req.dispatch_with(&rocket);
@@ -225,7 +238,10 @@ fn v0_recipes_info() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::recipes_info_default, v0::recipes_info_filter]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::recipes_info_default, v0::recipes_info_filter])
+                         .manage(RecipeRepo::new(RECIPE_PATH));
+
 
     let mut req = MockRequest::new(Method::Get, "/recipes/info/example,http-server,nfs-server");
     let mut response = req.dispatch_with(&rocket);
@@ -250,7 +266,10 @@ fn v0_recipes_new() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::recipes_new]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::recipes_new])
+                         .manage(RecipeRepo::new(RECIPE_PATH));
+
 
     let recipe_path = config::active()
                           .unwrap()
@@ -287,7 +306,10 @@ fn v0_recipes_depsolve() {
     write_config();
 
     // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/", routes![v0::recipes_depsolve]);
+    let rocket = rocket::ignite()
+                         .mount("/", routes![v0::recipes_depsolve])
+                         .manage(DBPool::new(DB_PATH))
+                         .manage(RecipeRepo::new(RECIPE_PATH));
 
     let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/example");
     let mut response = req.dispatch_with(&rocket);
