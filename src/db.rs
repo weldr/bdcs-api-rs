@@ -491,6 +491,37 @@ pub fn get_projects_filename(conn: &Connection, filename: &str) -> rusqlite::Res
     Ok(contents)
 }
 
+/// Find all groups that contain a given filename.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `filename` - The full path of the file to match
+///
+/// # Returns
+///
+/// * A Vector of [Groups](struct.Groups.html) for the matching filename.
+pub fn get_groups_filename(conn: &Connection, filename: &str) -> rusqlite::Result<Vec<Groups>> {
+    let mut stmt = try!(conn.prepare("
+            select groups.*
+            from groups, group_files, files
+            on groups.id == group_files.group_id and group_files.file_id == files.id
+            where files.path == :filename"));
+    let mut rows = try!(stmt.query_named(&[(":filename", &filename)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Groups {
+                        id: row.get(0),
+                        name: row.get(1),
+                        group_type: row.get(2)
+                    });
+    }
+    Ok(contents)
+}
+
 /// Find all projects matching a name
 ///
 /// # Arguments
@@ -812,7 +843,7 @@ pub fn get_requirements_group_id(conn: &Connection, group_id: i64) -> rusqlite::
             select requirements.*
             from group_requirements, requirements
             on requirements.id == group_requirements.req_id
-            where group_requirements.group_id == :group_id"));
+            where group_requirements.group_id == :group_id and not requirements.req_expr like 'rpmlib%'"));
     let mut rows = try!(stmt.query_named(&[(":group_id", &group_id)]));
 
     let mut contents = Vec::new();
@@ -944,6 +975,88 @@ pub fn get_groups_deps_vec(conn: &Connection, groups: &[&str], offset: i64, limi
         }
     }
     Ok(results)
+}
+
+
+/// Get information for everything that obsoletes a given group.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_id` - The id of the [Groups](struct.Groups.html) entry to get
+///
+/// # Returns
+///
+/// * A Vector of ([Groups](struct.Groups.html), [KeyVal](struct.KeyVal.html)) for the matching
+///   `group_id`.  The tuple includes both the group that does the obsoleting and any version
+///   expression that is useful for checking version numbers later.
+pub fn get_group_obsoletes(conn: &Connection, group_id: i64) -> rusqlite::Result<Vec<(Groups, KeyVal)>> {
+    let mut stmt = try!(conn.prepare("
+            select distinct groups.*, key_val.*
+            from groups, key_val, group_key_values
+            on key_val.id == group_key_values.key_val_id and group_key_values.group_id == groups.id
+            where groups.id == :group_id and key_val.key_value == 'rpm-obsolete'"));
+    let mut rows = try!(stmt.query_named(&[(":group_id", &group_id)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        contents.push((Groups {
+                         id: row.get(0),
+                         name: row.get(1),
+                         group_type: row.get(2),
+                       },
+                       KeyVal {
+                         id: row.get(3),
+                         key_value: row.get(4),
+                         val_value: row.get(5),
+                         ext_value: row.get(6),
+                       }));
+    }
+    Ok(contents)
+}
+
+
+/// Get information for everything that provides a given name.  This could be a file, an soname, a
+/// config value, a package, etc.  Multiple packages could potentially provide the same value.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `thing` - The thing
+///
+/// # Returns
+///
+/// * A Vector of ([Groups](struct.Groups.html), [KeyVal](struct.KeyVal.html)) for the matching
+///   `thing`.  The tuple includes both the group that provides the given name and any version
+///   expression that is useful for checking version numbers later.
+pub fn get_provider_groups(conn: &Connection, thing: &str) -> rusqlite::Result<Vec<(Groups, KeyVal)>> {
+    let mut iter = thing.split_whitespace();
+    let base_thing = iter.next();
+
+    let mut stmt = try!(conn.prepare("
+            select distinct groups.*, key_val.*
+            from groups, key_val, group_key_values
+            on key_val.id == group_key_values.key_val_id and group_key_values.group_id == groups.id
+            where key_val.val_value == :thing and key_val.key_value == 'rpm-provide'"));
+    let mut rows = try!(stmt.query_named(&[(":thing", &base_thing)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        contents.push((Groups {
+                         id: row.get(0),
+                         name: row.get(1),
+                         group_type: row.get(2),
+                       },
+                       KeyVal {
+                         id: row.get(3),
+                         key_value: row.get(4),
+                         val_value: row.get(5),
+                         ext_value: row.get(6),
+                       }));
+    }
+    Ok(contents)
 }
 
 
