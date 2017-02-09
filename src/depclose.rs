@@ -74,7 +74,10 @@ fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, Propositi
     match get_provider_groups(conn, thing) {
         Ok(providers)   => { for tup in providers {
                                  let nevra = get_nevra_group_id(conn, tup.0.id);
-                                 contents.push((tup.0.id, Proposition::Provides (nevra, String::from(thing))));
+                                 match tup.1.ext_value {
+                                     Some(expr) => contents.push((tup.0.id, Proposition::Provides (nevra, expr))),
+                                     None       => contents.push((tup.0.id, Proposition::Provides (nevra, String::from(thing)))),
+                                 }
                              }
                            }
     
