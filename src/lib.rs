@@ -44,6 +44,7 @@ extern crate toml;
 
 pub mod api;
 pub mod db;
+pub mod depclose;
 pub mod recipe;
 pub mod rpm;
 
