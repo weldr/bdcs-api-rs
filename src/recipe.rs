@@ -2,8 +2,8 @@
 //!
 //! ## Overview
 //!
-//! Composer recipes are stored as TOML formatted files. This module provides functions for
-//! listing, reading, and writing them.
+//! Composer recipes are stored as TOML formatted files in a git repository.
+//! This module provides functions for listing, reading, and writing them.
 //!
 
 // Copyright (C) 2016-2017 Red Hat, Inc.
@@ -29,9 +29,10 @@ use std::io;
 use std::io::prelude::*;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
+use std::str;
 
 use git2::{self, Branch, BranchType, Commit, DiffFormat, DiffOptions, ObjectType, Pathspec, Repository};
-use git2::TreeBuilder;
+use git2::{Signature, TreeBuilder};
 use glob::{self, glob};
 use toml;
 
@@ -57,6 +58,8 @@ pub enum RecipeError {
     Io(io::Error),
     Git2(git2::Error),
     Glob(glob::PatternError),
+    Utf8(str::Utf8Error),
+    RecipeName,
     ParseTOML
 }
 
@@ -78,6 +81,12 @@ impl From<glob::PatternError> for RecipeError {
     }
 }
 
+impl From<str::Utf8Error> for RecipeError {
+    fn from(err: str::Utf8Error) -> RecipeError {
+        RecipeError::Utf8(err)
+    }
+}
+
 
 /// Composer Recipe
 ///
@@ -90,6 +99,12 @@ pub struct Recipe {
     pub description: Option<String>,
     pub modules: Option<Vec<Modules>>,
     pub packages: Option<Vec<Packages>>
+}
+
+impl Recipe {
+    fn filename(&self) -> Result<String, RecipeError> {
+        recipe_filename(&self.name)
+    }
 }
 
 /// Recipe Modules
@@ -114,6 +129,44 @@ pub struct Packages {
 }
 
 
+// From 24 days of Rust
+/// Find master branch's HEAD and return it
+///
+/// # Arguments
+///
+/// * `repo` - An open repository
+///
+/// # Returns
+///
+/// * master branch's HEAD Commit
+///
+///
+fn find_last_commit(repo: &Repository) -> Result<Commit, git2::Error> {
+        let obj = repo.head()?.resolve()?.peel(ObjectType::Commit)?;
+            obj.into_commit().map_err(|_| git2::Error::from_str("Couldn't find commit"))
+}
+
+
+/// Return a filename for the recipe
+///
+/// # Arguments
+///
+/// * `name` - A recipe name string
+///
+/// # Returns
+///
+/// * A String or a RecipeError
+///
+/// This appends '.toml' to the recipe name after replacing spaces with '-'
+///
+fn recipe_filename(name: &str) -> Result<String, RecipeError> {
+    if name.len() > 0 {
+        Ok(format!("{}.toml", name.clone().replace(" ", "-")))
+    } else {
+        Err(RecipeError::RecipeName)
+    }
+}
+
 /// Initialize the Recipe's git repo
 ///
 /// # Arguments
@@ -134,27 +187,21 @@ pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
         Ok(try!(Repository::open(&repo_path)))
     } else {
         try!(create_dir_all(&repo_path));
-        Ok(try!(Repository::init_bare(&repo_path)))
+        let repo = try!(Repository::init_bare(&repo_path));
+
+        {
+            // Make an initial empty commit
+            let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+            let tree_id = {
+                let mut index = try!(repo.index());
+                try!(index.write_tree())
+            };
+            let tree = try!(repo.find_tree(tree_id));
+            try!(repo.commit(Some("HEAD"), &sig, &sig, "Initial Recipe repository commit", &tree, &[]));
+        }
+
+        Ok(repo)
     }
-}
-
-/// Add a file to a branch
-///
-/// # Arguments
-///
-/// * `repo` - An open Repository
-/// * `file` - Path to the file to add
-/// * `branch` - Name of the branch to add the file to
-///
-/// # Return
-///
-/// * Result with () or a RecipeError
-///
-/// This assumes that the file name is the same as the recipe name.
-///
-pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<(), RecipeError> {
-
-    Ok(())
 }
 
 /// Add directory to a branch
@@ -170,11 +217,43 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<(), Recip
 /// * Result with () or a RecipeError
 ///
 /// This will add all the files in the directory, without recursing into any directories.
-/// This assumes that the file names are the same as the recipe names.
 ///
 pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), RecipeError> {
-
+    let toml_glob = format!("{}/*.toml", path);
+    for recipe_file in glob(&toml_glob).unwrap().filter_map(Result::ok) {
+        if let Some(file) = recipe_file.to_str() {
+            debug!("Adding {} to branch {}", file, branch);
+            match add_file(repo, file, branch) {
+                Ok(_) => {}
+                Err(e) => error!("add_dir->add_file failed"; "file" => file, "error" => format!("{:?}", e))
+            }
+        }
+    }
     Ok(())
+}
+
+/// Add a file to a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `file` - Path to the file to add
+/// * `branch` - Name of the branch to add the file to
+///
+/// # Return
+///
+/// * Result with () or a RecipeError
+///
+/// Files are read into a [Recipe](struct.Recipe.html) struct before being written to disk.
+/// The filename committed to git is the name inside the recipe, not the filename it is
+/// read from.
+///
+pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<(), RecipeError> {
+    let mut input = String::new();
+    let _ = try!(File::open(file)).read_to_string(&mut input);
+    let recipe = try!(toml::from_str::<Recipe>(&input).or(Err(RecipeError::ParseTOML)));
+
+    write_recipe(repo, &recipe, branch)
 }
 
 /// Write a recipe to a branch
@@ -191,10 +270,103 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), Recipe
 /// * Result with () or a RecipeError
 ///
 /// This is used to create a new file, or to write new contents to an existing file.
+/// If the branch does not exist, it will be created.
 ///
-pub fn write_recipe(repo: &Repository, name: &str, recipe: &Recipe, branch: &str) -> Result<(), RecipeError> {
+pub fn write_recipe(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<(), RecipeError> {
+    // Does the branch exist? If not, create it based on master
+    match repo.find_branch(branch, BranchType::Local) {
+        Ok(_) => {}
+        Err(_) => {
+            let parent_commit = try!(find_last_commit(&repo));
+            try!(repo.branch(branch, &parent_commit, false));
+        }
+    }
+    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
+                                      .get()
+                                      .target() {
+        debug!("Branch {}'s id is {}", branch, branch_id);
+        let parent_commit = try!(repo.find_commit(branch_id));
+        let blob_id = {
+            let recipe_toml = try!(toml::to_string(&recipe).or(Err(RecipeError::ParseTOML)));
+            try!(repo.blob(recipe_toml.as_bytes()))
+        };
+        let tree_id = {
+            let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
+            tree.insert(try!(recipe.filename()), blob_id, 0o100644);
+            tree.write().unwrap()
+        };
+        let tree = try!(repo.find_tree(tree_id));
+        let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+        let commit_msg = format!("Recipe {} saved", recipe.name);
+        let branch_ref = format!("refs/heads/{}", branch);
+        let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+        debug!("Recipe commit:"; "branch" => branch, "recipe_name" => recipe.name, "commit_msg" => commit_msg);
+    }
 
     Ok(())
+}
+
+/// Read a recipe from a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name to read
+/// * `commit` - Commit to read from, or None for HEAD
+///
+/// # Return
+///
+/// * An Option with the array of bytes or None, or a RecipeError
+///
+/// The recipe name is converted to a filename by appending '.toml' and replacing
+/// all spaces with '-'
+///
+pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -> Result<Recipe, RecipeError> {
+    // Read a filename from a branch.
+    let spec = {
+        match commit {
+            Some(commit) => format!("{}:{}", commit, try!(recipe_filename(name))),
+            None => format!("{}:{}", branch, try!(recipe_filename(name)))
+        }
+    };
+    let object = try!(repo.revparse_single(&spec[..]));
+    let blob = try!(repo.find_blob(object.id()));
+    let blob_str = try!(str::from_utf8(blob.content()));
+    Ok(try!(toml::from_str::<Recipe>(blob_str).or(Err(RecipeError::ParseTOML))))
+}
+
+/// List the recipes in a branch
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `branch` - Name of the branch to list
+/// * `commit` - Commit to read from, or None for HEAD
+///
+/// # Return
+///
+/// * A Vector of Strings or a RecipeError
+///
+pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
+    let mut recipes = Vec::new();
+
+    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
+                                      .get()
+                                      .target() {
+
+        debug!("branch {}'s id is {}", branch, branch_id);
+        let parent_commit = try!(repo.find_commit(branch_id));
+        let tree = try!(parent_commit.tree());
+        for entry in tree.iter() {
+            // filenames end with .toml, strip that off and return the base.
+            if let Some(name) = entry.name() {
+                let recipe_name = name.rsplitn(2, ".").last().unwrap_or("");
+                recipes.push(recipe_name.to_string());
+            }
+        }
+    }
+
+    Ok(recipes)
 }
 
 /// Rename a recipe file
@@ -230,44 +402,6 @@ pub fn rename_recipe(repo: &Repository, name_orig: &str, name_new: &str, branch:
 pub fn delete_recipe(repo: &Repository, name: &str, branch: &str) -> Result<(), RecipeError> {
 
     Ok(())
-}
-
-/// Read a recipe from a branch
-///
-/// # Arguments
-///
-/// * `repo` - An open Repository
-/// * `name` - Recipe name to read
-/// * `commit` - Commit to read from, or None for HEAD
-///
-/// # Return
-///
-/// * An Option with the array of bytes or None, or a RecipeError
-///
-pub fn read_recipe(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -> Result<Recipe, RecipeError> {
-    Ok(Recipe {
-        name: "placeholder".to_string(),
-        description: None,
-        modules: None,
-        packages: None
-    })
-}
-
-/// List the files in a branch
-///
-/// # Arguments
-///
-/// * `repo` - An open Repository
-/// * `branch` - Name of the branch to list
-/// * `commit` - Commit to read from, or None for HEAD
-///
-/// # Return
-///
-/// * A Vector of Strings or a RecipeError
-///
-pub fn list_recipes(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
-
-    Ok(vec!["placeholder".to_string()])
 }
 
 /// Recipe Changes
@@ -370,54 +504,6 @@ pub fn recipes_changes(repo: &Repository,
         to: "empty".to_string(),
         diff: vec![]
     })
-}
-
-/// Return a list of the recipe names
-///
-/// # Arguments
-///
-/// * `path` - path to directory with recipes
-///
-/// # Return
-///
-/// * A Vector of Strings Result
-///
-/// This will read all of the files ending in .toml from the directory path
-/// and return a vector of just the recipe names.
-///
-/// TODO Make this a lazy iterator
-///
-pub fn list(path: &str) -> Result<Vec<String>, RecipeError> {
-    let recipes_glob = path.to_string() + "*.toml";
-
-    let mut result = Vec::new();
-    for path in try!(glob(&recipes_glob)).filter_map(Result::ok) {
-        // Parse the TOML recipe into a Recipe struct
-        let mut input = String::new();
-        let _ = try!(File::open(path))
-                    .read_to_string(&mut input);
-        let recipe: Recipe = try!(toml::from_str(&input).or(Err(RecipeError::ParseTOML)));
-        result.push(recipe.name);
-    }
-    Ok(result)
-}
-
-
-/// Read a recipe TOML file and return a Recipe struct
-///
-/// # Arguments
-///
-/// * `path` - path to the recipe TOML file
-///
-/// # Returns
-///
-/// * A Recipe Result.
-///
-pub fn read(path: &str) -> Result<Recipe, RecipeError> {
-        let mut input = String::new();
-        let _ = try!(File::open(path))
-                    .read_to_string(&mut input);
-        toml::from_str::<Recipe>(&input).or(Err(RecipeError::ParseTOML))
 }
 
 

@@ -591,13 +591,9 @@ pub fn recipes_list_default(repo: State<RecipeRepo>) -> CORS<JSON<RecipesListRes
 ///
 pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesListResponse>> {
     info!("/recipes/list"; "offset" => offset, "limit" => limit);
-    // TODO This should be a per-user path
-    let recipes_path = config::active()
-                           .unwrap()
-                           .get_str("recipe_path")
-                           .unwrap_or("/var/tmp/recipes/");
+    // TODO Get the user's branch name. Use master for now.
 
-    let mut result = recipe::list(&recipes_path).unwrap_or(vec![]);
+    let mut result = recipe::list(&repo.repo(), "master", None).unwrap_or(vec![]);
     result.sort();
     result.dedup();
     result.truncate(limit as usize);
@@ -662,17 +658,12 @@ pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON
 ///
 pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
     info!("/recipes/info/"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
-    // TODO This should be a per-user path
-    let recipe_path = config::active()
-                          .unwrap()
-                          .get_str("recipe_path")
-                          .unwrap_or("/var/tmp/recipes/");
+    // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
     for name in recipe_names.split(",").take(limit as usize) {
         // TODO Filesystem Path needs to be sanitized!
-        let path = format!("{}{}.toml", recipe_path, name.replace(" ", "-"));
-        let _ = recipe::read(&path).map(|recipe| {
+        let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
             result.push(recipe);
         });
     }
@@ -786,17 +777,11 @@ pub struct RecipesDepsolveResponse {
 #[get("/recipes/depsolve/<recipe_names>")]
 pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesDepsolveResponse>> {
     info!("/recipes/depsolve/"; "recipe_names" => recipe_names);
-    // TODO This should be a per-user path
-    let recipe_path = config::active()
-                          .unwrap()
-                          .get_str("recipe_path")
-                          .unwrap_or("/var/tmp/recipes/");
+    // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
     for name in recipe_names.split(",") {
-        // TODO Filesystem Path needs to be sanitized!
-        let path = format!("{}{}.toml", recipe_path, name.replace(" ", "-"));
-        let _ = recipe::read(&path).map(|recipe| {
+        let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
             let mut modules = Vec::new();
             for module in recipe.clone().modules.unwrap_or(vec![]) {
                 match get_group_deps(&db.conn(), &module.name, 0, i64::max_value()) {
