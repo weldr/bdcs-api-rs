@@ -166,12 +166,10 @@ pub fn close_dependencies(conn: &Connection, packages: Vec<String>) -> rusqlite:
             props.insert(Proposition::Obsoletes (i.0.clone(), i.1.clone()));
         }
 
-        if !providers.is_empty() {
-            for (p, reqs_for_p) in providers.iter().zip(&reqs) {
-                for i in reqs_for_p {
-                    let nevra = get_nevra_group_id(conn, p.0);
-                    props.insert(Proposition::Requires (nevra, i.clone()));
-                }
+        for (p, reqs_for_p) in providers.iter().zip(&reqs) {
+            for i in reqs_for_p {
+                let nevra = get_nevra_group_id(conn, p.0);
+                props.insert(Proposition::Requires (nevra, i.clone()));
             }
         }
 
