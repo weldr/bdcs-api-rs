@@ -56,11 +56,11 @@ fn get_nevra_group_id(conn: &Connection, id: i64) -> NEVRA {
 
     for row in kvs.unwrap() {
         match row.key_value.as_ref() {
-            "name"      => name = row.val_value.clone(),
-            "epoch"     => epoch = Some(row.val_value.clone()),
-            "version"   => ver = row.val_value.clone(),
-            "release"   => rel = row.val_value.clone(),
-            "arch"      => arch = row.val_value.clone(),
+            "name"      => name = row.val_value,
+            "epoch"     => epoch = Some(row.val_value),
+            "version"   => ver = row.val_value,
+            "release"   => rel = row.val_value,
+            "arch"      => arch = row.val_value,
             _           => continue,
         }
     }
