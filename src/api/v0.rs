@@ -29,7 +29,7 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use rocket::{config, State};
+use rocket::State;
 use rocket_contrib::JSON;
 
 // bdcs database functions
@@ -142,7 +142,7 @@ pub fn compose_cancel<'r>() -> CORS<&'static str> {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("/compose/status")]
-pub fn compose_status<'r>() -> CORS<&'static str> {
+pub fn compose_status() -> CORS<&'static str> {
     CORS("Unimplemented")
 }
 
@@ -163,7 +163,7 @@ pub fn compose_status<'r>() -> CORS<&'static str> {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("/compose/status/<id>")]
-pub fn compose_status_id<'r>(id: &str) -> CORS<&'static str> {
+pub fn compose_status_id(id: &str) -> CORS<&'static str> {
     CORS("Unimplemented")
 }
 
@@ -185,7 +185,7 @@ pub fn compose_status_id<'r>(id: &str) -> CORS<&'static str> {
 /// * Pass it the id of a running compose
 ///
 #[get("/compose/log/<kbytes>")]
-pub fn compose_log<'r>(kbytes: usize) -> CORS<&'static str> {
+pub fn compose_log(kbytes: usize) -> CORS<&'static str> {
     CORS("Unimplemented")
 }
 
@@ -516,7 +516,7 @@ pub fn modules_list_noargs_default(db: State<DBPool>) -> CORS<JSON<ModulesListRe
 /// ```
 ///
 pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
-    if modules.len() == 0 {
+    if modules.is_empty() {
         modules = "*";
     }
     info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
