@@ -1,4 +1,4 @@
-# Composer BDCS API Library and Server
+# BDCS API Library and Server
 
 This codebase is the BDCS API server, it handles API requests for project
 information, recipes, and image composing.

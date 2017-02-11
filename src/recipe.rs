@@ -1,8 +1,8 @@
-//! Composer Recipe Functions
+//! Welder Recipe Functions
 //!
 //! ## Overview
 //!
-//! Composer recipes are stored as TOML formatted files in a git repository.
+//! Welder recipes are stored as TOML formatted files in a git repository.
 //! This module provides functions for listing, reading, and writing them.
 //!
 
@@ -102,7 +102,7 @@ impl From<toml::de::Error> for RecipeError {
 }
 
 
-/// Composer Recipe
+/// Welder Recipe
 ///
 /// This is used to parse the full recipe's TOML, and to write a JSON representation of
 /// the Recipe.
