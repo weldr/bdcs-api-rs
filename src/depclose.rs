@@ -17,7 +17,7 @@
 
 use db::*;
 use rusqlite::{self, Connection};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -41,7 +41,6 @@ impl fmt::Display for NEVRA {
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Proposition {
     Obsoletes(String, String),
-    Provides(NEVRA, String),
     Requires(NEVRA, String),
 }
 
@@ -68,15 +67,15 @@ fn get_nevra_group_id(conn: &Connection, id: i64) -> NEVRA {
     NEVRA { name: name, epoch: epoch, version: ver, release: rel, arch: arch }
 }
 
-fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, Proposition)> {
+fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, (NEVRA, String))> {
     let mut contents = Vec::new();
 
     match get_provider_groups(conn, thing) {
         Ok(providers)   => { for tup in providers {
                                  let nevra = get_nevra_group_id(conn, tup.0.id);
                                  match tup.1.ext_value {
-                                     Some(expr) => contents.push((tup.0.id, Proposition::Provides (nevra, expr))),
-                                     None       => contents.push((tup.0.id, Proposition::Provides (nevra, String::from(thing)))),
+                                     Some(expr) => contents.push((tup.0.id, (nevra, expr))),
+                                     None       => contents.push((tup.0.id, (nevra, String::from(thing)))),
                                  }
                              }
                            }
@@ -87,13 +86,13 @@ fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, Propositi
     contents
 }
 
-fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, Proposition)> {
+fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, (NEVRA, String))> {
     let mut contents = Vec::new();
 
     match get_groups_filename(conn, thing) {
         Ok(providers)   => { for tup in providers {
                                  let nevra = get_nevra_group_id(conn, tup.id);
-                                 contents.push((tup.id, Proposition::Provides (nevra, String::from(thing))));
+                                 contents.push((tup.id, (nevra, String::from(thing))));
                              }
                            }
         Err(_)          => { }
@@ -116,8 +115,9 @@ fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(String, String)> {
     contents
 }
 
-pub fn close_dependencies(conn: &Connection, packages: Vec<String>) -> rusqlite::Result<Vec<Proposition>> {
+pub fn close_dependencies(conn: &Connection, packages: Vec<String>) -> rusqlite::Result<(Vec<Proposition>, HashMap<String, Vec<NEVRA>>)> {
     let mut props = HashSet::new();
+    let mut provided_by_dict: HashMap<String, Vec<NEVRA>> = HashMap::new();
     let mut seen = HashSet::new();
     let mut worklist = packages.clone();
 
@@ -141,34 +141,37 @@ pub fn close_dependencies(conn: &Connection, packages: Vec<String>) -> rusqlite:
         // Extract the group IDs from each provider tuple.
         let group_ids: Vec<i64> = providers.clone().into_iter().map(|x| x.0).collect();
 
+        // Add all the new providers to the mapping.  This is keyed on the thing being
+        // provided, and multiple packages can provide the same thing, hence this is a
+        // little more complicated than it should be.
+        for (_, (provided_by, whats_provided)) in providers {
+            provided_by_dict.entry(whats_provided).or_insert(vec![]).push(provided_by);
+        }
+
         // Get the requirements and obsoletes for each.
         let mut reqs = Vec::new();
         let mut obs = Vec::new();
 
-        for i in group_ids {
-            match get_requirements_group_id(conn, i) {
+        for i in &group_ids {
+            match get_requirements_group_id(conn, *i) {
                 Ok(lst) => { let new = lst.into_iter().map(|x| x.req_expr).collect();
                              reqs.push(new);
                            }
                 Err(_)  => { reqs.push(Vec::new()); }
             }
 
-            let mut lst = what_obsoletes(conn, i);
+            let mut lst = what_obsoletes(conn, *i);
             obs.append(&mut lst);
         }
 
         // Add the new propositions to the set.
-        for i in &providers {
-            props.insert(i.1.clone());
-        }
-
         for i in &obs {
             props.insert(Proposition::Obsoletes (i.0.clone(), i.1.clone()));
         }
 
-        for (p, reqs_for_p) in providers.iter().zip(&reqs) {
+        for (p, reqs_for_p) in group_ids.iter().zip(&reqs) {
             for i in reqs_for_p {
-                let nevra = get_nevra_group_id(conn, p.0);
+                let nevra = get_nevra_group_id(conn, *p);
                 props.insert(Proposition::Requires (nevra, i.clone()));
             }
         }
@@ -186,5 +189,5 @@ pub fn close_dependencies(conn: &Connection, packages: Vec<String>) -> rusqlite:
         worklist.append(&mut obsolete_names);
     }
 
-    Ok(props.into_iter().collect())
+    Ok((props.into_iter().collect(), provided_by_dict))
 }
