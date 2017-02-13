@@ -31,7 +31,7 @@ slog-scope = "0.2.*"
 slog-stream = "1.2.*"
 slog-term = "1.3.*"
 #toml = {version = "0.2.*", default-features=false, features = ["serde"]}
-toml = {git="https://github.com/bcl/toml-rs.git", rev="serde-upgrade"}
+toml = {git="https://github.com/alexcrichton/toml-rs.git", rev="master"}
 unicase = "1.*"
 
 [dev-dependencies]

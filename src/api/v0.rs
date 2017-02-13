@@ -721,13 +721,15 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 #[post("/recipes/new", format="application/json", data="<recipe>")]
 pub fn recipes_new(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
     info!("/recipes/new/"; "recipe.name" => recipe.name);
-    // TODO This should be a per-user path
-    let recipe_path = config::active()
-                          .unwrap()
-                          .get_str("recipe_path")
-                          .unwrap_or("/var/tmp/recipes/");
+    // TODO Get the user's branch name. Use master for now.
 
-    let status = recipe::write(&recipe_path, &recipe).unwrap_or(false);
+    let status = match recipe::write(&repo.repo(), &recipe, "master") {
+        Ok(result) => result,
+        Err(e) => {
+            error!("recipes_new"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+            false
+        }
+    };
 
     // TODO Return error information
     CORS(JSON(RecipesNewResponse {
@@ -783,14 +785,14 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
     for name in recipe_names.split(",") {
         let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
             let mut modules = Vec::new();
-            for module in recipe.clone().modules.unwrap_or(vec![]) {
+            for module in recipe.clone().modules {
                 match get_group_deps(&db.conn(), &module.name, 0, i64::max_value()) {
                     Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
             }
 
-            for package in recipe.clone().packages.unwrap_or(vec![]) {
+            for package in recipe.clone().packages {
                 match get_group_deps(&db.conn(), &package.name, 0, i64::max_value()) {
                     Ok(r) => modules.push(r),
                     Err(_) => {}

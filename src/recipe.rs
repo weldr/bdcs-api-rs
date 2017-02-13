@@ -59,6 +59,8 @@ pub enum RecipeError {
     Git2(git2::Error),
     Glob(glob::PatternError),
     Utf8(str::Utf8Error),
+    TomlSer(toml::ser::Error),
+    TomlDe(toml::de::Error),
     RecipeName,
     ParseTOML
 }
@@ -87,6 +89,18 @@ impl From<str::Utf8Error> for RecipeError {
     }
 }
 
+impl From<toml::ser::Error> for RecipeError {
+    fn from(err: toml::ser::Error) -> RecipeError {
+        RecipeError::TomlSer(err)
+    }
+}
+
+impl From<toml::de::Error> for RecipeError {
+    fn from(err: toml::de::Error) -> RecipeError {
+        RecipeError::TomlDe(err)
+    }
+}
+
 
 /// Composer Recipe
 ///
@@ -97,8 +111,10 @@ impl From<str::Utf8Error> for RecipeError {
 pub struct Recipe {
     pub name: String,
     pub description: Option<String>,
-    pub modules: Option<Vec<Modules>>,
-    pub packages: Option<Vec<Packages>>
+    #[serde(default)]
+    pub modules: Vec<Modules>,
+    #[serde(default)]
+    pub packages: Vec<Packages>
 }
 
 impl Recipe {
@@ -248,12 +264,12 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), Recipe
 /// The filename committed to git is the name inside the recipe, not the filename it is
 /// read from.
 ///
-pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<(), RecipeError> {
+pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<bool, RecipeError> {
     let mut input = String::new();
     let _ = try!(File::open(file)).read_to_string(&mut input);
     let recipe = try!(toml::from_str::<Recipe>(&input).or(Err(RecipeError::ParseTOML)));
 
-    write_recipe(repo, &recipe, branch)
+    write(repo, &recipe, branch)
 }
 
 /// Write a recipe to a branch
@@ -272,7 +288,7 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<(), Recip
 /// This is used to create a new file, or to write new contents to an existing file.
 /// If the branch does not exist, it will be created.
 ///
-pub fn write_recipe(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<(), RecipeError> {
+pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, RecipeError> {
     // Does the branch exist? If not, create it based on master
     match repo.find_branch(branch, BranchType::Local) {
         Ok(_) => {}
@@ -287,8 +303,10 @@ pub fn write_recipe(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<
         debug!("Branch {}'s id is {}", branch, branch_id);
         let parent_commit = try!(repo.find_commit(branch_id));
         let blob_id = {
-            let recipe_toml = try!(toml::to_string(&recipe).or(Err(RecipeError::ParseTOML)));
-            try!(repo.blob(recipe_toml.as_bytes()))
+            // NOTE toml::to_string() can fail depending on which struct elements are empty
+            // we use try_from to work around this by converting to a Value first.
+            let recipe_toml = try!(toml::Value::try_from(recipe));
+            try!(repo.blob(recipe_toml.to_string().as_bytes()))
         };
         let tree_id = {
             let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
@@ -303,7 +321,7 @@ pub fn write_recipe(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<
         debug!("Recipe commit:"; "branch" => branch, "recipe_name" => recipe.name, "commit_msg" => commit_msg);
     }
 
-    Ok(())
+    Ok(true)
 }
 
 /// Read a recipe from a branch
@@ -504,29 +522,4 @@ pub fn recipes_changes(repo: &Repository,
         to: "empty".to_string(),
         diff: vec![]
     })
-}
-
-
-/// Write a Recipe to disk
-///
-/// # Arguments
-///
-/// * `path` - path to directory with recipes
-///
-/// # Returns
-///
-/// * a bool Result
-///
-pub fn write(path: &str, recipe: &Recipe) -> Result<bool, RecipeError> {
-    let recipe_toml = try!(toml::to_string(&recipe).or(Err(RecipeError::ParseTOML)));
-
-    let path = format!("{}{}.toml", path, recipe.name.clone().replace(" ", "-"));
-
-    let _ = try!(OpenOptions::new()
-                 .write(true)
-                 .truncate(true)
-                 .create(true)
-                 .open(&path))
-            .write_all(recipe_toml.as_bytes());
-    Ok(true)
 }
