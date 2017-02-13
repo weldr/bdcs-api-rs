@@ -5,12 +5,70 @@ extern crate rusqlite;
 
 use r2d2_sqlite::SqliteConnectionManager;
 use bdcs::depclose::*;
+use std::collections::{HashMap, HashSet};
 use std::env;
 
-fn print_one(p: Proposition) {
+#[derive (PartialEq, Eq, Hash)]
+enum Expression {
+    Atom(String),
+    Nevra(NEVRA),
+    And(Box<Expression>, Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
+    Not(Box<Expression>)
+}
+
+fn expression_to_string(x: Expression) -> String {
+    match x {
+        Expression::Atom(a)     => a,
+        Expression::Nevra(a)    => a.to_string(),
+        Expression::And(a, b)   => format!("{} and {}", expression_to_string(*a), expression_to_string(*b)),
+        Expression::Or(a, b)    => format!("{} or {}", expression_to_string(*a), expression_to_string(*b)),
+        Expression::Not(a)      => format!("not {}", expression_to_string(*a))
+    }
+}
+
+fn build_or_expression(lst: &mut Vec<NEVRA>) -> Expression {
+    let hd = lst.remove(0);
+
+    if lst.len() == 0 { Expression::Nevra(hd) }
+    else { Expression::Or(Box::new(Expression::Nevra(hd)),
+                          Box::new(build_or_expression(lst))) }
+}
+
+fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<NEVRA>>) -> Option<Expression> {
     match p {
-        Proposition::Obsoletes(left, right) => println!("{} obsoletes {}", left, right),
-        Proposition::Requires(nevra, thing) => println!("{} requires {}", nevra, thing),
+        Proposition::Requires(nevra, thing)  => {
+            let left_side = Expression::Nevra(nevra);
+            let right_side = match dict.get(&thing) {
+                None      => Expression::Atom(thing),
+                Some(lst) => { if lst.len() == 1 { Expression::Nevra(lst[0].clone()) }
+                               else {
+                                   // Filter out duplicates in the list of things that must be
+                                   // installed because they are required by the left_side.  It
+                                   // would be nicer to prevent duplicates from ever getting in
+                                   // here in close_dependencies, but that may not be possible.
+                                   let mut our_lst = lst.clone();
+                                   our_lst.sort();
+                                   our_lst.dedup();
+                                   build_or_expression(&mut our_lst)
+                               }
+                             }
+            };
+
+            // Ignore possibilities like "libidn and libidn".  These should really be filtered out
+            // by close_dependencies, but it may not be possible - what if we only know they're
+            // equal after using the provided_by_dict?
+            if left_side != right_side {
+                Some(Expression::And(Box::new(left_side), Box::new(right_side)))
+            }
+            else {
+                None
+            }
+        },
+        Proposition::Obsoletes(left, right)  => {
+            Some(Expression::And(Box::new(Expression::Atom(left)),
+                                 Box::new(Expression::Not(Box::new(Expression::Atom(right))))))
+        }
     }
 }
 
@@ -30,25 +88,23 @@ fn main() {
 
     let conn = pool.get().unwrap();
 
-    let (props, provided_by_dict) = close_dependencies(&conn, argv).unwrap_or_default();
+    let (props, provided_by_dict) = close_dependencies(&conn, &argv).unwrap_or_default();
 
-    // Split propositions into three lists for ease of comparing output with haskell version.
-    let mut obs = Vec::new();
-    let mut reqs = Vec::new();
+    let mut exprs = HashSet::new();
 
+    // Add boolean expressions for each thing that was requested to be installed.
+    for thing in argv {
+        exprs.insert(Expression::Atom(thing));
+    }
+
+    // Convert all the Propositions given by close_dependencies into boolean expressions
+    // that can be solved.  This also involves translating Provides into what actually
+    // provides them.
     for p in props {
-        match p {
-            Proposition::Obsoletes(_, _) => obs.push(p),
-            Proposition::Requires(_, _)  => reqs.push(p),
+        if let Some(x) = proposition_to_expression(p, &provided_by_dict) {
+            exprs.insert(x);
         }
     }
 
-    obs.sort();
-    reqs.sort();
-
-    for i in obs { print_one(i) }
-    for i in reqs { print_one(i) }
-    for (p, what_provides) in provided_by_dict {
-        println!("{} is provided by {:?}", p, what_provides);
-    }
+    for x in exprs { println!("{}", expression_to_string(x)) }
 }

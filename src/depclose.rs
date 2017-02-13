@@ -115,7 +115,7 @@ fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(String, String)> {
     contents
 }
 
-pub fn close_dependencies(conn: &Connection, packages: Vec<String>) -> rusqlite::Result<(Vec<Proposition>, HashMap<String, Vec<NEVRA>>)> {
+pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite::Result<(Vec<Proposition>, HashMap<String, Vec<NEVRA>>)> {
     let mut props = HashSet::new();
     let mut provided_by_dict: HashMap<String, Vec<NEVRA>> = HashMap::new();
     let mut seen = HashSet::new();
