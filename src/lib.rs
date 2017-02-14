@@ -44,6 +44,7 @@ extern crate toml;
 pub mod api;
 pub mod db;
 pub mod recipe;
+pub mod rpm;
 
 /// Configuration file used by Rocket
 #[derive(Debug, Serialize)]
