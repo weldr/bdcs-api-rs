@@ -86,16 +86,9 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use r2d2;
-use r2d2_sqlite::SqliteConnectionManager;
-use rocket::config;
-use rocket::http::Status;
+use hyper::method::Method;
 use rocket::http::hyper::header;
-use rocket::http::hyper::Method;
-use rocket::request::{self, Request, FromRequest};
 use rocket::response::{self, Responder, Response};
-use rocket::outcome::Outcome::*;
-use rusqlite::Connection;
 
 
 pub mod v0;
@@ -106,36 +99,6 @@ pub mod docs;
 pub static OFFSET: i64 = 0;
 pub static LIMIT: i64 = 20;
 
-
-// Initialize the database pool and make it available to the handlers
-// From - https://github.com/SergioBenitez/Rocket/issues/53#issuecomment-269460216
-lazy_static! {
-    pub static ref DB_POOL: r2d2::Pool<SqliteConnectionManager> = {
-        let db_url = config::active().unwrap().get_str("db_path").unwrap_or("./metadata.db");
-        let db_mgr = SqliteConnectionManager::new(&db_url);
-        let db_pool = r2d2::Pool::new(r2d2::Config::default(), db_mgr)
-                        .expect("Unable to initialize the connection pool.");
-        db_pool
-    };
-}
-
-pub struct DB(r2d2::PooledConnection<SqliteConnectionManager>);
-
-impl DB {
-    pub fn conn(&self) -> &Connection {
-        &*self.0
-    }
-}
-
-impl<'a, 'r> FromRequest<'a, 'r> for DB {
-    type Error = r2d2::GetTimeout;
-    fn from_request(_: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        match DB_POOL.get() {
-            Ok(conn) => Success(DB(conn)),
-            Err(e) => Failure((Status::InternalServerError, e)),
-        }
-    }
-}
 
 /// This is used for optional query parameters that filter the results
 ///

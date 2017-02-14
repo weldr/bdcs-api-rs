@@ -11,27 +11,28 @@ path = "src/main.rs"
 [dependencies]
 clap = "2.*"
 flate2 = "0.*"
+git2 = "0.6.*"
 glob = "0.*"
-hyper = "0.*"
+hyper = "0.10.*"
 lazy_static = "0.2.*"
-r2d2 = "0.*"
-r2d2_sqlite = "0.*"
-rocket = "0.1.*"
-rocket_codegen = "0.1.*"
-rocket_contrib = "0.1.*"
+r2d2 = "0.7.*"
+r2d2_sqlite = "0.1.*"
+rocket = "0.2.*"
+rocket_codegen = "0.2.*"
+rocket_contrib = "0.2.*"
 rusqlite = "0.9.*"
 rustc-serialize = "0.3.*"
-serde = "=0.8.21"
-serde_json = "0.8.*"
-serde_derive = "=0.8.21"
+serde = "0.9.*"
+serde_derive = "0.9.*"
+serde_json = "0.9.*"
 slog = "1.3.*"
 slog-json = "1.2.*"
 slog-scope = "0.2.*"
 slog-stream = "1.2.*"
 slog-term = "1.3.*"
-# Note that toml cannot be switched to serde due to rocket's use of toml with rustc-serialize
-toml = "0.2.*"
+#toml = {version = "0.2.*", default-features=false, features = ["serde"]}
+toml = {git="https://github.com/alexcrichton/toml-rs.git", rev="master"}
 unicase = "1.*"
 
 [dev-dependencies]
-rocket = { version = "0.1.*", features = ["testing"] }
+rocket = { version = "0.2.*", features = ["testing"] }

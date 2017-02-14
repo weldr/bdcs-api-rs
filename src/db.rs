@@ -33,7 +33,26 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use r2d2;
+use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{self, Connection};
+
+
+/// Database pool connection, used with Rocket's managed state system
+pub struct DBPool(r2d2::Pool<SqliteConnectionManager>);
+impl DBPool {
+    pub fn new(db_path: &str) -> DBPool {
+        // Setup the database pool
+        let db_mgr = SqliteConnectionManager::new(db_path);
+        let db_pool = r2d2::Pool::new(r2d2::Config::default(), db_mgr)
+                            .expect("Unable to initialize the connection pool.");
+        DBPool(db_pool)
+    }
+
+    pub fn conn(&self) -> r2d2::PooledConnection<SqliteConnectionManager> {
+        self.0.get().unwrap()
+    }
+}
 
 
 /// High level details for upstream projects

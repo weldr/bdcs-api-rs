@@ -23,19 +23,17 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 #![feature(plugin)]
-#![feature(proc_macro)]
 #![feature(custom_derive)]
 #![plugin(rocket_codegen)]
 
+extern crate git2;
 extern crate glob;
 extern crate hyper;
-#[macro_use] extern crate lazy_static;
 extern crate r2d2;
 extern crate r2d2_sqlite;
 extern crate rocket;
 #[macro_use] extern crate rocket_contrib;
 extern crate rusqlite;
-extern crate rustc_serialize;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate slog;
@@ -48,12 +46,12 @@ pub mod db;
 pub mod recipe;
 
 /// Configuration file used by Rocket
-#[derive(Debug, RustcEncodable)]
+#[derive(Debug, Serialize)]
 pub struct RocketToml {
     pub global: RocketConfig
 }
 
-#[derive(Debug, RustcEncodable)]
+#[derive(Debug, Serialize)]
 pub struct RocketConfig {
     pub address: String,
     pub port: usize,

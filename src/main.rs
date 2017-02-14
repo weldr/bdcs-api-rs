@@ -61,6 +61,8 @@ use std::io::Write;
 
 use bdcs::{RocketToml, RocketConfig};
 use bdcs::api::{v0, mock, docs};
+use bdcs::db::DBPool;
+use bdcs::recipe::{self, RecipeRepo};
 use clap::{Arg, App};
 use slog::DrainExt;
 
@@ -114,9 +116,9 @@ fn main() {
     };
 
     // Write out a Rocket.toml config with [global] settings
-    let rocket_toml = toml::encode(&rocket_config);
+    let rocket_toml = toml::to_string(&rocket_config).unwrap();
     File::create("Rocket.toml").unwrap()
-        .write_all(toml::encode_str(&rocket_toml).as_bytes()).unwrap();
+        .write_all(rocket_toml.as_bytes()).unwrap();
 
     // Setup logging
     let term_drain = slog_term::streamer().build();
@@ -131,6 +133,12 @@ fn main() {
 
     info!(format!("BDCS API v{} started", crate_version!()));
     info!("Config:"; "rocket_config" => format!("{:?}", rocket_config));
+
+    // Import the recipes from recipe_path into master branch of the git repository
+    {
+        let repo = recipe::init_repo(&rocket_config.global.recipe_path).unwrap();
+        recipe::add_dir(&repo, &rocket_config.global.recipe_path, "master").unwrap();
+    }
 
     rocket::ignite()
         .mount("/api/v0/", routes![v0::test, v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,
@@ -148,5 +156,7 @@ fn main() {
                                      mock::static_route_param, mock::static_route_param_filter,
                                      mock::static_route_action, mock::static_route_action_filter])
         .mount("/api/docs/", routes![docs::index, docs::files])
+        .manage(DBPool::new(&rocket_config.global.db_path))
+        .manage(RecipeRepo::new(&rocket_config.global.recipe_path))
         .launch();
 }

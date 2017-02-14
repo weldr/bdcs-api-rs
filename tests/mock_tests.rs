@@ -57,9 +57,9 @@ fn write_config() {
     };
 
     // Write out a Rocket.toml config with [global] settings
-    let rocket_toml = toml::encode(&rocket_config);
+    let rocket_toml = toml::to_string(&rocket_config).unwrap();
     File::create("Rocket.toml").unwrap()
-        .write_all(toml::encode_str(&rocket_toml).as_bytes()).unwrap();
+        .write_all(rocket_toml.as_bytes()).unwrap();
 }
 
 #[test]
