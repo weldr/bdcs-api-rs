@@ -44,7 +44,7 @@
 #![plugin(rocket_codegen)]
 
 extern crate bdcs;
-extern crate clap;
+#[macro_use] extern crate clap;
 extern crate rocket;
 extern crate rusqlite;
 extern crate rustc_serialize;
@@ -71,6 +71,7 @@ use slog::DrainExt;
 fn main() {
     let matches = App::new("bdcs-api")
                             .about("A REST API on top of the BDCS")
+                            .version(crate_version!())
                             .arg(Arg::with_name("host")
                                         .long("host")
                                         .value_name("HOSTNAME|IP")
@@ -130,7 +131,7 @@ fn main() {
     let log = slog::Logger::root(slog::duplicate(term_drain, file_drain).fuse(), o!());
     slog_scope::set_global_logger(log);
 
-    info!(format!("BDCS API v{} started", env!("CARGO_PKG_VERSION")));
+    info!(format!("BDCS API v{} started", crate_version!()));
     info!("Config:"; "rocket_config" => format!("{:?}", rocket_config));
 
     // Import the recipes from recipe_path into master branch of the git repository
