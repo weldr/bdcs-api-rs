@@ -32,7 +32,7 @@ use bdcs::recipe::{self, RecipeRepo};
 use rocket::http::{ContentType, Method, Status};
 use rocket::testing::MockRequest;
 
-const DB_PATH: &'static str = "./metadata.db";
+const DB_PATH: &'static str = "./tests/metadata.db";
 // XXX This path is REMOVED on each run.
 const RECIPE_PATH: &'static str = "/var/tmp/bdcs-recipes-test/";
 
@@ -141,7 +141,7 @@ fn run_api_tests() {
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/projects/list?offset=10&limit=2");
+    let mut req = MockRequest::new(Method::Get, "/projects/list?offset=2&limit=2");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
@@ -182,7 +182,7 @@ fn run_api_tests() {
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/modules/list?offset=15&limit=2");
+    let mut req = MockRequest::new(Method::Get, "/modules/list?offset=2&limit=2");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
