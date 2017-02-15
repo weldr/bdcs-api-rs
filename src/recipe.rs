@@ -107,6 +107,8 @@ impl From<toml::de::Error> for RecipeError {
 /// This is used to parse the full recipe's TOML, and to write a JSON representation of
 /// the Recipe.
 ///
+/// Empty modules or packages are represented as an empty list.
+///
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Recipe {
     pub name: String,
@@ -125,8 +127,7 @@ impl Recipe {
 
 /// Recipe Modules
 ///
-/// This is used for the Recipe's `modules` section and can be serialized
-/// to/from JSON and TOML.
+/// This is used for the Recipe's `modules` section.
 ///
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Modules {
@@ -194,7 +195,8 @@ fn recipe_filename(name: &str) -> Result<String, RecipeError> {
 /// * A Result with a Repository or a RecipeError
 ///
 /// A bare git repo will be created in ./git/ at the specified path.
-/// If a repo already exists it will be opened and returned.
+/// If a repo already exists it will be opened and returned instead of
+/// creating a new one.
 ///
 pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
     let repo_path = Path::new(path).join("git");
@@ -232,7 +234,9 @@ pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
 ///
 /// * Result with () or a RecipeError
 ///
-/// This will add all the files in the directory, without recursing into any directories.
+/// This will add all the files in the `path` directory, without recursing
+/// into any sub-directories. The files will be added as individual commits,
+/// using [add_file](fn.add_file.html)
 ///
 pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), RecipeError> {
     let toml_glob = format!("{}/*.toml", path);
@@ -258,11 +262,11 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), Recipe
 ///
 /// # Return
 ///
-/// * Result with () or a RecipeError
+/// * Result with `true` or a RecipeError
 ///
 /// Files are read into a [Recipe](struct.Recipe.html) struct before being written to disk.
-/// The filename committed to git is the name inside the recipe, not the filename it is
-/// read from.
+/// The filename committed to git is the name inside the recipe after replacing spaces with '-'
+/// and appending .toml to it. It is not the filename it is read from.
 ///
 pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<bool, RecipeError> {
     let mut input = String::new();
@@ -283,10 +287,11 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<bool, Rec
 ///
 /// # Return
 ///
-/// * Result with () or a RecipeError
+/// * Result with `true` or a RecipeError
 ///
 /// This is used to create a new file, or to write new contents to an existing file.
-/// If the branch does not exist, it will be created.
+/// If the branch does not exist, it will be created. By convention the `master`
+/// branch is used for example recipes.
 ///
 pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, RecipeError> {
     // Does the branch exist? If not, create it based on master
@@ -334,7 +339,7 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, R
 ///
 /// # Return
 ///
-/// * An Option with the array of bytes or None, or a RecipeError
+/// * A Result with a Recipe, or a RecipeError
 ///
 /// The recipe name is converted to a filename by appending '.toml' and replacing
 /// all spaces with '-'
@@ -363,7 +368,7 @@ pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -
 ///
 /// # Return
 ///
-/// * A Vector of Strings or a RecipeError
+/// * A Result with a Vector of Strings or a RecipeError
 ///
 pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
     let mut recipes = Vec::new();
