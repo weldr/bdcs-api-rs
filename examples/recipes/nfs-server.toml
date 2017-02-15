@@ -1,6 +1,0 @@
-description = "An example NFS server"
-name = "nfs-server"
-
-[[packages]]
-name = "nfs"
-version = "4.1"
