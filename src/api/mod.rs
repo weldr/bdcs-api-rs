@@ -44,7 +44,19 @@
 //! * Use plural nouns for resources, and HTTP Methods as the verbs.
 //! * GET does not alter the state of the server
 //! * Use sub-resources for relations (eg. TODO Add an example)
-//! * Use query parameters to filter, sort, and paginate results. eg. `/api/v0/recipes/list?limit=50&offset=42`
+//!
+//! ## Optional filter parameters
+//!
+//! Some API routes that can return large amounts of data, like `/projects/list`, default to returning
+//! a limited number of results (currently the default is 20). The caller can change this limit by using
+//! the `limit` parameter to set a different limit. eg. `/api/v0/recipes/list?limit=50`
+//!
+//! These responses can also be paginated by passing an `offset` parameter to skip some number of results
+//! before returning values. eg. to get the 2nd 'page' of projects you would request
+//! `/api/v0/recipes/list?offset=20`
+//!
+//! These can also be combined. eg. `/api/v0/recipes/list?limit=10&offset=40` to implement different page
+//! lengths.
 //!
 //! # Responses
 //!

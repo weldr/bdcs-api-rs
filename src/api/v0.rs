@@ -6,6 +6,52 @@
 //! listing projects, retrieving detailed information on projects and modules, manipulating recipe
 //! files, etc.
 //!
+//! # v0 API routes
+//!
+//! * `/api/v0/test`
+//! * `/api/v0/isos`
+//! * `/api/v0/compose`
+//! * `/api/v0/compose/cancel`
+//! * `/api/v0/compose/status`
+//! * `/api/v0/compose/status/<id>`
+//! * `/api/v0/compose/log/<kbytes>`
+//! * `/api/v0/compose/types`
+//!  - Return the types of images that can be created
+//!  - [Example JSON](fn.compose_types.html#examples)
+//! * `/api/v0/projects/list`
+//!  - Return summaries about available projects
+//!  - [Example JSON](fn.projects_list.html#examples)
+//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
+//! * `/api/v0/projects/info/<projects>
+//!  - Return detailed information about the project, all of its builds, and the sources of the
+//!    builds.
+//!  - [Example JSON](fn.projects_info.html#examples)
+//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
+//! * `/api/v0/modules/list`
+//!  - Return a list of available modules
+//!  - [Example JSON](fn.modules_list.html#examples)
+//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
+//! * `/api/v0/modules/info/<modules>
+//!  - Return detailed information about a module.
+//!  - [Example JSON](fn.modules_info.html#examples)
+//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
+//! * `/api/v0/recipes/list`
+//!  - List the names of the available recipes
+//!  - [Example JSON](fn.recipes_list.html#examples)
+//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
+//! * `/api/v0/recipes/info/<recipes>`
+//!  - Return the contents of the recipe
+//!  - [Example JSON](fn.recipes_info.html#examples)
+//! * `/api/v0/recipes/depsolve/<recipes>`
+//!  - Return the recipe and summary information about all of its modules and packages.
+//!  - [Example JSON](fn.recipes_depsolve.html#examples)
+//! * POST `/api/v0/recipes/new`
+//!  - Create or update a recipe.
+//!  - The body of the post is a JSON representation of the recipe, using the same format
+//!    received by ``/api/v0/recipes/info/<recipes>`
+//!  - [Example JSON](fn.recipes_new.html#examples)
+//!
+//!
 //! ## TODO
 //!
 //!  * Implement generic gzip handling for all responses.
@@ -228,14 +274,28 @@ pub struct ComposeTypesResponse {
 ///
 /// * JSON response with 'types' set to a list of {'name':value, 'enabled': true|false} entries.
 ///
-/// # Panics
-///
-/// * Failure to serialize the response
 ///
 /// # Examples
 ///
 /// ```json
-/// {"types":[{"enabled":true,"name":"iso"},{"enabled":false,"name":"disk-image"},{"enabled":false,"name":"fs-image"},{"enabled":false,"name":"ami"},{"enabled":false,"name":"tar"},{"enabled":false,"name":"live-pxe"},{"enabled":false,"name":"live-ostree"},{"enabled":false,"name":"oci"},{"enabled":false,"name":"vagrant"},{"enabled":false,"name":"qcow2"},{"enabled":false,"name":"vmdk"},{"enabled":false,"name":"vhdx"}]}
+/// {
+///     "types": [
+///         {
+///             "name": "iso",
+///             "enabled": true
+///         },
+///         {
+///             "name": "disk-image",
+///             "enabled": false
+///         },
+///         {
+///             "name": "fs-image",
+///             "enabled": false
+///         },
+///         ...
+///         }
+///     ]
+/// }
 /// ```
 #[get("/compose/types")]
 pub fn compose_types() -> CORS<JSON<ComposeTypesResponse>> {
@@ -301,12 +361,25 @@ pub fn projects_list_default(db: State<DBPool>) -> CORS<JSON<ProjectsResponse>> 
 /// # Panics
 ///
 /// * Failure to get a database connection
-/// * Failure to serialize the response
+///
 ///
 /// # Examples
 ///
 /// ```json
-/// TODO
+/// {
+///     "projects": [
+///         {
+///             "name": "basesystem",
+///             "summary": "The skeleton package which defines a simple CentOS Linux system",
+///             "description": "Basesystem defines the components of a basic CentOS Linux\nsystem (for example, the package installation order to use during\nbootstrapping). Basesystem should be in every installation of a system,\nand it should never be removed.",
+///             "homepage": null,
+///             "upstream_vcs": "UPSTREAM_VCS"
+///         },
+///         ...
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
 /// ```
 ///
 pub fn projects_list(db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
@@ -364,16 +437,49 @@ pub fn projects_info_default(projects: &str, db: State<DBPool>) -> CORS<JSON<Pro
 /// # Panics
 ///
 /// * Failure to get a database connection
-/// * Failure to serialize the response
 ///
 ///
 /// The response includes details about the project, the available builds for the project,
 /// and the sources used for the builds.
 ///
+///
 /// # Examples
 ///
 /// ```json
-/// TODO
+/// {
+///     "projects": [
+///         {
+///             "name": "httpd",
+///             "summary": "Apache HTTP Server",
+///             "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
+///             "homepage": "http://httpd.apache.org/",
+///             "upstream_vcs": "UPSTREAM_VCS",
+///             "metadata": {},
+///             "builds": [
+///                 {
+///                     "epoch": 0,
+///                     "release": "45.el7.centos",
+///                     "arch": "x86_64",
+///                     "build_time": "2016-11-14T18:06:40",
+///                     "changelog": "- Remove index.html, add centos-noindex.tar.gz\n- change vstring\n- change symlink for poweredby.png\n- update welcome.conf with proper aliases",
+///                     "build_config_ref": "BUILD_CONFIG_REF",
+///                     "build_env_ref": "BUILD_ENV_REF",
+///                     "metadata": {
+///                         "packageName": "httpd"
+///                     },
+///                     "source": {
+///                         "license": "ASL 2.0",
+///                         "version": "2.4.6",
+///                         "source_ref": "SOURCE_REF",
+///                         "metadata": {}
+///                     }
+///                 }
+///             ]
+///         }
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
 /// ```
 ///
 pub fn projects_info(projects: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
@@ -431,13 +537,25 @@ pub fn modules_info_default(modules: &str, db: State<DBPool>) -> CORS<JSON<Modul
 /// # Panics
 ///
 /// * Failure to get a database connection
-/// * Failure to serialize the response
 ///
 ///
 /// # Examples
 ///
 /// ```json
-/// TODO
+/// {
+///     "modules": [
+///         {
+///             "name": "httpd",
+///             "summary": "Apache HTTP Server",
+///             "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
+///             "homepage": "http://httpd.apache.org/",
+///             "upstream_vcs": "UPSTREAM_VCS",
+///             "projects": []
+///         }
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
 /// ```
 ///
 pub fn modules_info(modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
@@ -512,7 +630,28 @@ pub fn modules_list_noargs_default(db: State<DBPool>) -> CORS<JSON<ModulesListRe
 /// # Examples
 ///
 /// ```json
-/// TODO
+/// {
+///     "modules": [
+///         {
+///             "name": "basesystem",
+///             "group_type": "rpm"
+///         },
+///         {
+///             "name": "bash",
+///             "group_type": "rpm"
+///         },
+///         {
+///             "name": "filesystem",
+///             "group_type": "rpm"
+///         },
+///         {
+///             "name": "httpd",
+///             "group_type": "rpm"
+///         }
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
 /// ```
 ///
 pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
@@ -586,7 +725,18 @@ pub fn recipes_list_default(repo: State<RecipeRepo>) -> CORS<JSON<RecipesListRes
 /// # Examples
 ///
 /// ```json
-/// {"recipes":["nfs-server","http-server","email-server"]}
+/// {
+///     "recipes": [
+///         "development",
+///         "glusterfs",
+///         "http-server",
+///         "jboss",
+///         "kubernetes",
+///         "octave",
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
 /// ```
 ///
 pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesListResponse>> {
@@ -648,12 +798,56 @@ pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON
 ///
 /// * Failure to serialize the response
 ///
-/// # Errors
 ///
 /// # Examples
 ///
 /// ```json
-/// TODO
+/// {
+///     "recipes": [
+///         {
+///             "name": "http-server",
+///             "description": "An example http server with PHP and MySQL support.",
+///             "modules": [
+///                 {
+///                     "name": "httpd",
+///                     "version": "2.4.*"
+///                 },
+///                 {
+///                     "name": "mod_auth_kerb",
+///                     "version": "5.4"
+///                 },
+///                 {
+///                     "name": "mod_ssl",
+///                     "version": "2.4.*"
+///                 },
+///                 {
+///                     "name": "php",
+///                     "version": "5.4.*"
+///                 },
+///                 {
+///                     "name": "php-mysql",
+///                     "version": "5.4.*"
+///                 }
+///             ],
+///             "packages": [
+///                 {
+///                     "name": "tmux",
+///                     "version": "2.2"
+///                 },
+///                 {
+///                     "name": "openssh-server",
+///                     "version": "6.6.*"
+///                 },
+///                 {
+///                     "name": "rsync",
+///                     "version": "3.0.*"
+///                 }
+///             ]
+///         }
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
 /// ```
 ///
 pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
@@ -703,11 +897,7 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 ///
 /// # Response
 ///
-/// * JSON response with recipe contents, using the recipe name(s) as keys
-///
-/// # Panics
-///
-/// * Failure to serialize the response
+/// * JSON response with "status" set to true or false.
 ///
 ///
 /// The body of the POST should be a valid Recipe in JSON format. If it cannot be parsed an
@@ -715,8 +905,57 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 ///
 /// # Examples
 ///
+/// ## POST body
+///
 /// ```json
-/// {"name":"http-server","description":"An example http server","modules":[{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
+/// {
+///     "name": "http-server",
+///     "description": "An example http server with PHP and MySQL support.",
+///     "modules": [
+///         {
+///             "name": "httpd",
+///             "version": "2.4.*"
+///         },
+///         {
+///             "name": "mod_auth_kerb",
+///             "version": "5.4"
+///         },
+///         {
+///             "name": "mod_ssl",
+///             "version": "2.4.*"
+///         },
+///         {
+///             "name": "php",
+///             "version": "5.4.*"
+///         },
+///         {
+///             "name": "php-mysql",
+///             "version": "5.4.*"
+///         }
+///     ],
+///     "packages": [
+///         {
+///             "name": "tmux",
+///             "version": "2.2"
+///         },
+///         {
+///             "name": "openssh-server",
+///             "version": "6.6.*"
+///         },
+///         {
+///             "name": "rsync",
+///             "version": "3.0.*"
+///         }
+///     ]
+/// }
+/// ```
+///
+/// ## Response
+///
+/// ```json
+/// {
+///     "status": true
+/// }
 /// ```
 #[post("/recipes/new", format="application/json", data="<recipe>")]
 pub fn recipes_new(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
@@ -773,8 +1012,43 @@ pub struct RecipesDepsolveResponse {
 /// # Examples
 ///
 /// ```json
-/// TODO
 /// ```
+/// {
+///     "recipes": [
+///         {
+///             "recipe": {
+///             [SAME CONTENT AS /recipes/info]
+///             },
+///             "modules": [
+///                 {
+///                     "name": "httpd",
+///                     "summary": "Apache HTTP Server",
+///                     "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
+///                     "homepage": "http://httpd.apache.org/",
+///                     "upstream_vcs": "UPSTREAM_VCS",
+///                     "projects": []
+///                 },
+///                 {
+///                     "name": "mod_auth_kerb",
+///                     "summary": "Kerberos authentication module for HTTP",
+///                     "description": "mod_auth_kerb is module for the Apache HTTP Server designed to\nprovide Kerberos authentication over HTTP.  The module supports the\nNegotiate authentication method, which performs full Kerberos\nauthentication based on ticket exchanges.",
+///                     "homepage": "http://modauthkerb.sourceforge.net/",
+///                     "upstream_vcs": "UPSTREAM_VCS",
+///                     "projects": [
+///                         {
+///                             "name": "httpd",
+///                             "summary": "Apache HTTP Server",
+///                             "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
+///                             "homepage": "http://httpd.apache.org/",
+///                             "upstream_vcs": "UPSTREAM_VCS"
+///                         }
+///                     ]
+///                 },
+///                 ...
+///             ]
+///         }
+///     ]
+/// }
 ///
 #[get("/recipes/depsolve/<recipe_names>")]
 pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesDepsolveResponse>> {
