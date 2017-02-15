@@ -47,7 +47,14 @@ const RECIPE_PATH: &'static str = "/var/tmp/bdcs-recipes-test/";
 /// Setup the test environment properly.
 ///
 fn write_config() {
-    remove_dir_all(RECIPE_PATH).unwrap();
+    // Ignore ENOENT, fail on anything else
+    match remove_dir_all(RECIPE_PATH) {
+        Ok(_)  => (),
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::NotFound => (),
+            _ => panic!("Unable to remove {}: {}", RECIPE_PATH, e)
+        }
+    };
 
     // Write out the config to a Rocket.toml (this is easier than using rocket::custom)
     let rocket_config = RocketToml {
