@@ -22,14 +22,12 @@ extern crate bdcs;
 extern crate rocket;
 extern crate toml;
 
-use std::fs::{File, remove_file};
-use std::io::{Read, Write};
-use std::path::Path;
+use std::fs::File;
+use std::io::Write;
 
 use bdcs::{RocketToml, RocketConfig};
 use bdcs::api::mock;
-use rocket::config;
-use rocket::http::{ContentType, Method, Status};
+use rocket::http::{Method, Status};
 use rocket::testing::MockRequest;
 
 
@@ -136,4 +134,3 @@ fn mock_route_action() {
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
 }
-
