@@ -81,7 +81,8 @@ use rocket_contrib::JSON;
 // bdcs database functions
 use db::*;
 use recipe::{self, RecipeRepo, Recipe};
-use api::{CORS, Filter, OFFSET, LIMIT};
+use api::{CORS, Filter, Format, OFFSET, LIMIT};
+use api::toml::TOML;
 
 
 /// Test the connection to the API
@@ -851,12 +852,11 @@ pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON
 /// ```
 ///
 pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
-    info!("/recipes/info/"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
+    info!("/recipes/info/ (JSON)"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
     // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
     for name in recipe_names.split(",").take(limit as usize) {
-        // TODO Filesystem Path needs to be sanitized!
         let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
             result.push(recipe);
         });
@@ -870,6 +870,27 @@ pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<Rec
         limit:   limit
     }))
 }
+
+/// Return the requested recipe as TOML
+/// Note that this only supports 1 recipe at a time
+///
+/// The request should be: `/recipes/info/<recipe_name>?format=toml`
+///
+/// NOTE this is accomplished this way because Rocket doesn't have a way to specify a
+/// custom Content-Type for GET requests.
+///
+/// TODO Figure out how to add custom content types
+#[get("/recipes/info/<recipe_name>?<format>", rank=3)]
+pub fn recipes_info_toml(recipe_name: &str, format: Format, repo: State<RecipeRepo>) -> CORS<TOML<Recipe>> {
+    info!("/recipes/info/ (TOML)"; "recipe_name" => recipe_name, "format" => format!("{:?}", format));
+    // TODO Get the user's branch name. Use master for now.
+
+    // TODO Error handling for format requests other than toml
+    CORS(TOML(
+        recipe::read(&repo.repo(), &recipe_name, "master", None).unwrap()
+    ))
+}
+
 
 /// Hold the JSON response for /recipes/new/
 #[derive(Debug, Serialize)]
@@ -958,8 +979,35 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 /// }
 /// ```
 #[post("/recipes/new", format="application/json", data="<recipe>")]
-pub fn recipes_new(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
-    info!("/recipes/new/"; "recipe.name" => recipe.name);
+pub fn recipes_new_json(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+    info!("/recipes/new/ (JSON)"; "recipe.name" => recipe.name);
+    // TODO Get the user's branch name. Use master for now.
+
+    let status = match recipe::write(&repo.repo(), &recipe, "master") {
+        Ok(result) => result,
+        Err(e) => {
+            error!("recipes_new"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+            false
+        }
+    };
+
+    // TODO Return error information
+    CORS(JSON(RecipesNewResponse {
+            status: status
+    }))
+}
+
+
+/// Accept a TOML formatted POST to /recipes/new
+///
+/// This requires that the client set the type to "text/x-toml" and that the data be passed
+/// without change.
+///
+/// eg. `curl -H "Content-Type: text/x-toml" -X POST --data-binary @nginx.toml http://API/URL`
+///
+#[post("/recipes/new", data="<recipe>", rank=2)]
+pub fn recipes_new_toml(recipe: TOML<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+    info!("/recipes/new/ (TOML)"; "recipe.name" => recipe.name);
     // TODO Get the user's branch name. Use master for now.
 
     let status = match recipe::write(&repo.repo(), &recipe, "master") {

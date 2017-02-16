@@ -106,6 +106,7 @@ use rocket::response::{self, Responder, Response};
 pub mod v0;
 pub mod mock;
 pub mod docs;
+pub mod toml;
 
 // defaults for queries that return multiple responses
 pub static OFFSET: i64 = 0;
@@ -121,6 +122,15 @@ pub static LIMIT: i64 = 20;
 pub struct Filter {
     pub offset: Option<i64>,
     pub limit: Option<i64>
+}
+
+/// This is used for requesting a specific format for the result
+///
+/// Pass it to the handler as `format: Format` and it will contain the ?format=<string> argument.
+///
+#[derive(Debug, Serialize, FromForm)]
+pub struct Format {
+    pub format: String
 }
 
 /// Response wrapper that adds CORS headers to the response
