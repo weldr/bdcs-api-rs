@@ -8,6 +8,7 @@ use bdcs::depclose::*;
 use bdcs::rpm::*;
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::process::exit;
 use std::str::FromStr;
 
 #[derive (PartialEq, Eq, Hash)]
@@ -86,7 +87,12 @@ fn main() {
 
     let conn = pool.get().unwrap();
 
-    let (props, provided_by_dict) = close_dependencies(&conn, &argv).unwrap_or_default();
+    let (props, provided_by_dict) = match close_dependencies(&conn, &argv) {
+        Err(e)  => { println!("Error: {}", e);
+                     exit(1);
+                   }
+        Ok(tup) => tup
+    };
 
     let mut exprs = HashSet::new();
 

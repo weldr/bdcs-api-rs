@@ -54,7 +54,7 @@ fn get_requirement_group_id(conn: &Connection, id: i64) -> Requirement {
     }
 }
 
-fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, (Requirement, Requirement))> {
+fn find_provider_for_name(conn: &Connection, thing: &str) -> Result<Vec<(i64, (Requirement, Requirement))>, String> {
     let mut contents = Vec::new();
 
     match get_provider_groups(conn, thing) {
@@ -65,15 +65,15 @@ fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, (Requirem
                                      None       => contents.push((tup.0.id, (nevra, Requirement::from_str(thing).unwrap()))),
                                  }
                              }
+
+                             Ok(contents)
                            }
     
-        Err(_)          => { }
+        Err(e)          => { Err(e.to_string()) }
     }
-
-    contents
 }
 
-fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, (Requirement, Requirement))> {
+fn find_group_containing_file(conn: &Connection, thing: &str) -> Result<Vec<(i64, (Requirement, Requirement))>, String> {
     let mut contents = Vec::new();
 
     match get_groups_filename(conn, thing) {
@@ -81,14 +81,14 @@ fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, (Requ
                                  let nevra = get_requirement_group_id(conn, tup.id);
                                  contents.push((tup.id, (nevra, Requirement::from_str(thing).unwrap())));
                              }
-                           }
-        Err(_)          => { }
-    }
 
-    contents
+                             Ok(contents)
+                           }
+        Err(e)          => { Err(e.to_string()) }
+    }
 }
 
-fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(Requirement, Requirement)> {
+fn what_obsoletes(conn: &Connection, id: i64) -> Result<Vec<(Requirement, Requirement)>, String> {
     let mut contents = Vec::new();
 
     match get_group_obsoletes(conn, id) {
@@ -99,14 +99,14 @@ fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(Requirement, Requirement)>
                                  contents.push((Requirement::from_str(name).unwrap(),
                                                 Requirement::from_str(expr.as_str()).unwrap()));
                              }
-                           }
-        Err(_)          => { }
-    }
 
-    contents
+                             Ok(contents)
+                           }
+        Err(e)          => { Err(e.to_string()) }
+    }
 }
 
-pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite::Result<(Vec<Proposition>, HashMap<String, Vec<Requirement>>)> {
+pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> Result<(Vec<Proposition>, HashMap<String, Vec<Requirement>>), String> {
     let mut props = HashSet::new();
     let mut provided_by_dict: HashMap<String, Vec<Requirement>> = HashMap::new();
     let mut seen = HashSet::new();
@@ -120,13 +120,22 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite
             continue;
         }
 
-        let mut providers = find_provider_for_name(conn, hd.as_str());
+        let mut providers = try!(find_provider_for_name(conn, hd.as_str()));
 
         // If the requirement looks like a filename, also look for packages
         // providing the file.
         if hd.starts_with('/') {
-            let mut file_providers = find_group_containing_file(conn, hd.as_str());
+            let mut file_providers = try!(find_group_containing_file(conn, hd.as_str()));
             providers.append(&mut file_providers);
+        }
+
+        // If we get here and nothing provides hd, that's an error - some package is asking
+        // for something that does not exist.  We can't just have find_provider_for_name and
+        // find_group_containing_file return an Err if a requirement is missing.  Consider
+        // "Requires: /bin/sh".  This looks like a file, but it no longer exists.  It is however
+        // provided by a package.  Thus we need to look in both spots for it.
+        if providers.is_empty() {
+            return Err(format!("Nothing provides {}", hd.as_str()));
         }
 
         // Extract the group IDs from each provider tuple.
@@ -151,7 +160,7 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite
                 Err(_)  => { reqs.push(Vec::new()); }
             }
 
-            let mut lst = what_obsoletes(conn, *i);
+            let mut lst = try!(what_obsoletes(conn, *i));
             obs.append(&mut lst);
         }
 
