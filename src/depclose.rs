@@ -16,35 +16,19 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use db::*;
+use rpm::*;
 use rusqlite::{self, Connection};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::str::FromStr;
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct NEVRA {
-    pub name: String,
-    pub epoch: Option<String>,
-    pub version: String,
-    pub release: String,
-    pub arch: String
-}
-
-impl fmt::Display for NEVRA {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.epoch {
-            None            => write!(f, "{}-{}-{}.{}", self.name, self.version, self.release, self.arch),
-            Some(ref epoch) => write!(f, "{}:{}-{}-{}.{}", epoch, self.name, self.version, self.release, self.arch)
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Proposition {
-    Obsoletes(String, String),
-    Requires(NEVRA, String),
+    Obsoletes(Requirement, Requirement),
+    Requires(Requirement, Requirement),
 }
 
-fn get_nevra_group_id(conn: &Connection, id: i64) -> NEVRA {
+fn get_requirement_group_id(conn: &Connection, id: i64) -> Requirement {
     let kvs = get_groups_kv_group_id(conn, id);
 
     let mut name = String::from("");
@@ -64,18 +48,21 @@ fn get_nevra_group_id(conn: &Connection, id: i64) -> NEVRA {
         }
     }
 
-    NEVRA { name: name, epoch: epoch, version: ver, release: rel, arch: arch }
+    match epoch {
+        Some(e) => Requirement::from_str(format!("{}:{}-{}-{}.{}", e, name, ver, rel, arch).as_str()).unwrap(),
+        None    => Requirement::from_str(format!("{}-{}-{}.{}", name, ver, rel, arch).as_str()).unwrap()
+    }
 }
 
-fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, (NEVRA, String))> {
+fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, (Requirement, Requirement))> {
     let mut contents = Vec::new();
 
     match get_provider_groups(conn, thing) {
         Ok(providers)   => { for tup in providers {
-                                 let nevra = get_nevra_group_id(conn, tup.0.id);
+                                 let nevra = get_requirement_group_id(conn, tup.0.id);
                                  match tup.1.ext_value {
-                                     Some(expr) => contents.push((tup.0.id, (nevra, expr))),
-                                     None       => contents.push((tup.0.id, (nevra, String::from(thing)))),
+                                     Some(expr) => contents.push((tup.0.id, (nevra, Requirement::from_str(expr.as_str()).unwrap()))),
+                                     None       => contents.push((tup.0.id, (nevra, Requirement::from_str(thing).unwrap()))),
                                  }
                              }
                            }
@@ -86,13 +73,13 @@ fn find_provider_for_name(conn: &Connection, thing: &str) -> Vec<(i64, (NEVRA, S
     contents
 }
 
-fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, (NEVRA, String))> {
+fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, (Requirement, Requirement))> {
     let mut contents = Vec::new();
 
     match get_groups_filename(conn, thing) {
         Ok(providers)   => { for tup in providers {
-                                 let nevra = get_nevra_group_id(conn, tup.id);
-                                 contents.push((tup.id, (nevra, String::from(thing))));
+                                 let nevra = get_requirement_group_id(conn, tup.id);
+                                 contents.push((tup.id, (nevra, Requirement::from_str(thing).unwrap())));
                              }
                            }
         Err(_)          => { }
@@ -101,12 +88,16 @@ fn find_group_containing_file(conn: &Connection, thing: &str) -> Vec<(i64, (NEVR
     contents
 }
 
-fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(String, String)> {
+fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(Requirement, Requirement)> {
     let mut contents = Vec::new();
 
     match get_group_obsoletes(conn, id) {
         Ok(obsoleters)  => { for tup in obsoleters {
-                                 contents.push((tup.0.name.clone(), tup.1.ext_value.clone().unwrap()));
+                                 let name = tup.0.name.as_str();
+                                 let expr = tup.1.ext_value.unwrap();
+
+                                 contents.push((Requirement::from_str(name).unwrap(),
+                                                Requirement::from_str(expr.as_str()).unwrap()));
                              }
                            }
         Err(_)          => { }
@@ -115,9 +106,9 @@ fn what_obsoletes(conn: &Connection, id: i64) -> Vec<(String, String)> {
     contents
 }
 
-pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite::Result<(Vec<Proposition>, HashMap<String, Vec<NEVRA>>)> {
+pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite::Result<(Vec<Proposition>, HashMap<String, Vec<Requirement>>)> {
     let mut props = HashSet::new();
-    let mut provided_by_dict: HashMap<String, Vec<NEVRA>> = HashMap::new();
+    let mut provided_by_dict: HashMap<String, Vec<Requirement>> = HashMap::new();
     let mut seen = HashSet::new();
     let mut worklist = packages.clone();
 
@@ -145,7 +136,7 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite
         // provided, and multiple packages can provide the same thing, hence this is a
         // little more complicated than it should be.
         for (_, (provided_by, whats_provided)) in providers {
-            provided_by_dict.entry(whats_provided).or_insert(vec![]).push(provided_by);
+            provided_by_dict.entry(whats_provided.name).or_insert(vec![]).push(provided_by);
         }
 
         // Get the requirements and obsoletes for each.
@@ -166,13 +157,13 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite
 
         // Add the new propositions to the set.
         for i in &obs {
-            props.insert(Proposition::Obsoletes (i.0.clone(), i.1.clone()));
+            props.insert(Proposition::Obsoletes(i.0.clone(), i.1.clone()));
         }
 
         for (p, reqs_for_p) in group_ids.iter().zip(&reqs) {
             for i in reqs_for_p {
-                let nevra = get_nevra_group_id(conn, *p);
-                props.insert(Proposition::Requires (nevra, i.clone()));
+                let nevra = get_requirement_group_id(conn, *p);
+                props.insert(Proposition::Requires (nevra, Requirement::from_str(i).unwrap()));
             }
         }
 
@@ -185,7 +176,7 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> rusqlite
         let mut flattened : Vec<String> = reqs.into_iter().flat_map(|x| x.into_iter()).collect();
         worklist.append(&mut flattened);
 
-        let mut obsolete_names = obs.into_iter().map(|x| x.0).collect();
+        let mut obsolete_names = obs.into_iter().map(|x| x.0.name).collect();
         worklist.append(&mut obsolete_names);
     }
 

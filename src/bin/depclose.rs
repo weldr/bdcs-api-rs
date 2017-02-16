@@ -5,13 +5,14 @@ extern crate rusqlite;
 
 use r2d2_sqlite::SqliteConnectionManager;
 use bdcs::depclose::*;
+use bdcs::rpm::*;
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::str::FromStr;
 
 #[derive (PartialEq, Eq, Hash)]
 enum Expression {
-    Atom(String),
-    Nevra(NEVRA),
+    Atom(Requirement),
     And(Box<Expression>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     Not(Box<Expression>)
@@ -19,38 +20,35 @@ enum Expression {
 
 fn expression_to_string(x: Expression) -> String {
     match x {
-        Expression::Atom(a)     => a,
-        Expression::Nevra(a)    => a.to_string(),
+        Expression::Atom(a)     => a.to_string(),
         Expression::And(a, b)   => format!("{} and {}", expression_to_string(*a), expression_to_string(*b)),
         Expression::Or(a, b)    => format!("{} or {}", expression_to_string(*a), expression_to_string(*b)),
         Expression::Not(a)      => format!("not {}", expression_to_string(*a))
     }
 }
 
-fn build_or_expression(lst: &mut Vec<NEVRA>) -> Expression {
+fn build_or_expression(lst: &mut Vec<Requirement>) -> Expression {
     let hd = lst.remove(0);
 
-    if lst.len() == 0 { Expression::Nevra(hd) }
-    else { Expression::Or(Box::new(Expression::Nevra(hd)),
+    if lst.len() == 0 { Expression::Atom(hd) }
+    else { Expression::Or(Box::new(Expression::Atom(hd)),
                           Box::new(build_or_expression(lst))) }
 }
 
-fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<NEVRA>>) -> Option<Expression> {
+fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<Requirement>>) -> Option<Expression> {
     match p {
         Proposition::Requires(nevra, thing)  => {
-            let left_side = Expression::Nevra(nevra);
-            let right_side = match dict.get(&thing) {
+            let left_side = Expression::Atom(nevra);
+            let right_side = match dict.get(&thing.name) {
                 None      => Expression::Atom(thing),
-                Some(lst) => { if lst.len() == 1 { Expression::Nevra(lst[0].clone()) }
+                Some(lst) => { if lst.len() == 1 { Expression::Atom(lst[0].clone()) }
                                else {
                                    // Filter out duplicates in the list of things that must be
                                    // installed because they are required by the left_side.  It
                                    // would be nicer to prevent duplicates from ever getting in
                                    // here in close_dependencies, but that may not be possible.
-                                   let mut our_lst = lst.clone();
-                                   our_lst.sort();
-                                   our_lst.dedup();
-                                   build_or_expression(&mut our_lst)
+                                   let tmp: HashSet<Requirement> = lst.clone().into_iter().collect();
+                                   build_or_expression(&mut tmp.into_iter().collect())
                                }
                              }
             };
@@ -94,7 +92,7 @@ fn main() {
 
     // Add boolean expressions for each thing that was requested to be installed.
     for thing in argv {
-        exprs.insert(Expression::Atom(thing));
+        exprs.insert(Expression::Atom(Requirement::from_str(thing.as_str()).unwrap()));
     }
 
     // Convert all the Propositions given by close_dependencies into boolean expressions
