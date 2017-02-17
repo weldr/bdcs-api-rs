@@ -28,7 +28,7 @@ pub enum Proposition {
     Requires(Requirement, Requirement),
 }
 
-fn get_requirement_group_id(conn: &Connection, id: i64) -> Requirement {
+fn get_requirement_group_id(conn: &Connection, arches: &Vec<String>, id: i64) -> Option<Requirement> {
     let kvs = get_groups_kv_group_id(conn, id);
 
     let mut name = String::from("");
@@ -48,21 +48,26 @@ fn get_requirement_group_id(conn: &Connection, id: i64) -> Requirement {
         }
     }
 
+    if arch != "noarch" && !arches.contains(&arch) {
+        return None;
+    }
+
     match epoch {
-        Some(e) => Requirement::from_str(format!("{}:{}-{}-{}.{}", e, name, ver, rel, arch).as_str()).unwrap(),
-        None    => Requirement::from_str(format!("{}-{}-{}.{}", name, ver, rel, arch).as_str()).unwrap()
+        Some(e) => Some(Requirement::from_str(format!("{}:{}-{}-{}.{}", e, name, ver, rel, arch).as_str()).unwrap()),
+        None    => Some(Requirement::from_str(format!("{}-{}-{}.{}", name, ver, rel, arch).as_str()).unwrap())
     }
 }
 
-fn find_provider_for_name(conn: &Connection, thing: &str) -> Result<Vec<(i64, (Requirement, Requirement))>, String> {
+fn find_provider_for_name(conn: &Connection, arches: &Vec<String>, thing: &str) -> Result<Vec<(i64, (Requirement, Requirement))>, String> {
     let mut contents = Vec::new();
 
     match get_provider_groups(conn, thing) {
         Ok(providers)   => { for tup in providers {
-                                 let nevra = get_requirement_group_id(conn, tup.0.id);
-                                 match tup.1.ext_value {
-                                     Some(expr) => contents.push((tup.0.id, (nevra, Requirement::from_str(expr.as_str()).unwrap()))),
-                                     None       => contents.push((tup.0.id, (nevra, Requirement::from_str(thing).unwrap()))),
+                                 if let Some(nevra) = get_requirement_group_id(conn, arches, tup.0.id) {
+                                     match tup.1.ext_value {
+                                         Some(expr) => contents.push((tup.0.id, (nevra, Requirement::from_str(expr.as_str()).unwrap()))),
+                                         None       => contents.push((tup.0.id, (nevra, Requirement::from_str(thing).unwrap()))),
+                                     }
                                  }
                              }
 
@@ -73,13 +78,14 @@ fn find_provider_for_name(conn: &Connection, thing: &str) -> Result<Vec<(i64, (R
     }
 }
 
-fn find_group_containing_file(conn: &Connection, thing: &str) -> Result<Vec<(i64, (Requirement, Requirement))>, String> {
+fn find_group_containing_file(conn: &Connection, arches: &Vec<String>, thing: &str) -> Result<Vec<(i64, (Requirement, Requirement))>, String> {
     let mut contents = Vec::new();
 
     match get_groups_filename(conn, thing) {
         Ok(providers)   => { for tup in providers {
-                                 let nevra = get_requirement_group_id(conn, tup.id);
-                                 contents.push((tup.id, (nevra, Requirement::from_str(thing).unwrap())));
+                                 if let Some(nevra) = get_requirement_group_id(conn, arches, tup.id) {
+                                     contents.push((tup.id, (nevra, Requirement::from_str(thing).unwrap())));
+                                 }
                              }
 
                              Ok(contents)
@@ -106,7 +112,7 @@ fn what_obsoletes(conn: &Connection, id: i64) -> Result<Vec<(Requirement, Requir
     }
 }
 
-pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> Result<(Vec<Proposition>, HashMap<String, Vec<Requirement>>), String> {
+pub fn close_dependencies(conn: &Connection, arches: &Vec<String>, packages: &Vec<String>) -> Result<(Vec<Proposition>, HashMap<String, Vec<Requirement>>), String> {
     let mut props = HashSet::new();
     let mut provided_by_dict: HashMap<String, Vec<Requirement>> = HashMap::new();
     let mut seen = HashSet::new();
@@ -120,12 +126,12 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> Result<(
             continue;
         }
 
-        let mut providers = try!(find_provider_for_name(conn, hd.as_str()));
+        let mut providers = try!(find_provider_for_name(conn, arches, hd.as_str()));
 
         // If the requirement looks like a filename, also look for packages
         // providing the file.
         if hd.starts_with('/') {
-            let mut file_providers = try!(find_group_containing_file(conn, hd.as_str()));
+            let mut file_providers = try!(find_group_containing_file(conn, arches, hd.as_str()));
             providers.append(&mut file_providers);
         }
 
@@ -135,7 +141,7 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> Result<(
         // "Requires: /bin/sh".  This looks like a file, but it no longer exists.  It is however
         // provided by a package.  Thus we need to look in both spots for it.
         if providers.is_empty() {
-            return Err(format!("Nothing provides {}", hd.as_str()));
+            return Err(format!("Nothing provides {} for architecture {:?}", hd.as_str(), arches));
         }
 
         // Extract the group IDs from each provider tuple.
@@ -171,8 +177,9 @@ pub fn close_dependencies(conn: &Connection, packages: &Vec<String>) -> Result<(
 
         for (p, reqs_for_p) in group_ids.iter().zip(&reqs) {
             for i in reqs_for_p {
-                let nevra = get_requirement_group_id(conn, *p);
-                props.insert(Proposition::Requires (nevra, Requirement::from_str(i).unwrap()));
+                if let Some(nevra) = get_requirement_group_id(conn, arches, *p) {
+                    props.insert(Proposition::Requires (nevra, Requirement::from_str(i).unwrap()));
+                }
             }
         }
 

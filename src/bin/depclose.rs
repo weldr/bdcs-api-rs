@@ -87,7 +87,7 @@ fn main() {
 
     let conn = pool.get().unwrap();
 
-    let (props, provided_by_dict) = match close_dependencies(&conn, &argv) {
+    let (props, provided_by_dict) = match close_dependencies(&conn, &vec!(String::from("x86_64")), &argv) {
         Err(e)  => { println!("Error: {}", e);
                      exit(1);
                    }
