@@ -229,14 +229,14 @@ fn run_api_tests() {
     // Mount the API and run a request against it
 
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/example,http-server,nfs-server");
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,http-server");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/example,http-server,nfs-server?limit=2");
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,http-server,kubernetes?limit=2");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
@@ -261,7 +261,7 @@ fn run_api_tests() {
 
     // Mount the API and run a request against it
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/example");
+    let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/http-server");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);

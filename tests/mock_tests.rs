@@ -30,6 +30,10 @@ use bdcs::api::mock;
 use rocket::http::{Method, Status};
 use rocket::testing::MockRequest;
 
+const DB_PATH: &'static str = "./tests/metadata.db";
+// XXX This path is REMOVED on each run.
+const RECIPE_PATH: &'static str = "/var/tmp/bdcs-recipes-test/";
+
 
 /// Write Rocket.toml
 ///
@@ -46,8 +50,8 @@ fn write_config() {
         global: RocketConfig {
             address: "127.0.0.1".to_string(),
             port: 4000,
-            db_path: "./metadata.db".to_string(),
-            recipe_path: "/var/tmp/recipes/".to_string(),
+            db_path: DB_PATH.to_string(),
+            recipe_path: RECIPE_PATH.to_string(),
             log_path: "/var/log/bdcs-api.log".to_string(),
             mockfiles_path: "./tests/results/v0/".to_string()
 
