@@ -40,11 +40,13 @@ extern crate serde_json;
 #[macro_use] extern crate slog;
 #[macro_use] extern crate slog_scope;
 extern crate toml;
+extern crate itertools;
 
 
 pub mod api;
 pub mod db;
 pub mod depclose;
+pub mod depsolve;
 pub mod recipe;
 pub mod rpm;
 
