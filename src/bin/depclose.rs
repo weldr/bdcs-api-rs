@@ -1,39 +1,40 @@
 extern crate bdcs;
+extern crate itertools;
 extern crate r2d2;
 extern crate r2d2_sqlite;
 extern crate rusqlite;
 
-use r2d2_sqlite::SqliteConnectionManager;
 use bdcs::depclose::*;
 use bdcs::rpm::*;
+use itertools::*;
+use r2d2_sqlite::SqliteConnectionManager;
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::fmt;
 use std::process::exit;
 use std::str::FromStr;
 
 #[derive (PartialEq, Eq, Hash)]
 enum Expression {
     Atom(Requirement),
-    And(Box<Expression>, Box<Expression>),
-    Or(Box<Expression>, Box<Expression>),
+    And(Vec<Box<Expression>>),
+    Or(Vec<Box<Expression>>),
     Not(Box<Expression>)
 }
 
-fn expression_to_string(x: Expression) -> String {
-    match x {
-        Expression::Atom(a)     => a.to_string(),
-        Expression::And(a, b)   => format!("{} and {}", expression_to_string(*a), expression_to_string(*b)),
-        Expression::Or(a, b)    => format!("{} or {}", expression_to_string(*a), expression_to_string(*b)),
-        Expression::Not(a)      => format!("not {}", expression_to_string(*a))
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Expression::Atom(ref req)   => write!(f, "{}", req),
+            Expression::And(ref lst)    => { let strs: String = lst.iter().map(|x| x.to_string()).intersperse(String::from(" AND ")).collect();
+                                             write!(f, "{}", strs)
+                                           }
+            Expression::Not(ref expr)   => write!(f, "{}", expr),
+            Expression::Or(ref lst)     => { let strs: String = lst.iter().map(|x| x.to_string()).intersperse(String::from(" OR ")).collect();
+                                             write!(f, "{}", strs)
+                                           }
+        }
     }
-}
-
-fn build_or_expression(lst: &mut Vec<Requirement>) -> Expression {
-    let hd = lst.remove(0);
-
-    if lst.len() == 0 { Expression::Atom(hd) }
-    else { Expression::Or(Box::new(Expression::Atom(hd)),
-                          Box::new(build_or_expression(lst))) }
 }
 
 fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<Requirement>>) -> Option<Expression> {
@@ -49,7 +50,7 @@ fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<Requirem
                                    // would be nicer to prevent duplicates from ever getting in
                                    // here in close_dependencies, but that may not be possible.
                                    let tmp: HashSet<Requirement> = lst.clone().into_iter().collect();
-                                   build_or_expression(&mut tmp.into_iter().collect())
+                                   Expression::Or(tmp.into_iter().map(|x| Box::new(Expression::Atom(x))).collect())
                                }
                              }
             };
@@ -58,15 +59,15 @@ fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<Requirem
             // by close_dependencies, but it may not be possible - what if we only know they're
             // equal after using the provided_by_dict?
             if left_side != right_side {
-                Some(Expression::And(Box::new(left_side), Box::new(right_side)))
+                Some(Expression::And(vec!(Box::new(left_side), Box::new(right_side))))
             }
             else {
                 None
             }
         },
         Proposition::Obsoletes(left, right)  => {
-            Some(Expression::And(Box::new(Expression::Atom(left)),
-                                 Box::new(Expression::Not(Box::new(Expression::Atom(right))))))
+            Some(Expression::And(vec!(Box::new(Expression::Atom(left)),
+                                      Box::new(Expression::Not(Box::new(Expression::Atom(right)))))))
         }
     }
 }
@@ -110,5 +111,5 @@ fn main() {
         }
     }
 
-    for x in exprs { println!("{}", expression_to_string(x)) }
+    for x in exprs { println!("{}", x) }
 }
