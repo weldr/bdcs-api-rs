@@ -145,7 +145,7 @@ pub fn close_dependencies(conn: &Connection, arches: &Vec<String>, packages: &Ve
         }
 
         // Extract the group IDs from each provider tuple.
-        let group_ids: Vec<i64> = providers.clone().into_iter().map(|x| x.0).collect();
+        let group_ids: Vec<i64> = providers.iter().map(|x| x.0).collect();
 
         // Add all the new providers to the mapping.  This is keyed on the thing being
         // provided, and multiple packages can provide the same thing, hence this is a
