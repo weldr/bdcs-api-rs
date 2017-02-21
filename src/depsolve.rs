@@ -22,7 +22,7 @@ impl fmt::Display for Expression {
             Expression::And(ref lst)    => { let strs: String = lst.iter().map(|x| x.to_string()).intersperse(String::from(" AND ")).collect();
                                              write!(f, "{}", strs)
                                            }
-            Expression::Not(ref expr)   => write!(f, "{}", expr),
+            Expression::Not(ref expr)   => write!(f, "NOT {}", expr),
             Expression::Or(ref lst)     => { let strs: String = lst.iter().map(|x| x.to_string()).intersperse(String::from(" OR ")).collect();
                                              write!(f, "{}", strs)
                                            }
