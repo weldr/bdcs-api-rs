@@ -17,7 +17,7 @@
 
 use db::*;
 use rpm::*;
-use rusqlite::{self, Connection};
+use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -26,6 +26,15 @@ use std::str::FromStr;
 pub enum Proposition {
     Obsoletes(Requirement, Requirement),
     Requires(Requirement, Requirement),
+}
+
+impl fmt::Display for Proposition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Proposition::Obsoletes(ref left, ref right) => write!(f, "{} OBSOLETES {}", left, right),
+            Proposition::Requires(ref left, ref right)  => write!(f, "{} REQUIRES {}", left, right)
+        }
+    }
 }
 
 fn get_requirement_group_id(conn: &Connection, arches: &Vec<String>, id: i64) -> Option<Requirement> {
