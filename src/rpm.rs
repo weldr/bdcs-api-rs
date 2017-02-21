@@ -170,16 +170,23 @@ impl FromStr for ReqOperator {
     }
 }
 
-impl ReqOperator {
-    // Match a ReqOperator with an Operator, so, e.g., >= matches > and =
-    fn cmp(&self, o: Ordering) -> bool {
+// Match a ReqOperator with an Operator, so, e.g., >= matches > and =
+impl PartialEq<Ordering> for ReqOperator {
+    fn eq(&self, o: &Ordering) -> bool {
         match self {
-            &ReqOperator::GreaterThanEqual => o == Ordering::Greater || o == Ordering::Equal,
-            &ReqOperator::GreaterThan      => o == Ordering::Greater,
-            &ReqOperator::EqualTo          => o == Ordering::Equal,
-            &ReqOperator::LessThanEqual    => o == Ordering::Less || o == Ordering::Equal,
-            &ReqOperator::LessThan         => o == Ordering::Less
+            &ReqOperator::GreaterThanEqual => o == &Ordering::Greater || o == &Ordering::Equal,
+            &ReqOperator::GreaterThan      => o == &Ordering::Greater,
+            &ReqOperator::EqualTo          => o == &Ordering::Equal,
+            &ReqOperator::LessThanEqual    => o == &Ordering::Less || o == &Ordering::Equal,
+            &ReqOperator::LessThan         => o == &Ordering::Less
         }
+    }
+}
+
+// Also implement the reverse
+impl PartialEq<ReqOperator> for Ordering {
+    fn eq(&self, o: &ReqOperator) -> bool {
+        o == self
     }
 }
 
@@ -239,11 +246,11 @@ impl Requirement {
         // e.g. Provides: whatever <= 1.0, Requires: whatever >= 1.0-9
         if provides_evr.epoch.unwrap_or(0) == requires_evr.epoch.unwrap_or(0) &&
                 provides_evr.version == requires_evr.version {
-            if provides_operator.cmp(Ordering::Equal) && provides_evr.release == String::from("") {
+            if provides_operator == &Ordering::Equal && provides_evr.release == String::from("") {
                 return true;
             }
 
-            if requires_operator.cmp(Ordering::Equal) && requires_evr.release == String::from("") {
+            if requires_operator == &Ordering::Equal && requires_evr.release == String::from("") {
                 return true;
             }
         }
@@ -251,15 +258,15 @@ impl Requirement {
         // Now unravel whether the ranges overlap
         match provides_evr.cmp(requires_evr) {
             // true if Provides: >[=] x || Requires: <[=] y
-            Ordering::Less    => provides_operator.cmp(Ordering::Greater) || requires_operator.cmp(Ordering::Less),
+            Ordering::Less    => provides_operator == &Ordering::Greater || requires_operator == &Ordering::Less,
                 
             // true if Provides <[=] x || Requires: >[=] y
-            Ordering::Greater => provides_operator.cmp(Ordering::Less) || requires_operator.cmp(Ordering::Greater),
+            Ordering::Greater => provides_operator == &Ordering::Less || requires_operator == &Ordering::Greater,
 
             // true if the directions match
-            Ordering::Equal   => (provides_operator.cmp(Ordering::Less) && requires_operator.cmp(Ordering::Less)) ||
-                                 (provides_operator.cmp(Ordering::Equal) && requires_operator.cmp(Ordering::Equal)) ||
-                                 (provides_operator.cmp(Ordering::Greater) && requires_operator.cmp(Ordering::Greater))
+            Ordering::Equal   => (provides_operator == &Ordering::Less && requires_operator == &Ordering::Less) ||
+                                 (provides_operator == &Ordering::Equal && requires_operator == &Ordering::Equal) ||
+                                 (provides_operator == &Ordering::Greater && requires_operator == &Ordering::Greater)
         }
     }
 }
@@ -580,25 +587,25 @@ mod test_reqoperator_parse {
 
 #[test]
 fn test_reqoperator_cmp() -> () {
-    assert!(ReqOperator::GreaterThanEqual.cmp(Ordering::Greater));
-    assert!(ReqOperator::GreaterThanEqual.cmp(Ordering::Equal));
-    assert!(!ReqOperator::GreaterThanEqual.cmp(Ordering::Less));
+    assert!(ReqOperator::GreaterThanEqual == Ordering::Greater);
+    assert!(ReqOperator::GreaterThanEqual == Ordering::Equal);
+    assert!(ReqOperator::GreaterThanEqual != Ordering::Less);
 
-    assert!(ReqOperator::GreaterThan.cmp(Ordering::Greater));
-    assert!(!ReqOperator::GreaterThan.cmp(Ordering::Equal));
-    assert!(!ReqOperator::GreaterThan.cmp(Ordering::Less));
+    assert!(ReqOperator::GreaterThan == Ordering::Greater);
+    assert!(ReqOperator::GreaterThan != Ordering::Equal);
+    assert!(ReqOperator::GreaterThan != Ordering::Less);
 
-    assert!(!ReqOperator::EqualTo.cmp(Ordering::Greater));
-    assert!(ReqOperator::EqualTo.cmp(Ordering::Equal));
-    assert!(!ReqOperator::EqualTo.cmp(Ordering::Less));
+    assert!(ReqOperator::EqualTo != Ordering::Greater);
+    assert!(ReqOperator::EqualTo == Ordering::Equal);
+    assert!(ReqOperator::EqualTo != Ordering::Less);
 
-    assert!(!ReqOperator::LessThanEqual.cmp(Ordering::Greater));
-    assert!(ReqOperator::LessThanEqual.cmp(Ordering::Equal));
-    assert!(ReqOperator::LessThanEqual.cmp(Ordering::Less));
+    assert!(ReqOperator::LessThanEqual != Ordering::Greater);
+    assert!(ReqOperator::LessThanEqual == Ordering::Equal);
+    assert!(ReqOperator::LessThanEqual == Ordering::Less);
 
-    assert!(!ReqOperator::LessThan.cmp(Ordering::Greater));
-    assert!(!ReqOperator::LessThan.cmp(Ordering::Equal));
-    assert!(ReqOperator::LessThan.cmp(Ordering::Less));
+    assert!(ReqOperator::LessThan != Ordering::Greater);
+    assert!(ReqOperator::LessThan != Ordering::Equal);
+    assert!(ReqOperator::LessThan == Ordering::Less);
 }
 
 #[test]
