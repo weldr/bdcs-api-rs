@@ -8,7 +8,7 @@ use bdcs::depsolve::*;
 use bdcs::rpm::Requirement;
 
 use r2d2_sqlite::SqliteConnectionManager;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::process::exit;
 use std::str::FromStr;
@@ -36,11 +36,11 @@ fn main() {
         Ok(tup) => tup
     };
 
-    let mut exprs = HashSet::new();
+    let mut exprset = HashSet::new();
 
     // Add boolean expressions for each thing that was requested to be installed.
     for thing in argv {
-        exprs.insert(Expression::Atom(Requirement::from_str(thing.as_str()).unwrap()));
+        exprset.insert(Expression::Atom(Requirement::from_str(thing.as_str()).unwrap()));
     }
 
     // Convert all the Propositions given by close_dependencies into boolean expressions
@@ -48,9 +48,14 @@ fn main() {
     // provides them.
     for p in props {
         if let Some(x) = proposition_to_expression(p, &provided_by_dict) {
-            exprs.insert(x);
+            exprset.insert(x);
         }
     }
 
+    let mut assignments = HashMap::new();
+    let mut exprs = exprset.into_iter().collect();
+    unit_propagation(&mut exprs, &mut assignments);
+
+    for a in assignments { println!("{:?}", a) }
     for x in exprs { println!("{}", x) }
 }
