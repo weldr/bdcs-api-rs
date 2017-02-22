@@ -65,3 +65,17 @@ service you would add this to the commandline (before weld/bdcs-api):
 The files in tests/results/v0/ are suitable to use with the `/api/mock/` service.
 
 See the [documentation on the mock api](src/api/mock.rs) for more information.
+
+## Testing
+
+To execute the available tests:
+
+`cargo test`
+
+Use `RUST_TEST_THREADS=1` to force sequential execution and debug failing tests!
+
+General information about testing in Rust can be found at
+
+* [The Rust Testing Guide](http://aturon.github.io/stability-dashboard/guide-testing.html)
+* [Official Testing Documentation](https://doc.rust-lang.org/book/testing.html)
+* [Testing|Rust by Example](http://rustbyexample.com/meta/test.html)
