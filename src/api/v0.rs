@@ -74,6 +74,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
+use std::cmp;
 
 use rocket::State;
 use rocket_contrib::JSON;
@@ -661,11 +662,17 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
     }
     info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
-    let mut result = get_groups_vec(&db.conn(), &modules, offset, limit)
+    let mut result = get_groups_vec(&db.conn(), &modules)
                      .unwrap_or(vec![]);
     result.sort();
     // Groups includes the unique id, so dedupe using the name.
     result.dedup_by(|a, b| a.name.eq(&b.name));
+
+    // Remove 'offset' items
+    for i in 0..cmp::min(offset as usize, result.len()) {
+        result.remove(0);
+    }
+    result.truncate(limit as usize);
 
     CORS(JSON(ModulesListResponse {
             modules: result,

@@ -774,17 +774,15 @@ pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) 
 ///
 /// * `conn` - The database connection
 /// * `group` - The name of the group, glob search patterns allowed
-/// * `offset` - Number of results to skip before returning `limit`
-/// * `limit` - Maximum number of results to return
 ///
 /// # Returns
 ///
 /// * A Vector of [Groups](struct.Groups.html) for the matching group names
 ///
-pub fn get_groups_vec(conn: &Connection, groups: &[&str], offset: i64, limit: i64) -> rusqlite::Result<Vec<Groups>> {
+pub fn get_groups_vec(conn: &Connection, groups: &[&str]) -> rusqlite::Result<Vec<Groups>> {
     let mut results = Vec::new();
     for group_name in groups {
-        match get_groups_name(conn, group_name, offset, limit) {
+        match get_groups_name(conn, group_name, 0, i64::max_value()) {
             Ok(r) => results.extend(r),
             Err(_) => {}
         }
