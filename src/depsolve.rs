@@ -7,11 +7,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
-#[derive (PartialEq, Eq, Hash)]
+#[derive (Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Expression {
     Atom(Requirement),
-    And(Vec<Box<Expression>>),
-    Or(Vec<Box<Expression>>),
+    And(Box<Vec<Expression>>),
+    Or(Box<Vec<Expression>>),
     Not(Box<Expression>)
 }
 
@@ -43,7 +43,7 @@ pub fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<Requ
                                    // would be nicer to prevent duplicates from ever getting in
                                    // here in close_dependencies, but that may not be possible.
                                    let tmp: HashSet<Requirement> = lst.clone().into_iter().collect();
-                                   Expression::Or(tmp.into_iter().map(|x| Box::new(Expression::Atom(x))).collect())
+                                   Expression::Or(Box::new(tmp.into_iter().map(|x| Expression::Atom(x)).collect()))
                                }
                              }
             };
@@ -52,15 +52,15 @@ pub fn proposition_to_expression(p: Proposition, dict: &HashMap<String, Vec<Requ
             // by close_dependencies, but it may not be possible - what if we only know they're
             // equal after using the provided_by_dict?
             if left_side != right_side {
-                Some(Expression::And(vec!(Box::new(left_side), Box::new(right_side))))
+                Some(Expression::And(Box::new(vec!(left_side, right_side))))
             }
             else {
                 None
             }
         },
         Proposition::Obsoletes(left, right)  => {
-            Some(Expression::And(vec!(Box::new(Expression::Atom(left)),
-                                      Box::new(Expression::Not(Box::new(Expression::Atom(right)))))))
+            Some(Expression::And(Box::new(vec!(Expression::Atom(left),
+                                               Expression::Not(Box::new(Expression::Atom(right)))))))
         }
     }
 }
