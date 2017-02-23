@@ -664,7 +664,9 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
     let mut result = get_groups_vec(&db.conn(), &modules, offset, limit)
                      .unwrap_or(vec![]);
     result.sort();
-    result.dedup();
+    // Groups includes the unique id, so dedupe using the name.
+    result.dedup_by(|a, b| a.name.eq(&b.name));
+
     CORS(JSON(ModulesListResponse {
             modules: result,
             offset: offset,
