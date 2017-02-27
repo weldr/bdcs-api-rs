@@ -3,7 +3,7 @@ FROM weld/fedora:24
 MAINTAINER Brian C. Lane <bcl@redhat.com>
 
 RUN curl https://sh.rustup.rs -sSf \
-  | sh -s -- -y --default-toolchain nightly-2017-02-22
+  | sh -s -- -y --default-toolchain nightly
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -16,4 +16,4 @@ VOLUME /mddb /bdcs-recipes /mockfiles
 ## Do the things more likely to change below here. ##
 ## Run rustup update to pick up the latest nightly ##
 COPY . /bdcs-api-rs/
-RUN cd /bdcs-api-rs/ && rustup update && cargo build && cargo doc
+RUN cd /bdcs-api-rs/ && rm -rf ./target/ Cargo.lock && rustup update && cargo build && cargo doc
