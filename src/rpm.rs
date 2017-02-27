@@ -225,7 +225,7 @@ impl FromStr for Requirement {
 }
 
 impl Requirement {
-    fn satisfies(&self, requires: &Requirement) -> bool {
+    pub fn satisfies(&self, requires: &Requirement) -> bool {
         // Names gotta match
         if self.name != requires.name {
             return false;
