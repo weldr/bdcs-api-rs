@@ -20,6 +20,7 @@
 
 extern crate bdcs;
 extern crate rocket;
+extern crate serde_json;
 extern crate toml;
 
 use std::fs::{File, remove_dir_all};
@@ -31,6 +32,7 @@ use bdcs::db::DBPool;
 use bdcs::recipe::{self, RecipeRepo};
 use rocket::http::{ContentType, Method, Status};
 use rocket::testing::MockRequest;
+use serde_json::Value;
 
 const DB_PATH: &'static str = "./tests/metadata.db";
 // XXX This path is REMOVED on each run.
@@ -79,7 +81,7 @@ fn write_config() {
 /// Setup the Recipe git repo and import example recipes into it.
 fn setup_repo() {
     let repo = recipe::init_repo(RECIPE_PATH).unwrap();
-    recipe::add_dir(&repo, "./examples/recipes/", "master").unwrap();
+    recipe::add_dir(&repo, "./examples/recipes/", "master", false).unwrap();
 }
 
 #[test]
@@ -100,7 +102,9 @@ fn run_api_tests() {
                                         v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
                                         v0::recipes_list_default, v0::recipes_list_filter,
                                         v0::recipes_info_default, v0::recipes_info_filter,
-                                        v0::recipes_new_json,
+                                        v0::recipes_changes_default, v0::recipes_changes_filter,
+                                        v0::recipes_diff,
+                                        v0::recipes_new_json, v0::recipes_new_toml,
                                         v0::recipes_depsolve])
                                 .manage(db_pool)
                                 .manage(recipe_repo);
@@ -226,8 +230,6 @@ fn run_api_tests() {
     let expected_default = include_str!("results/v0/recipes-info.json").trim_right();
     let expected_filter = include_str!("results/v0/recipes-info-filter.json").trim_right();
 
-    // Mount the API and run a request against it
-
 
     let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,http-server");
     let mut response = req.dispatch_with(&rocket);
@@ -242,6 +244,28 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
+
+
+    // v0_recipes_changes()
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave,kubernetes");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "kubernetes".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["summary"], "Recipe kubernetes saved".to_string());
+    assert_eq!(j["recipes"][1]["name"], "octave".to_string());
+    assert_eq!(j["recipes"][1]["changes"][0]["summary"], "Recipe octave saved".to_string());
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?limit=1");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "octave".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["summary"], "Recipe octave saved".to_string());
 
 
     // v0_recipes_new()
@@ -267,4 +291,47 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected.to_string()));
+
+    // v0_recipes_new_toml()
+    // Update the example http-server recipe with some changes.
+    let recipe_toml = include_str!("results/v0/http-server.toml").trim_right();
+
+    let mut req = MockRequest::new(Method::Post, "/recipes/new")
+                    .header(ContentType::new("text", "x-toml"))
+                    .body(recipe_toml);
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    // v0_recipes_diff()
+    // Need the commit id from the change to http-server for the next test
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/http-server");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
+    assert_eq!(j["recipes"][0]["changes"][1]["summary"], "Recipe http-server saved".to_string());
+
+    // Convert serde::Value to a &str
+    let commit_id = match j["recipes"][0]["changes"][1]["commit"].as_str() {
+        Some(str) => str,
+        None => ""
+    };
+
+    let mut req = MockRequest::new(Method::Get, format!("/recipes/diff/http-server/{}/NEWEST", commit_id));
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
+    assert_eq!(j["recipes"][0]["from"], commit_id);
+    assert_eq!(j["recipes"][0]["to"], "NEWEST".to_string());
+    assert_eq!(j["recipes"][0]["diff"][8], "-name = \"php\"".to_string());
+    assert_eq!(j["recipes"][0]["diff"][14], "+name = \"ruby\"".to_string());
+    assert_eq!(j["recipes"][0]["diff"][15], "+version = \"2.0.0.598\"".to_string());
 }

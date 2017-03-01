@@ -1,0 +1,30 @@
+name = "http-server"
+description = "An example http server with PHP and MySQL support."
+
+[[modules]]
+name = "httpd"
+version = "2.4.*"
+
+[[modules]]
+name = "mod_auth_kerb"
+version = "5.4"
+
+[[modules]]
+name = "mod_ssl"
+version = "2.4.*"
+
+[[modules]]
+name = "ruby"
+version = "2.0.0.598"
+
+[[packages]]
+name = "tmux"
+version = "2.2"
+
+[[packages]]
+name = "openssh-server"
+version = "6.6.*"
+
+[[packages]]
+name = "rsync"
+version = "3.0.*"

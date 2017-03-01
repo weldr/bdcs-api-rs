@@ -137,7 +137,7 @@ fn main() {
     // Import the recipes from recipe_path into master branch of the git repository
     {
         let repo = recipe::init_repo(&rocket_config.global.recipe_path).unwrap();
-        recipe::add_dir(&repo, &rocket_config.global.recipe_path, "master").unwrap();
+        recipe::add_dir(&repo, &rocket_config.global.recipe_path, "master", false).unwrap();
     }
 
     rocket::ignite()
@@ -151,6 +151,8 @@ fn main() {
                                    v0::recipes_list_default, v0::recipes_list_filter,
                                    v0::recipes_info_default, v0::recipes_info_filter,
                                    v0::recipes_info_toml,
+                                   v0::recipes_changes_default, v0::recipes_changes_filter,
+                                   v0::recipes_diff,
                                    v0::options_recipes_new, v0::recipes_new_json, v0::recipes_new_toml,
                                    v0::recipes_depsolve])
         .mount("/api/mock/", routes![mock::static_route, mock::static_route_filter,

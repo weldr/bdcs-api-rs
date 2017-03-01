@@ -40,8 +40,14 @@
 //!  - [Example JSON](fn.recipes_list.html#examples)
 //!  - [Optional filter parameters](../index.html#optional-filter-parameters)
 //! * `/api/v0/recipes/info/<recipes>`
-//!  - Return the contents of the recipe
+//!  - Return the contents of the recipe.
 //!  - [Example JSON](fn.recipes_info.html#examples)
+//! * `/api/v0/recipes/changes/<recipes>`
+//!  - Return the commit history of the recipes
+//!  - [Example JSON](fn.recipes_changes.html#examples)
+//! * `/api/v0/recipes/diff/<recipe>/<from_commit>/<to_commit>`
+//!  - Return the diff between the two recipe commits. Set to_commit to NEWEST to use the newest commit.
+//!  - [Example JSON](fn.recipes_diff.html#examples)
 //! * `/api/v0/recipes/depsolve/<recipes>`
 //!  - Return the recipe and summary information about all of its modules and packages.
 //!  - [Example JSON](fn.recipes_depsolve.html#examples)
@@ -81,7 +87,7 @@ use rocket_contrib::JSON;
 
 // bdcs database functions
 use db::*;
-use recipe::{self, RecipeRepo, Recipe};
+use recipe::{self, RecipeRepo, Recipe, RecipeCommit};
 use api::{CORS, Filter, Format, OFFSET, LIMIT};
 use api::toml::TOML;
 
@@ -873,6 +879,7 @@ pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<Rec
     result.sort();
     result.dedup();
     result.truncate(limit as usize);
+
     CORS(JSON(RecipesInfoResponse {
         recipes: result,
         offset:  offset,
@@ -900,6 +907,210 @@ pub fn recipes_info_toml(recipe_name: &str, format: Format, repo: State<RecipeRe
     ))
 }
 
+/// Hold the JSON response for /recipes/changes/
+#[derive(Debug, Serialize)]
+pub struct RecipesChangesResponse {
+    recipes: Vec<RecipeCommitInfo>,
+    offset:  i64,
+    limit:   i64
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RecipeCommitInfo {
+    name: String,
+    changes: Vec<RecipeCommit>
+}
+
+/// Handler for `/recipes/changes/` with offset and limit arguments.
+///
+/// This calls [recipes_changes](fn.recipes_changes.html) with the optional `offset` and/or `limit`
+/// values.
+#[get("/recipes/changes/<recipes>?<filter>")]
+pub fn recipes_changes_filter(recipes: &str, filter: Filter, repo: State<RecipeRepo>) -> CORS<JSON<RecipesChangesResponse>> {
+    recipes_changes(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT), repo)
+}
+
+/// Handler for `/recipes/changes/<recipes>`
+///
+/// This calls [recipes_changes](fn.recipes_changes.html) with the default `offset` and `limit` values.
+#[get("/recipes/changes/<recipes>", rank=2)]
+pub fn recipes_changes_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesChangesResponse>> {
+    recipes_changes(recipes, OFFSET, LIMIT, repo)
+}
+
+/// Return the changes to a recipe or list of recipes
+///
+/// # Arguments
+///
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+/// * `recipe_names` - Comma separated list of recipe names to return
+///
+/// # Response
+///
+/// * JSON response with recipe changes.
+///
+///
+/// # Examples
+///
+/// ```json
+/// {
+///     "recipes": [
+///         {
+///             "name": "nfs-server",
+///             "changes": [
+///                 {
+///                     "commit": "97d483e8dd0b178efca9a805e5fd8e722c48ac8e",
+///                     "time": "Wed,  1 Mar 2017 13:29:37 -0800",
+///                     "summary": "Recipe nfs-server saved"
+///                 },
+///                 {
+///                     "commit": "857e1740f983bf033345c3242204af0ed7b81f37",
+///                     "time": "Wed,  1 Mar 2017 09:28:53 -0800",
+///                     "summary": "Recipe nfs-server saved"
+///                 }
+///             ]
+///         },
+///         {
+///             "name": "ruby",
+///             "changes": [
+///                 {
+///                     "commit": "4b84f072befc3f4debbe1348d6f4b166f7c83d78",
+///                     "time": "Wed,  1 Mar 2017 13:32:09 -0800",
+///                     "summary": "Recipe ruby saved"
+///                 },
+///                 {
+///                     "commit": "85999253c1790367a860a344ea622971b7e0a050",
+///                     "time": "Wed,  1 Mar 2017 13:31:19 -0800",
+///                     "summary": "Recipe ruby saved"
+///                 }
+///             ]
+///         }
+///     ],
+///     "offset": 0,
+///     "limit": 20
+/// }
+/// ```
+///
+pub fn recipes_changes(recipe_names: &str, offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesChangesResponse>> {
+    info!("/recipes/changes/ (JSON)"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
+    // TODO Get the user's branch name. Use master for now.
+
+    let mut result = Vec::new();
+    for name in recipe_names.split(",") {
+        match recipe::commits(&repo.repo(), &name, "master") {
+            Ok(mut commits) => {
+                commits.truncate(limit as usize);
+                result.push(RecipeCommitInfo {
+                                name: name.to_string(),
+                                changes: commits
+                });
+            },
+            Err(e) => {
+                error!("Problem getting commits"; "recipe_name" => name, "error" => format!("{:?}", e));
+            }
+        }
+    }
+    result.sort();
+
+    CORS(JSON(RecipesChangesResponse {
+        recipes: result,
+        offset:  offset,
+        limit:   limit
+    }))
+}
+
+
+/// Hold the JSON response for /recipes/diff/
+#[derive(Debug, Serialize)]
+pub struct RecipesDiffResponse {
+    recipes: Vec<RecipeDiffInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RecipeDiffInfo {
+    name: String,
+    from: String,
+    to: String,
+    diff: Vec<String>
+}
+
+/// Handler for `/recipes/diff/<recipe>/<from_commit>/<to_commit>`
+///
+/// Return the differences between two commits of a recipe
+///
+/// # Arguments
+///
+/// * `recipe_name` - Recipe name
+/// * `from_commit` - The older commit to caclulate the difference from
+/// * `to_commit` - The newer commit to calculate the diff. to or NEWEST
+/// * `offset` - Number of results to skip before returning results. Default is 0.
+/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
+///
+/// # Response
+///
+/// * JSON response with recipe changes.
+///
+///
+/// # Examples
+///
+/// ```json
+/// {
+///     "recipes": [
+///         {
+///             "name": "nfs-server",
+///             "from": "857e1740f983bf033345c3242204af0ed7b81f37",
+///             "to": "NEWEST",
+///             "diff": [
+///                 "diff --git a/nfs-server.toml b/nfs-server.toml",
+///                 "index 72b2953..adcf5e3 100644",
+///                 "--- a/nfs-server.toml",
+///                 "+++ b/nfs-server.toml",
+///                 "@@ -5,3 +5,7 @@ name = \"nfs-server\"",
+///                 " [[packages]]",
+///                 " name = \"nfs\"",
+///                 " version = \"4.1\"",
+///                 "+",
+///                 "+[[packages]]",
+///                 "+name = \"NetworkManager\"",
+///                 "+version = \"1.0.6\""
+///             ]
+///         }
+///     ]
+/// }
+/// ```
+///
+#[get("/recipes/diff/<recipe_name>/<from_commit>/<to_commit>")]
+pub fn recipes_diff(recipe_name: &str, from_commit: &str, to_commit: &str,
+                    repo: State<RecipeRepo>) -> CORS<JSON<RecipesDiffResponse>> {
+    info!("/recipes/diff/"; "recipe_name" => recipe_name,
+                            "from_commit" => from_commit, "to_commit" => to_commit);
+    // TODO Get the user's branch name. Use master for now.
+
+    // Convert to_commit == NEWEST to None
+    let new_commit = match to_commit {
+        "NEWEST" => None,
+        commit => Some(commit)
+    };
+    let diff = match recipe::diff(&repo.repo(), recipe_name, "master", from_commit, new_commit) {
+        Ok(diff) => diff,
+        Err(e) => {
+            error!("Problem getting diff"; "recipe_name" => recipe_name, "error" => format!("{:?}", e));
+            vec![]
+        }
+    };
+
+    let result = RecipeDiffInfo {
+        name: recipe_name.to_string(),
+        from: from_commit.to_string(),
+        to: to_commit.to_string(),
+        diff: diff
+    };
+
+    CORS(JSON(RecipesDiffResponse {
+        recipes: vec![result],
+    }))
+}
 
 /// Hold the JSON response for /recipes/new/
 #[derive(Debug, Serialize)]

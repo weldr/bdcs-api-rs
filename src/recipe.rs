@@ -28,11 +28,12 @@ use std::fs::{File, OpenOptions, create_dir_all};
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
+use std::str::{self, FromStr};
 use std::sync::{Mutex, MutexGuard};
-use std::str;
 
-use git2::{self, Branch, BranchType, Commit, DiffFormat, DiffOptions, ObjectType, Pathspec, Repository};
-use git2::{Signature, TreeBuilder};
+use chrono::{DateTime, TimeZone, NaiveDateTime, FixedOffset};
+use git2::{self, Branch, BranchType, Commit, DiffFormat, DiffOptions, Oid, ObjectType};
+use git2::{Pathspec, Repository, Signature, Time, TreeBuilder};
 use glob::{self, glob};
 use toml;
 
@@ -62,6 +63,7 @@ pub enum RecipeError {
     TomlSer(toml::ser::Error),
     TomlDe(toml::de::Error),
     RecipeName,
+    Branch,
     ParseTOML
 }
 
@@ -184,6 +186,15 @@ fn recipe_filename(name: &str) -> Result<String, RecipeError> {
     }
 }
 
+
+/// Convert git2::Time to RFC3339 time string
+fn time_rfc2822(time: Time) -> String {
+    let offset = FixedOffset::east(time.offset_minutes() * 60);
+    let dt = DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(time.seconds(), 0), offset);
+    dt.to_rfc2822()
+}
+
+
 /// Initialize the Recipe's git repo
 ///
 /// # Arguments
@@ -229,6 +240,7 @@ pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
 /// * `repo` - An open Repository
 /// * `path` - Path to the directory to add
 /// * `branch` - Name of the branch to add the directory contents to
+/// * `replace` - Set to true to replace an existing recipe
 ///
 /// # Return
 ///
@@ -238,13 +250,15 @@ pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
 /// into any sub-directories. The files will be added as individual commits,
 /// using [add_file](fn.add_file.html)
 ///
-pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), RecipeError> {
+/// If `replace` is false it will skip recipes that already exist in the repository.
+///
+pub fn add_dir(repo: &Repository, path: &str, branch: &str, replace: bool) -> Result<(), RecipeError> {
     let toml_glob = format!("{}/*.toml", path);
     for recipe_file in glob(&toml_glob).unwrap().filter_map(Result::ok) {
         if let Some(file) = recipe_file.to_str() {
-            debug!("Adding {} to branch {}", file, branch);
-            match add_file(repo, file, branch) {
-                Ok(_) => {}
+            match add_file(repo, file, branch, replace) {
+                Ok(true) => debug!("Added {} to branch {}", file, branch),
+                Ok(false) => debug!("Skipping {}, already in branch {}", file, branch),
                 Err(e) => error!("add_dir->add_file failed"; "file" => file, "error" => format!("{:?}", e))
             }
         }
@@ -259,6 +273,7 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), Recipe
 /// * `repo` - An open Repository
 /// * `file` - Path to the file to add
 /// * `branch` - Name of the branch to add the file to
+/// * `replace` - Set to true to replace an existing recipe
 ///
 /// # Return
 ///
@@ -268,10 +283,20 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str) -> Result<(), Recipe
 /// The filename committed to git is the name inside the recipe after replacing spaces with '-'
 /// and appending .toml to it. It is not the filename it is read from.
 ///
-pub fn add_file(repo: &Repository, file: &str, branch: &str) -> Result<bool, RecipeError> {
+/// If `replace` is false it will skip recipes that already exist in the repository.
+///
+pub fn add_file(repo: &Repository, file: &str, branch: &str, replace: bool) -> Result<bool, RecipeError> {
     let mut input = String::new();
     let _ = try!(File::open(file)).read_to_string(&mut input);
     let recipe = try!(toml::from_str::<Recipe>(&input).or(Err(RecipeError::ParseTOML)));
+
+    // Skip existing recipes (using the same recipe.name)
+    if replace == false {
+        match read(repo, &recipe.name, branch, None) {
+            Ok(_) => return Ok(false),
+            Err(_) => {}
+        }
+    }
 
     write(repo, &recipe, branch)
 }
@@ -373,6 +398,7 @@ pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -
 pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
     let mut recipes = Vec::new();
 
+    // TODO use commit instead of branch head if it isn't None
     if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
                                       .get()
                                       .target() {
@@ -392,50 +418,58 @@ pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec
     Ok(recipes)
 }
 
-/// Rename a recipe file
-///
-/// # Arguments
-///
-/// * `repo` - An open Repository
-/// * `name_orig` - Original Recipe name
-/// * `name_new` - New Recipe name
-/// * `branch` - Name of the branch to add to
-///
-/// # Return
-///
-/// * Result with () or a RecipeError
-///
-pub fn rename_recipe(repo: &Repository, name_orig: &str, name_new: &str, branch: &str) -> Result<(), RecipeError> {
-
-    Ok(())
-}
-
 /// Delete a recipe from a branch
 ///
 /// # Arguments
 ///
 /// * `repo` - An open Repository
-/// * `name` - Recipe name to write to
+/// * `name` - Recipe name to delete
 /// * `branch` - Name of the branch to add to
 ///
 /// # Return
 ///
 /// * Result with () or a RecipeError
 ///
-pub fn delete_recipe(repo: &Repository, name: &str, branch: &str) -> Result<(), RecipeError> {
+/// Recipe name is expected to already have spaces replaces by '-' and .toml appended.
+/// Branch and filename must exist otherwise a RecipeError will be returned.
+///
+pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<(), RecipeError> {
+    // Does the branch exist? If not, it's an error
+    match repo.find_branch(branch, BranchType::Local) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(RecipeError::Branch);
+        }
+    }
+    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
+                                      .get()
+                                      .target() {
+        debug!("Branch {}'s id is {}", branch, branch_id);
+        let parent_commit = try!(repo.find_commit(branch_id));
+        let tree_id = {
+            let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
+            try!(tree.remove(recipe_name));
+            tree.write().unwrap()
+        };
+        let tree = try!(repo.find_tree(tree_id));
+        let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+        let commit_msg = format!("Recipe {} deleted", recipe_name);
+        let branch_ref = format!("refs/heads/{}", branch);
+        let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+        debug!("Recipe delete commit:"; "branch" => branch, "recipe_name" => recipe_name, "commit_msg" => commit_msg);
+    }
 
     Ok(())
 }
 
-/// Recipe Changes
+/// Recipe Commit
 ///
-/// Details about a change to a recipe
+/// Details about changes to a recipe
 ///
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
-pub struct RecipeChange {
-    pub name: String,
-    pub branch: String,
+pub struct RecipeCommit {
     pub commit: String,
+    pub time: String,
     pub summary: String
 }
 
@@ -449,25 +483,77 @@ pub struct RecipeChange {
 ///
 /// # Return
 ///
-/// * A Vector of RecipeChange or a RecipeError
+/// * A Vector of RecipeCommit or a RecipeError
 ///
 /// If the name is None all changes for the branch will be returned.
 ///
-pub fn list_commits(repo: &Repository, name: Option<&str>, branch: &str) -> Result<Vec<RecipeChange>, RecipeError> {
+pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<RecipeCommit>, RecipeError> {
+    // Does the branch exist? If not, it's an error
+    match repo.find_branch(branch, BranchType::Local) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(RecipeError::Branch);
+        }
+    }
 
-    Ok(vec![RecipeChange {
-        name: "placeholder".to_string(),
-        branch: "empty".to_string(),
-        commit: "empty".to_string(),
-        summary: "empty".to_string(),
-    }])
+    let mut revwalk = try!(repo.revwalk());
+    revwalk.set_sorting(git2::SORT_TIME);
+    revwalk.push_ref(&format!("refs/heads/{}", branch));
+
+    let filename = try!(recipe_filename(&name));
+    let mut diffopts = DiffOptions::new();
+    diffopts.pathspec(&filename);
+
+    let mut commits = Vec::new();
+    for id in revwalk {
+        let mut commit = try!(repo.find_commit(try!(id)));
+        let tree = try!(commit.tree());
+        let tree_entry = tree.get_name(&filename);
+        match tree_entry {
+            Some(entry) => {
+                // Check to see if the file changed between the parents and this commit
+                let m = commit.parents().all(|parent| {
+                    match_with_parent(repo, &commit, &parent, &mut diffopts)
+                    .unwrap_or(false)
+                });
+                if m {
+                    commits.push(RecipeCommit {
+                                    commit: format!("{}", commit.id()),
+                                    time: time_rfc2822(commit.time()),
+                                    summary: format!("{}", commit.summary().unwrap_or("Missing"))
+                    });
+                }
+            }
+            None => {}
+        }
+    }
+
+    Ok(commits)
 }
 
-pub struct RecipeDiff {
-    from: String,
-    to: String,
-    diff: Vec<String>
+
+// From git-rs log example
+/// Check for changes between commit and the commit's parent
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `commit` - A commit
+/// * `parent` - A parent of the commit
+/// * `opts` - Diff options (usually pathspec to limit it to a file)
+///
+/// # Return
+///
+/// Returns true if there were changes, false if not.
+///
+fn match_with_parent(repo: &Repository, commit: &Commit, parent: &Commit,
+                     opts: &mut DiffOptions) -> Result<bool, RecipeError> {
+    let a = try!(parent.tree());
+    let b = try!(commit.tree());
+    let diff = try!(repo.diff_tree_to_tree(Some(&a), Some(&b), Some(opts)));
+    Ok(diff.deltas().len() > 0)
 }
+
 
 /// Diff two commits for a recipe
 ///
@@ -481,50 +567,55 @@ pub struct RecipeDiff {
 ///
 /// # Return
 ///
-/// * RecipeDiff or a RecipeError
+/// * A Vec of String (diff lines) or a RecipeError
 ///
 /// If new_commit is None HEAD will be used.
 ///
-pub fn recipe_changes(repo: &Repository,
+pub fn diff(repo: &Repository,
                       name: &str,
                       branch: &str,
                       old_commit: &str,
-                      new_commit: Option<&str>) -> Result<RecipeDiff, RecipeError> {
+                      new_commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
+    // Does the branch exist? If not, it's an error
+    match repo.find_branch(branch, BranchType::Local) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(RecipeError::Branch);
+        }
+    }
 
-    Ok(RecipeDiff {
-        from: "placeholder".to_string(),
-        to: "empty".to_string(),
-        diff: vec![]
-    })
-}
+    // Show the diff between 2 revisions of a file using the commit ids
+    let old_tree = try!(try!(repo.find_commit(try!(Oid::from_str(old_commit)))).tree());
+    let new_tree = match new_commit {
+        Some(id) => {
+            try!(try!(repo.find_commit(try!(Oid::from_str(id)))).tree())
+        },
+        None => {
+            // No new_commit, use the HEAD of the branch as the one to compare with
+            let branch_id = try!(repo.find_branch(branch, BranchType::Local)).get().target().unwrap();
+            try!(try!(repo.find_commit(branch_id)).tree())
+        }
+    };
 
-/// Diff two recipes
-///
-/// # Arguments
-///
-/// * `repo` - An open Repository
-/// * `branch` - Name of the branch
-/// * `name_1` - First Recipe name
-/// * `name_2` - Second Recipe name
-/// * `commit_1` - Commit for name_1
-/// * `commit_2` - Commit for name_2
-///
-/// # Return
-///
-/// * RecipeDiff or a RecipeError
-///
-/// If commit_1 or commit_2 (or both) are None then HEAD will be used.
-///
-pub fn recipes_changes(repo: &Repository,
-                       branch: &str,
-                       name_1: &str,
-                       name_2: &str,
-                       commit_1: Option<&str>,
-                       commit_2: Option<&str>) -> Result<RecipeDiff, RecipeError> {
+    let filename = try!(recipe_filename(&name));
+    let mut opts = DiffOptions::new();
+    opts.patience(true)
+        .minimal(true)
+        .pathspec(filename);
+    let diff = try!(repo.diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts)));
 
-    Ok(RecipeDiff {
-        from: "placeholder".to_string(),
-        to: "empty".to_string(),
-        diff: vec![]
-    })
+    let mut diff_lines = Vec::new();
+    try!(diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+        match line.origin() {
+            '+' | '-' | ' ' => diff_lines.push(format!("{}{}", line.origin(), str::from_utf8(line.content()).unwrap().trim_right())),
+            _ => {
+                for l in str::from_utf8(line.content()).unwrap().lines() {
+                    diff_lines.push(format!("{}", l));
+                }
+            }
+        }
+        true
+    }));
+
+    Ok(diff_lines)
 }
