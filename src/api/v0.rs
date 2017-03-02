@@ -681,7 +681,7 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
     result.dedup_by(|a, b| a.name.eq(&b.name));
 
     // Remove 'offset' items
-    for i in 0..cmp::min(offset as usize, result.len()) {
+    for _ in 0..cmp::min(offset as usize, result.len()) {
         result.remove(0);
     }
     result.truncate(limit as usize);

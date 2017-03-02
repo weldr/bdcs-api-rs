@@ -121,7 +121,6 @@ fn run_api_tests() {
 
 
     // v0_isos()
-    // Mount the API and run a request against it
     let mut req = MockRequest::new(Method::Get, "/isos");
     let mut response = req.dispatch_with(&rocket);
 
@@ -133,7 +132,6 @@ fn run_api_tests() {
     // v0_compose_types()
     let expected = include_str!("results/v0/compose-types.json").trim_right();
 
-    // Mount the API and run a request against it
     let mut req = MockRequest::new(Method::Get, "/compose/types");
     let mut response = req.dispatch_with(&rocket);
 
@@ -144,8 +142,6 @@ fn run_api_tests() {
     // v0_projects_list()
     let expected_default = include_str!("results/v0/projects-list.json").trim_right();
     let expected_filter = include_str!("results/v0/projects-list-filter.json").trim_right();
-
-    // Mount the API and run a request against it
 
     let mut req = MockRequest::new(Method::Get, "/projects/list");
     let mut response = req.dispatch_with(&rocket);
@@ -186,8 +182,6 @@ fn run_api_tests() {
     let expected_default = include_str!("results/v0/modules-list.json").trim_right();
     let expected_filter = include_str!("results/v0/modules-list-filter.json").trim_right();
 
-    // Mount the API and run a request against it
-
     let mut req = MockRequest::new(Method::Get, "/modules/list");
     let mut response = req.dispatch_with(&rocket);
 
@@ -208,8 +202,6 @@ fn run_api_tests() {
 
     let expected_default = include_str!("results/v0/recipes-list.json").trim_right();
     let expected_filter = include_str!("results/v0/recipes-list-filter.json").trim_right();
-
-    // Mount the API and run a request against it
 
     let mut req = MockRequest::new(Method::Get, "/recipes/list/");
     let mut response = req.dispatch_with(&rocket);
@@ -284,8 +276,6 @@ fn run_api_tests() {
 
     // v0_recipes_depsolve()
     let expected = include_str!("results/v0/recipes-depsolve.json").trim_right();
-
-    // Mount the API and run a request against it
 
     let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/http-server");
     let mut response = req.dispatch_with(&rocket);

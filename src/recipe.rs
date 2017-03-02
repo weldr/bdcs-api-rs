@@ -24,16 +24,16 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::clone::Clone;
-use std::fs::{File, OpenOptions, create_dir_all};
+use std::fs::{File, create_dir_all};
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
-use std::str::{self, FromStr};
+use std::str;
 use std::sync::{Mutex, MutexGuard};
 
-use chrono::{DateTime, TimeZone, NaiveDateTime, FixedOffset};
-use git2::{self, Branch, BranchType, Commit, DiffFormat, DiffOptions, Oid, ObjectType};
-use git2::{Pathspec, Repository, Signature, Time, TreeBuilder};
+use chrono::{DateTime, NaiveDateTime, FixedOffset};
+use git2::{self, BranchType, Commit, DiffFormat, DiffOptions, Oid, ObjectType};
+use git2::{Repository, Signature, Time};
 use glob::{self, glob};
 use toml;
 
@@ -340,14 +340,14 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, R
         };
         let tree_id = {
             let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-            tree.insert(try!(recipe.filename()), blob_id, 0o100644);
+            try!(tree.insert(try!(recipe.filename()), blob_id, 0o100644));
             tree.write().unwrap()
         };
         let tree = try!(repo.find_tree(tree_id));
         let sig = try!(Signature::now("bdcs-api-server", "user-email"));
         let commit_msg = format!("Recipe {} saved", recipe.name);
         let branch_ref = format!("refs/heads/{}", branch);
-        let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+        try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
         debug!("Recipe commit:"; "branch" => branch, "recipe_name" => recipe.name, "commit_msg" => commit_msg);
     }
 
@@ -456,7 +456,7 @@ pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool
         let sig = try!(Signature::now("bdcs-api-server", "user-email"));
         let commit_msg = format!("Recipe {} deleted", filename);
         let branch_ref = format!("refs/heads/{}", branch);
-        let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+        try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
         debug!("Recipe delete commit:"; "branch" => branch, "recipe_name" => recipe_name,
                "filename" => filename, "commit_msg" => commit_msg);
     }
@@ -505,14 +505,14 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
                 let parent_commit = try!(repo.find_commit(branch_id));
                 let tree_id = {
                     let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-                    tree.insert(&filename, revert_id, 0o100644);
+                    try!(tree.insert(&filename, revert_id, 0o100644));
                     tree.write().unwrap()
                 };
                 let tree = try!(repo.find_tree(tree_id));
                 let sig = try!(Signature::now("bdcs-api-server", "user-email"));
                 let commit_msg = format!("Recipe {} reverted to commit {}", filename, commit);
                 let branch_ref = format!("refs/heads/{}", branch);
-                let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+                try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
                 debug!("Recipe revert commit:"; "branch" => branch, "recipe_name" => recipe_name,
                        "filename" => filename, "commit" => commit, "commit_msg" => commit_msg);
             }
@@ -560,7 +560,7 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
 
     let mut revwalk = try!(repo.revwalk());
     revwalk.set_sorting(git2::SORT_TIME);
-    revwalk.push_ref(&format!("refs/heads/{}", branch));
+    try!(revwalk.push_ref(&format!("refs/heads/{}", branch)));
 
     let filename = try!(recipe_filename(&name));
     let mut diffopts = DiffOptions::new();
@@ -572,7 +572,7 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
         let tree = try!(commit.tree());
         let tree_entry = tree.get_name(&filename);
         match tree_entry {
-            Some(entry) => {
+            Some(_) => {
                 // Check to see if the file changed between the parents and this commit
                 let m = commit.parents().all(|parent| {
                     match_with_parent(repo, &commit, &parent, &mut diffopts)

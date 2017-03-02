@@ -18,7 +18,6 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::ops::{Deref, DerefMut};
-use std::fs::File;
 use std::io::Read;
 
 use rocket::data::{self, Data, FromData};
