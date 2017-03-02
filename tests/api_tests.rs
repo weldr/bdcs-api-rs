@@ -105,6 +105,7 @@ fn run_api_tests() {
                                         v0::recipes_changes_default, v0::recipes_changes_filter,
                                         v0::recipes_diff,
                                         v0::recipes_new_json, v0::recipes_new_toml,
+                                        v0::recipes_delete,
                                         v0::recipes_depsolve])
                                 .manage(db_pool)
                                 .manage(recipe_repo);
@@ -334,4 +335,13 @@ fn run_api_tests() {
     assert_eq!(j["recipes"][0]["diff"][8], "-name = \"php\"".to_string());
     assert_eq!(j["recipes"][0]["diff"][14], "+name = \"ruby\"".to_string());
     assert_eq!(j["recipes"][0]["diff"][15], "+version = \"2.0.0.598\"".to_string());
+
+    // v0_recipes_delete
+    // Delete the test recipe created above
+    let mut req = MockRequest::new(Method::Delete, "/recipes/delete/recipe-test");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
 }

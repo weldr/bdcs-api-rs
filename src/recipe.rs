@@ -430,10 +430,9 @@ pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec
 ///
 /// * Result with () or a RecipeError
 ///
-/// Recipe name is expected to already have spaces replaces by '-' and .toml appended.
 /// Branch and filename must exist otherwise a RecipeError will be returned.
 ///
-pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<(), RecipeError> {
+pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, RecipeError> {
     // Does the branch exist? If not, it's an error
     match repo.find_branch(branch, BranchType::Local) {
         Ok(_) => {}
@@ -441,6 +440,8 @@ pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<(), 
             return Err(RecipeError::Branch);
         }
     }
+
+    let filename = try!(recipe_filename(recipe_name));
     if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
                                       .get()
                                       .target() {
@@ -448,18 +449,19 @@ pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<(), 
         let parent_commit = try!(repo.find_commit(branch_id));
         let tree_id = {
             let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-            try!(tree.remove(recipe_name));
+            try!(tree.remove(&filename));
             tree.write().unwrap()
         };
         let tree = try!(repo.find_tree(tree_id));
         let sig = try!(Signature::now("bdcs-api-server", "user-email"));
-        let commit_msg = format!("Recipe {} deleted", recipe_name);
+        let commit_msg = format!("Recipe {} deleted", filename);
         let branch_ref = format!("refs/heads/{}", branch);
         let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
-        debug!("Recipe delete commit:"; "branch" => branch, "recipe_name" => recipe_name, "commit_msg" => commit_msg);
+        debug!("Recipe delete commit:"; "branch" => branch, "recipe_name" => recipe_name,
+               "filename" => filename, "commit_msg" => commit_msg);
     }
 
-    Ok(())
+    Ok(true)
 }
 
 /// Recipe Commit

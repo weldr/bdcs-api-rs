@@ -56,6 +56,9 @@
 //!  - The body of the post is a JSON representation of the recipe, using the same format
 //!    received by ``/api/v0/recipes/info/<recipes>`
 //!  - [Example JSON](fn.recipes_new.html#examples)
+//! * DELETE `/api/v0/recipes/delete/<recipe>`
+//!  - Delete the named recipe from the repository
+//!  - [Example JSON](fn.recipes_delete.html#examples)
 //!
 //!
 //! ## TODO
@@ -1244,6 +1247,52 @@ pub fn recipes_new_toml(recipe: TOML<Recipe>, repo: State<RecipeRepo>) -> CORS<J
     }))
 }
 
+
+/// Hold the JSON response for /recipes/new/
+#[derive(Debug, Serialize)]
+pub struct RecipesDeleteResponse {
+    status: bool
+}
+
+/// Handler for `/recipes/delete/<recipe>`
+/// Delete a recipe
+///
+/// # Arguments
+///
+/// * `recipe_name` - Recipe to delete
+///
+/// # Response
+///
+/// * JSON response with "status" set to true or false.
+///
+///
+/// Only a DELETE request is valid. GET and POST are ignored.
+///
+/// ## Response
+///
+/// ```json
+/// {
+///     "status": true
+/// }
+/// ```
+#[delete("/recipes/delete/<recipe_name>")]
+pub fn recipes_delete(recipe_name: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesDeleteResponse>> {
+    info!("/recipes/delete/"; "recipe_name" => recipe_name);
+    // TODO Get the user's branch name. Use master for now.
+
+    let status = match recipe::delete(&repo.repo(), recipe_name, "master") {
+        Ok(result) => result,
+        Err(e) => {
+            error!("recipes_delete"; "recipe_name" => recipe_name, "error" => format!("{:?}", e));
+            false
+        }
+    };
+
+    // TODO Return error information
+    CORS(JSON(RecipesDeleteResponse {
+            status: status
+    }))
+}
 
 /// A Recipe and its dependencies
 #[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
