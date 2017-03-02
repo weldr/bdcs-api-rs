@@ -59,6 +59,9 @@
 //! * DELETE `/api/v0/recipes/delete/<recipe>`
 //!  - Delete the named recipe from the repository
 //!  - [Example JSON](fn.recipes_delete.html#examples)
+//! * POST /api/v0/recipes/undo/<recipe>/<commit>
+//!  - Revert a recipe to a previous commit
+//!  - [Example JSON](fn.recipes_undo.html#examples)
 //!
 //!
 //! ## TODO
@@ -1293,6 +1296,55 @@ pub fn recipes_delete(recipe_name: &str, repo: State<RecipeRepo>) -> CORS<JSON<R
             status: status
     }))
 }
+
+
+/// Hold the JSON response for /recipes/undo/
+#[derive(Debug, Serialize)]
+pub struct RecipesUndoResponse {
+    status: bool
+}
+
+/// Handler for `/recipes/undo/<recipe>/<commit>`
+/// Undo changes to a recipe by reverting to a previous commit
+///
+/// # Arguments
+///
+/// * `recipe_name` - Recipe to undo
+/// * `commit` - Commit to revert to
+///
+/// # Response
+///
+/// * JSON response with "status" set to true or false.
+///
+///
+/// Only a POST request is valid. GET is ignored.
+///
+/// ## Response
+///
+/// ```json
+/// {
+///     "status": true
+/// }
+/// ```
+#[post("/recipes/undo/<recipe_name>/<commit>")]
+pub fn recipes_undo(recipe_name: &str, commit: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesUndoResponse>> {
+    info!("/recipes/undo/"; "recipe_name" => recipe_name, "commit" => commit);
+    // TODO Get the user's branch name. Use master for now.
+
+    let status = match recipe::revert(&repo.repo(), recipe_name, "master", commit) {
+        Ok(result) => result,
+        Err(e) => {
+            error!("recipes_undo"; "recipe_name" => recipe_name, "commit" => commit, "error" => format!("{:?}", e));
+            false
+        }
+    };
+
+    // TODO Return error information
+    CORS(JSON(RecipesUndoResponse {
+            status: status
+    }))
+}
+
 
 /// A Recipe and its dependencies
 #[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]

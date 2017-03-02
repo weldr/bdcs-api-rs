@@ -155,6 +155,7 @@ fn main() {
                                    v0::recipes_diff,
                                    v0::options_recipes_new, v0::recipes_new_json, v0::recipes_new_toml,
                                    v0::recipes_delete,
+                                   v0::recipes_undo,
                                    v0::recipes_depsolve])
         .mount("/api/mock/", routes![mock::static_route, mock::static_route_filter,
                                      mock::static_route_param, mock::static_route_param_filter,

@@ -464,6 +464,66 @@ pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool
     Ok(true)
 }
 
+
+/// Revert a recipe to a previous commit
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name to revert
+/// * `commit` - Commit hash to revert to
+/// * `branch` - Name of the branch
+///
+/// # Return
+///
+/// * Result with true or a RecipeError
+///
+/// Branch and filename must exist otherwise a RecipeError will be returned.
+///
+pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) -> Result<bool, RecipeError> {
+    // Does the branch exist? If not, it's an error
+    match repo.find_branch(branch, BranchType::Local) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(RecipeError::Branch);
+        }
+    }
+
+    let filename = try!(recipe_filename(recipe_name));
+    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
+                                      .get()
+                                      .target() {
+        // Find the commit to revert to
+        let revert_tree = try!(try!(repo.find_commit(try!(Oid::from_str(commit)))).tree());
+        let revert_entry = revert_tree.get_name(&filename);
+        match revert_entry {
+            Some(entry) => {
+                let revert_id = entry.id();
+                debug!("revert"; "filename" => filename, "id" => format!("{}", revert_id));
+
+                debug!("Branch {}'s id is {}", branch, branch_id);
+                let parent_commit = try!(repo.find_commit(branch_id));
+                let tree_id = {
+                    let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
+                    tree.insert(&filename, revert_id, 0o100644);
+                    tree.write().unwrap()
+                };
+                let tree = try!(repo.find_tree(tree_id));
+                let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+                let commit_msg = format!("Recipe {} reverted to commit {}", filename, commit);
+                let branch_ref = format!("refs/heads/{}", branch);
+                let commit_id = try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+                debug!("Recipe revert commit:"; "branch" => branch, "recipe_name" => recipe_name,
+                       "filename" => filename, "commit" => commit, "commit_msg" => commit_msg);
+            }
+            None => return Ok(false)
+        }
+    }
+
+    Ok(true)
+}
+
+
 /// Recipe Commit
 ///
 /// Details about changes to a recipe

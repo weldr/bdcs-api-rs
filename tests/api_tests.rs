@@ -106,6 +106,7 @@ fn run_api_tests() {
                                         v0::recipes_diff,
                                         v0::recipes_new_json, v0::recipes_new_toml,
                                         v0::recipes_delete,
+                                        v0::recipes_undo,
                                         v0::recipes_depsolve])
                                 .manage(db_pool)
                                 .manage(recipe_repo);
@@ -335,6 +336,43 @@ fn run_api_tests() {
     assert_eq!(j["recipes"][0]["diff"][8], "-name = \"php\"".to_string());
     assert_eq!(j["recipes"][0]["diff"][14], "+name = \"ruby\"".to_string());
     assert_eq!(j["recipes"][0]["diff"][15], "+version = \"2.0.0.598\"".to_string());
+
+    // v0_recipes_undo()
+    // First write some changes to the recipe
+    let recipe_json = include_str!("results/v0/recipes-new-v2.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Post, "/recipes/new")
+                    .header(ContentType::JSON)
+                    .body(recipe_json);
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    // Get the original commit
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/recipe-test");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "recipe-test".to_string());
+
+    // Convert serde::Value to a &str
+    let commit_id = match j["recipes"][0]["changes"][1]["commit"].as_str() {
+        Some(str) => str,
+        None => ""
+    };
+
+    // Undo the change
+    let mut req = MockRequest::new(Method::Post, format!("/recipes/undo/recipe-test/{}", commit_id));
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
 
     // v0_recipes_delete
     // Delete the test recipe created above

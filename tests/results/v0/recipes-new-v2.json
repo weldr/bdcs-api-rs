@@ -1,0 +1,1 @@
+{"name":"recipe-test","description":"A test recipe","modules":[{"name":"httpd","version":"2.6.*"},{"name":"fm-httpd","version":"23.*"},{"name":"fm-php","version":"11.6.*"}],"packages":[{"name":"tmux","version":"2.2"}]}
