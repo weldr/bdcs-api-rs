@@ -65,6 +65,24 @@ impl fmt::Display for DepExpression {
     }
 }
 
+fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) -> bool {
+    match get_groups_kv_group_id(conn, group_id) {
+        Ok(kvs) => { for kv in kvs {
+                         if kv.key_value == "arch" {
+                             if kv.val_value == "noarch" || arches.contains(&kv.val_value) {
+                                 return true
+                             } else {
+                                 return false
+                             }
+                         }
+                     }
+
+                     return false
+                   },
+        Err(_) => return false
+    }
+}
+
 // Given a requirement, find a list of groups providing it and return all of that as an expression
 fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<RefCell<DepExpression>>>) -> Result<Option<Rc<RefCell<DepExpression>>>, String> {
     // helper function for converting a (Group, KeyVal) to Option<(group_id, Requirement)>
@@ -108,6 +126,8 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
                                              .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv))
                                              // filter out any that don't match version-wise
                                              .filter(|&(ref group_id, ref provider_req)| provider_req.satisfies(&req))
+                                             // filter out any that don't match arch-wise
+                                             .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches))
                                              // map the remaining providers to an expression, recursing to fetch the provider's requirements
                                              // any recursions that return Err unsatisfiable, so filter those out
                                              .filter_map(|(group_id, _)| match depclose_provider(conn, arches, group_id, parents, cache) {
@@ -302,11 +322,17 @@ pub fn close_dependencies(conn: &Connection, arches: &Vec<String>, packages: &Ve
     let mut cache = HashMap::new();
 
     for p in packages.iter() {
-        // TODO process all groups?
-        match get_groups_name(conn, p, 0, 1) {
-            Ok(groups) => req_list.push(
-                try!(depclose_package(conn, arches, groups[0].id, &HashSet::new(), &mut cache))
-            ),
+        // Get all the groups with the given name, and then filter out all those with an invalid
+        // architecture.  This will really only matter when we are called with a library package,
+        // which could have been built for several arches.  Binary packages are typically single
+        // arch.
+        match get_groups_name(conn, p, 0, -1) {
+            Ok(groups) => { for grp in groups {
+                                if group_matches_arch(conn, grp.id, arches) {
+                                    req_list.push(try!(depclose_package(conn, arches, grp.id, &HashSet::new(), &mut cache)));
+                                }
+                            }
+                          },
             Err(e)     => return Err(e.to_string())
         }
     }
