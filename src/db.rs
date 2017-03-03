@@ -1112,71 +1112,78 @@ pub struct SourceInfo {
 pub fn get_projects_details(conn: &Connection, projects: &[&str], offset: i64, limit: i64) -> rusqlite::Result<Vec<ProjectInfo>> {
     let mut project_list: Vec<ProjectInfo> = Vec::new();
     for project_name in projects {
-        match get_projects_name(conn, project_name, offset, limit) {
-            Ok(r) => for proj in r {
-                // Get the build and source details first
-                let mut build_list = Vec::new();
-                match get_builds_project_id(conn, proj.id) {
-                    Ok(r) => for build in r {
-                        let mut source_metadata: HashMap<String, String> = HashMap::new();
-                        match get_source_kv_source_id(&conn, build.source_id) {
-                           Ok(kvs) => for kv in kvs {
-                               source_metadata.entry(kv.key_value).or_insert(kv.val_value);
-                           },
-                           Err(_) => {}
-                        }
-                        let source_info = match get_source_id(conn, build.source_id) {
-                            Ok(source) => if let Some(source) = source {
-                                Some(SourceInfo {
-                                         license: source.license,
-                                         version: source.version,
-                                         source_ref: source.source_ref,
-                                         metadata: Some(source_metadata)
-                                })
-                            } else {
-                               None
-                            },
-                            Err(_) => None
-                        };
-                        let mut build_metadata: HashMap<String, String> = HashMap::new();
-                        match get_build_kv_build_id(conn, build.id) {
-                            Ok(kvs) => for kv in kvs {
-                                build_metadata.entry(kv.key_value).or_insert(kv.val_value);
-                            },
-                            Err(_) => {}
-                        }
-                        build_list.push(BuildInfo {
-                                            epoch:            build.epoch,
-                                            release:          build.release,
-                                            arch:             build.arch,
-                                            build_time:       build.build_time,
-                                            changelog:        String::from_utf8(build.changelog).unwrap_or("".to_string()),
-                                            build_config_ref: build.build_config_ref,
-                                            build_env_ref:    build.build_env_ref,
-                                            metadata:         Some(build_metadata),
-                                            source:           source_info
-                        });
-                    },
-                    Err(_) => {}
+        let projs = match get_projects_name(conn, project_name, offset, limit) {
+            Ok(p) => p,
+            Err(_) => { continue; }
+        };
+
+        for proj in projs  {
+            // Get the build and source details first
+            let mut build_list = Vec::new();
+            let builds = match get_builds_project_id(conn, proj.id) {
+                Ok(b) => b,
+                Err(_) => vec![]
+            };
+            for build in builds {
+                let mut source_metadata: HashMap<String, String> = HashMap::new();
+                let kvs = match get_source_kv_source_id(&conn, build.source_id) {
+                    Ok(k) => k,
+                    Err(_) => vec![]
+                };
+                for kv in kvs {
+                    source_metadata.entry(kv.key_value).or_insert(kv.val_value);
                 }
-                let mut proj_metadata: HashMap<String, String> = HashMap::new();
-                match get_project_kv_project_id(conn, proj.id) {
-                    Ok(kvs) => for kv in kvs {
-                        proj_metadata.entry(kv.key_value).or_insert(kv.val_value);
+                let source_info = match get_source_id(conn, build.source_id) {
+                    Ok(source) => if let Some(source) = source {
+                        Some(SourceInfo {
+                                 license: source.license,
+                                 version: source.version,
+                                 source_ref: source.source_ref,
+                                 metadata: Some(source_metadata)
+                        })
+                    } else {
+                       None
                     },
-                    Err(_) => {}
+                    Err(_) => None
+                };
+                let mut build_metadata: HashMap<String, String> = HashMap::new();
+                let kvs = match get_build_kv_build_id(conn, build.id) {
+                    Ok(k) => k,
+                    Err(_) => vec![]
+                };
+                for kv in kvs {
+                    build_metadata.entry(kv.key_value).or_insert(kv.val_value);
                 }
-                project_list.push(ProjectInfo {
-                                      name:         proj.name,
-                                      summary:      proj.summary,
-                                      description:  proj.description,
-                                      homepage:     proj.homepage,
-                                      upstream_vcs: proj.upstream_vcs,
-                                      metadata:     Some(proj_metadata),
-                                      builds:       Some(build_list)
+                build_list.push(BuildInfo {
+                                    epoch:            build.epoch,
+                                    release:          build.release,
+                                    arch:             build.arch,
+                                    build_time:       build.build_time,
+                                    changelog:        String::from_utf8(build.changelog).unwrap_or("".to_string()),
+                                    build_config_ref: build.build_config_ref,
+                                    build_env_ref:    build.build_env_ref,
+                                    metadata:         Some(build_metadata),
+                                    source:           source_info
                 });
-            },
-            Err(_) => {}
+            }
+
+            let mut proj_metadata: HashMap<String, String> = HashMap::new();
+            let kvs = match get_project_kv_project_id(conn, proj.id) {
+                Ok(k) => k,
+                Err(_) => vec![]
+            };
+            for kv in kvs {
+                proj_metadata.entry(kv.key_value).or_insert(kv.val_value);
+            }
+            project_list.push(ProjectInfo {
+                                  name:         proj.name,
+                                  summary:      proj.summary,
+                                  description:  proj.description,
+                                  homepage:     proj.homepage,
+                                  upstream_vcs: proj.upstream_vcs,
+                                  metadata:     Some(proj_metadata),
+                                  builds:       Some(build_list)
+            });
         }
     }
     Ok(project_list)
