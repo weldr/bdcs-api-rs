@@ -161,8 +161,8 @@ pub struct Packages {
 ///
 ///
 fn find_last_commit(repo: &Repository) -> Result<Commit, git2::Error> {
-        let obj = repo.head()?.resolve()?.peel(ObjectType::Commit)?;
-            obj.into_commit().map_err(|_| git2::Error::from_str("Couldn't find commit"))
+    let obj = repo.head()?.resolve()?.peel(ObjectType::Commit)?;
+    obj.into_commit().map_err(|_| git2::Error::from_str("Couldn't find commit"))
 }
 
 
@@ -213,25 +213,25 @@ pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
     let repo_path = Path::new(path).join("git");
 
     if repo_path.exists() {
-        Ok(try!(Repository::open(&repo_path)))
-    } else {
-        try!(create_dir_all(&repo_path));
-        let repo = try!(Repository::init_bare(&repo_path));
-
-        {
-            // Make an initial empty commit
-            let sig = try!(Signature::now("bdcs-api-server", "user-email"));
-            let tree_id = {
-                let mut index = try!(repo.index());
-                try!(index.write_tree())
-            };
-            let tree = try!(repo.find_tree(tree_id));
-            try!(repo.commit(Some("HEAD"), &sig, &sig, "Initial Recipe repository commit", &tree, &[]));
-        }
-
-        Ok(repo)
+        return Ok(try!(Repository::open(&repo_path)));
     }
+
+    try!(create_dir_all(&repo_path));
+    let repo = try!(Repository::init_bare(&repo_path));
+    {
+        // Make an initial empty commit
+        let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+        let tree_id = {
+            let mut index = try!(repo.index());
+            try!(index.write_tree())
+        };
+        let tree = try!(repo.find_tree(tree_id));
+        try!(repo.commit(Some("HEAD"), &sig, &sig, "Initial Recipe repository commit", &tree, &[]));
+    }
+
+    Ok(repo)
 }
+
 
 /// Add directory to a branch
 ///
@@ -266,6 +266,7 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str, replace: bool) -> Re
     Ok(())
 }
 
+
 /// Add a file to a branch
 ///
 /// # Arguments
@@ -277,7 +278,7 @@ pub fn add_dir(repo: &Repository, path: &str, branch: &str, replace: bool) -> Re
 ///
 /// # Return
 ///
-/// * Result with `true` or a RecipeError
+/// * Result with `true` if written, `false` if skipped because it exists, or a RecipeError
 ///
 /// Files are read into a [Recipe](struct.Recipe.html) struct before being written to disk.
 /// The filename committed to git is the name inside the recipe after replacing spaces with '-'
@@ -300,6 +301,7 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str, replace: bool) -> R
 
     write(repo, &recipe, branch)
 }
+
 
 /// Write a recipe to a branch
 ///
@@ -327,32 +329,32 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, R
             try!(repo.branch(branch, &parent_commit, false));
         }
     }
-    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
-                                      .get()
-                                      .target() {
-        debug!("Branch {}'s id is {}", branch, branch_id);
-        let parent_commit = try!(repo.find_commit(branch_id));
-        let blob_id = {
-            // NOTE toml::to_string() can fail depending on which struct elements are empty
-            // we use try_from to work around this by converting to a Value first.
-            let recipe_toml = try!(toml::Value::try_from(recipe));
-            try!(repo.blob(recipe_toml.to_string().as_bytes()))
-        };
-        let tree_id = {
-            let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-            try!(tree.insert(try!(recipe.filename()), blob_id, 0o100644));
-            tree.write().unwrap()
-        };
-        let tree = try!(repo.find_tree(tree_id));
-        let sig = try!(Signature::now("bdcs-api-server", "user-email"));
-        let commit_msg = format!("Recipe {} saved", recipe.name);
-        let branch_ref = format!("refs/heads/{}", branch);
-        try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
-        debug!("Recipe commit:"; "branch" => branch, "recipe_name" => recipe.name, "commit_msg" => commit_msg);
-    }
+
+    let branch_id  = try_opt!(try!(repo.find_branch(branch, BranchType::Local)).get().target(), Ok(false));
+    debug!("Branch {}'s id is {}", branch, branch_id);
+
+    let parent_commit = try!(repo.find_commit(branch_id));
+    let blob_id = {
+        // NOTE toml::to_string() can fail depending on which struct elements are empty
+        // we use try_from to work around this by converting to a Value first.
+        let recipe_toml = try!(toml::Value::try_from(recipe));
+        try!(repo.blob(recipe_toml.to_string().as_bytes()))
+    };
+    let tree_id = {
+        let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
+        try!(tree.insert(try!(recipe.filename()), blob_id, 0o100644));
+        tree.write().unwrap()
+    };
+    let tree = try!(repo.find_tree(tree_id));
+    let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+    let commit_msg = format!("Recipe {} saved", recipe.name);
+    let branch_ref = format!("refs/heads/{}", branch);
+    try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+    debug!("Recipe commit:"; "branch" => branch, "recipe_name" => recipe.name, "commit_msg" => commit_msg);
 
     Ok(true)
 }
+
 
 /// Read a recipe from a branch
 ///
@@ -381,6 +383,7 @@ pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -
     Ok(try!(toml::from_str::<Recipe>(blob_str).or(Err(RecipeError::ParseTOML))))
 }
 
+
 /// List the recipes in a branch
 ///
 /// # Arguments
@@ -397,24 +400,22 @@ pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec
     let mut recipes = Vec::new();
 
     // TODO use commit instead of branch head if it isn't None
-    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
-                                      .get()
-                                      .target() {
+    let branch_id = try_opt!(try!(repo.find_branch(branch, BranchType::Local)).get().target(), Ok(recipes));
+    debug!("branch {}'s id is {}", branch, branch_id);
 
-        debug!("branch {}'s id is {}", branch, branch_id);
-        let parent_commit = try!(repo.find_commit(branch_id));
-        let tree = try!(parent_commit.tree());
-        for entry in tree.iter() {
-            // filenames end with .toml, strip that off and return the base.
-            if let Some(name) = entry.name() {
-                let recipe_name = name.rsplitn(2, ".").last().unwrap_or("");
-                recipes.push(recipe_name.to_string());
-            }
+    let parent_commit = try!(repo.find_commit(branch_id));
+    let tree = try!(parent_commit.tree());
+    for entry in tree.iter() {
+        // filenames end with .toml, strip that off and return the base.
+        if let Some(name) = entry.name() {
+            let recipe_name = name.rsplitn(2, ".").last().unwrap_or("");
+            recipes.push(recipe_name.to_string());
         }
     }
 
     Ok(recipes)
 }
+
 
 /// Delete a recipe from a branch
 ///
@@ -440,24 +441,22 @@ pub fn delete(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool
     }
 
     let filename = try!(recipe_filename(recipe_name));
-    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
-                                      .get()
-                                      .target() {
-        debug!("Branch {}'s id is {}", branch, branch_id);
-        let parent_commit = try!(repo.find_commit(branch_id));
-        let tree_id = {
-            let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-            try!(tree.remove(&filename));
-            tree.write().unwrap()
-        };
-        let tree = try!(repo.find_tree(tree_id));
-        let sig = try!(Signature::now("bdcs-api-server", "user-email"));
-        let commit_msg = format!("Recipe {} deleted", filename);
-        let branch_ref = format!("refs/heads/{}", branch);
-        try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
-        debug!("Recipe delete commit:"; "branch" => branch, "recipe_name" => recipe_name,
-               "filename" => filename, "commit_msg" => commit_msg);
-    }
+    let branch_id = try_opt!(try!(repo.find_branch(branch, BranchType::Local)).get().target(), Ok(false));
+    debug!("Branch {}'s id is {}", branch, branch_id);
+
+    let parent_commit = try!(repo.find_commit(branch_id));
+    let tree_id = {
+        let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
+        try!(tree.remove(&filename));
+        tree.write().unwrap()
+    };
+    let tree = try!(repo.find_tree(tree_id));
+    let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+    let commit_msg = format!("Recipe {} deleted", filename);
+    let branch_ref = format!("refs/heads/{}", branch);
+    try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+    debug!("Recipe delete commit:"; "branch" => branch, "recipe_name" => recipe_name,
+           "filename" => filename, "commit_msg" => commit_msg);
 
     Ok(true)
 }
@@ -489,6 +488,7 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
 
     let filename = try!(recipe_filename(recipe_name));
     let branch_id = try_opt!(try!(repo.find_branch(branch, BranchType::Local)).get().target(), Ok(false));
+    debug!("Branch {}'s id is {}", branch, branch_id);
 
     // Find the commit to revert to
     let revert_tree = try!(try!(repo.find_commit(try!(Oid::from_str(commit)))).tree());
@@ -497,7 +497,6 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
     let revert_id = entry.id();
     debug!("revert"; "filename" => filename, "id" => format!("{}", revert_id));
 
-    debug!("Branch {}'s id is {}", branch, branch_id);
     let parent_commit = try!(repo.find_commit(branch_id));
     let tree_id = {
         let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
@@ -563,22 +562,19 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
         let mut commit = try!(repo.find_commit(try!(id)));
         let tree = try!(commit.tree());
         let tree_entry = tree.get_name(&filename);
-        match tree_entry {
-            Some(_) => {
-                // Check to see if the file changed between the parents and this commit
-                let m = commit.parents().all(|parent| {
-                    match_with_parent(repo, &commit, &parent, &mut diffopts)
-                    .unwrap_or(false)
+        if tree_entry.is_some() {
+            // Check to see if the file changed between the parents and this commit
+            let m = commit.parents().all(|parent| {
+                match_with_parent(repo, &commit, &parent, &mut diffopts)
+                .unwrap_or(false)
+            });
+            if m {
+                commits.push(RecipeCommit {
+                                commit: format!("{}", commit.id()),
+                                time: time_rfc2822(commit.time()),
+                                summary: format!("{}", commit.summary().unwrap_or("Missing"))
                 });
-                if m {
-                    commits.push(RecipeCommit {
-                                    commit: format!("{}", commit.id()),
-                                    time: time_rfc2822(commit.time()),
-                                    summary: format!("{}", commit.summary().unwrap_or("Missing"))
-                    });
-                }
             }
-            None => {}
         }
     }
 
