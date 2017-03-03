@@ -45,6 +45,17 @@ extern crate toml;
 extern crate itertools;
 
 
+// A macro to extract the T from an Option<T> or do an early return with a user-specified value
+macro_rules! try_opt {
+    ($e:expr, $r:expr) => (
+        match $e {
+            Some(t) => t,
+            None => return $r,
+        }
+    )
+}
+
+
 pub mod api;
 pub mod db;
 pub mod depclose;

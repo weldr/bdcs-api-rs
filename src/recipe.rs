@@ -371,11 +371,9 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, R
 ///
 pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -> Result<Recipe, RecipeError> {
     // Read a filename from a branch.
-    let spec = {
-        match commit {
-            Some(commit) => format!("{}:{}", commit, try!(recipe_filename(name))),
-            None => format!("{}:{}", branch, try!(recipe_filename(name)))
-        }
+    let spec = match commit {
+        Some(commit) => format!("{}:{}", commit, try!(recipe_filename(name))),
+        None => format!("{}:{}", branch, try!(recipe_filename(name)))
     };
     let object = try!(repo.revparse_single(&spec[..]));
     let blob = try!(repo.find_blob(object.id()));
@@ -490,35 +488,29 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
     }
 
     let filename = try!(recipe_filename(recipe_name));
-    if let Some(branch_id) = try!(repo.find_branch(branch, BranchType::Local))
-                                      .get()
-                                      .target() {
-        // Find the commit to revert to
-        let revert_tree = try!(try!(repo.find_commit(try!(Oid::from_str(commit)))).tree());
-        let revert_entry = revert_tree.get_name(&filename);
-        match revert_entry {
-            Some(entry) => {
-                let revert_id = entry.id();
-                debug!("revert"; "filename" => filename, "id" => format!("{}", revert_id));
+    let branch_id = try_opt!(try!(repo.find_branch(branch, BranchType::Local)).get().target(), Ok(false));
 
-                debug!("Branch {}'s id is {}", branch, branch_id);
-                let parent_commit = try!(repo.find_commit(branch_id));
-                let tree_id = {
-                    let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-                    try!(tree.insert(&filename, revert_id, 0o100644));
-                    tree.write().unwrap()
-                };
-                let tree = try!(repo.find_tree(tree_id));
-                let sig = try!(Signature::now("bdcs-api-server", "user-email"));
-                let commit_msg = format!("Recipe {} reverted to commit {}", filename, commit);
-                let branch_ref = format!("refs/heads/{}", branch);
-                try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
-                debug!("Recipe revert commit:"; "branch" => branch, "recipe_name" => recipe_name,
-                       "filename" => filename, "commit" => commit, "commit_msg" => commit_msg);
-            }
-            None => return Ok(false)
-        }
-    }
+    // Find the commit to revert to
+    let revert_tree = try!(try!(repo.find_commit(try!(Oid::from_str(commit)))).tree());
+    let entry = try_opt!(revert_tree.get_name(&filename), Ok(false));
+
+    let revert_id = entry.id();
+    debug!("revert"; "filename" => filename, "id" => format!("{}", revert_id));
+
+    debug!("Branch {}'s id is {}", branch, branch_id);
+    let parent_commit = try!(repo.find_commit(branch_id));
+    let tree_id = {
+        let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
+        try!(tree.insert(&filename, revert_id, 0o100644));
+        tree.write().unwrap()
+    };
+    let tree = try!(repo.find_tree(tree_id));
+    let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+    let commit_msg = format!("Recipe {} reverted to commit {}", filename, commit);
+    let branch_ref = format!("refs/heads/{}", branch);
+    try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
+    debug!("Recipe revert commit:"; "branch" => branch, "recipe_name" => recipe_name,
+           "filename" => filename, "commit" => commit, "commit_msg" => commit_msg);
 
     Ok(true)
 }
