@@ -19,6 +19,7 @@
 #![plugin(rocket_codegen)]
 
 extern crate bdcs;
+#[macro_use] extern crate lazy_static;
 extern crate rocket;
 extern crate toml;
 
@@ -34,6 +35,25 @@ const DB_PATH: &'static str = "./tests/metadata.db";
 // XXX This path is REMOVED on each run.
 const RECIPE_PATH: &'static str = "/var/tmp/bdcs-recipes-test/";
 
+
+/// Use lazy_static to write the config once, at runtime.
+struct TestFramework {
+    initialized: bool
+}
+
+impl TestFramework {
+    fn setup() -> TestFramework {
+        write_config();
+
+        TestFramework { initialized: true }
+    }
+}
+
+lazy_static! {
+    static ref FRAMEWORK: TestFramework = {
+        TestFramework::setup()
+    };
+}
 
 /// Write Rocket.toml
 ///
@@ -66,10 +86,10 @@ fn write_config() {
 
 #[test]
 fn mock_route() {
+    assert_eq!(FRAMEWORK.initialized, true);
+
     let expected_default = include_str!("results/v0/route.json");
     let expected_filter = include_str!("results/v0/route-filter.json");
-
-    write_config();
 
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![mock::static_route, mock::static_route_filter]);
@@ -91,10 +111,10 @@ fn mock_route() {
 
 #[test]
 fn mock_route_param() {
+    assert_eq!(FRAMEWORK.initialized, true);
+
     let expected_default = include_str!("results/v0/route-param.json");
     let expected_filter = include_str!("results/v0/route-param-filter.json");
-
-    write_config();
 
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![mock::static_route_param, mock::static_route_param_filter]);
@@ -116,22 +136,22 @@ fn mock_route_param() {
 
 #[test]
 fn mock_route_action() {
+    assert_eq!(FRAMEWORK.initialized, true);
+
     let expected_default = include_str!("results/v0/route-action.json");
     let expected_filter = include_str!("results/v0/route-action-filter.json");
-
-    write_config();
 
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![mock::static_route_action, mock::static_route_action_filter]);
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/http-server");
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/http-server?offset=10&limit=2");
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss?offset=10&limit=2");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);

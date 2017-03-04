@@ -19,6 +19,7 @@
 #![plugin(rocket_codegen)]
 
 extern crate bdcs;
+#[macro_use] extern crate lazy_static;
 extern crate rocket;
 extern crate serde_json;
 extern crate toml;
@@ -37,6 +38,52 @@ use serde_json::Value;
 const DB_PATH: &'static str = "./tests/metadata.db";
 // XXX This path is REMOVED on each run.
 const RECIPE_PATH: &'static str = "/var/tmp/bdcs-recipes-test/";
+
+/// Use lazy_static to write the config once, at runtime.
+struct TestFramework {
+    initialized: bool,
+    rocket: rocket::Rocket
+}
+
+impl TestFramework {
+    fn setup() -> TestFramework {
+        write_config();
+        setup_repo();
+
+        let db_pool = DBPool::new(DB_PATH);
+        let recipe_repo  = RecipeRepo::new(RECIPE_PATH);
+
+        // Mount the API and run a request against it
+        let rocket = rocket::ignite().mount("/",
+                                            routes![v0::test,
+                                            v0::isos,
+                                            v0::compose_types,
+                                            v0::projects_list_default, v0::projects_list_filter,
+                                            v0::modules_info_default, v0::modules_info_filter,
+                                            v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
+                                            v0::recipes_list_default, v0::recipes_list_filter,
+                                            v0::recipes_info_default, v0::recipes_info_filter,
+                                            v0::recipes_changes_default, v0::recipes_changes_filter,
+                                            v0::recipes_diff,
+                                            v0::recipes_new_json, v0::recipes_new_toml,
+                                            v0::recipes_delete,
+                                            v0::recipes_undo,
+                                            v0::recipes_depsolve])
+                                    .manage(db_pool)
+                                    .manage(recipe_repo);
+
+        TestFramework {
+            initialized: true,
+            rocket:      rocket
+        }
+    }
+}
+
+lazy_static! {
+    static ref FRAMEWORK: TestFramework = {
+        TestFramework::setup()
+    };
+}
 
 
 /// Write Rocket.toml
@@ -85,32 +132,9 @@ fn setup_repo() {
 }
 
 #[test]
-fn run_api_tests() {
-    write_config();
-    setup_repo();
-
-    let db_pool = DBPool::new(DB_PATH);
-    let recipe_repo = RecipeRepo::new(RECIPE_PATH);
-
-    // Mount the API and run a request against it
-    let rocket = rocket::ignite().mount("/",
-                                        routes![v0::test,
-                                        v0::isos,
-                                        v0::compose_types,
-                                        v0::projects_list_default, v0::projects_list_filter,
-                                        v0::modules_info_default, v0::modules_info_filter,
-                                        v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
-                                        v0::recipes_list_default, v0::recipes_list_filter,
-                                        v0::recipes_info_default, v0::recipes_info_filter,
-                                        v0::recipes_changes_default, v0::recipes_changes_filter,
-                                        v0::recipes_diff,
-                                        v0::recipes_new_json, v0::recipes_new_toml,
-                                        v0::recipes_delete,
-                                        v0::recipes_undo,
-                                        v0::recipes_depsolve])
-                                .manage(db_pool)
-                                .manage(recipe_repo);
-
+fn test_v0_test() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     let mut req = MockRequest::new(Method::Get, "/test");
     let mut response = req.dispatch_with(&rocket);
@@ -118,7 +142,12 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some("API v0 test".to_string()));
+}
 
+#[test]
+fn test_v0_isos() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     // v0_isos()
     let mut req = MockRequest::new(Method::Get, "/isos");
@@ -127,7 +156,12 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some("Unimplemented".to_string()));
+}
 
+#[test]
+fn test_v0_compose_types() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     // v0_compose_types()
     let expected = include_str!("results/v0/compose-types.json").trim_right();
@@ -138,6 +172,12 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected.to_string()));
+}
+
+#[test]
+fn test_v0_projects_list() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     // v0_projects_list()
     let expected_default = include_str!("results/v0/projects-list.json").trim_right();
@@ -156,27 +196,36 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
+}
 
+#[test]
+fn test_v0_modules_info() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
-/* Fails because...
     // v0_modules_info()
     let expected_default = include_str!("results/v0/modules-info.json").trim_right();
     let expected_filter = include_str!("results/v0/modules-info-filter.json").trim_right();
 
-    let mut req = MockRequest::new(Method::Get, "/modules/info/lorax");
+    let mut req = MockRequest::new(Method::Get, "/modules/info/basesystem");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/modules/info/lorax?limit=10");
+    let mut req = MockRequest::new(Method::Get, "/modules/info/basesystem?limit=10");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
-*/
+}
+
+#[test]
+fn test_v0_modules_list_noargs() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     // v0_modules_list_noargs()
     let expected_default = include_str!("results/v0/modules-list.json").trim_right();
@@ -195,28 +244,12 @@ fn run_api_tests() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
+}
 
-
-    // v0_recipes_list()
-    // TODO Copy ./examples/recipes/ to a temporary directory
-
-    let expected_default = include_str!("results/v0/recipes-list.json").trim_right();
-    let expected_filter = include_str!("results/v0/recipes-list-filter.json").trim_right();
-
-    let mut req = MockRequest::new(Method::Get, "/recipes/list/");
-    let mut response = req.dispatch_with(&rocket);
-
-    assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some(expected_default.to_string()));
-
-    let mut req = MockRequest::new(Method::Get, "/recipes/list?limit=2");
-    let mut response = req.dispatch_with(&rocket);
-
-    assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some(expected_filter.to_string()));
-
+#[test]
+fn test_v0_recipes_info() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     // v0_recipes_info()
     // TODO Copy ./examples/recipes/ to a temporary directory
@@ -225,20 +258,25 @@ fn run_api_tests() {
     let expected_filter = include_str!("results/v0/recipes-info-filter.json").trim_right();
 
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,http-server");
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,kubernetes");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,http-server,kubernetes?limit=2");
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,kubernetes,octave?limit=2");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
+}
 
+#[test]
+fn test_v0_recipes_changes() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
 
     // v0_recipes_changes()
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave,kubernetes");
@@ -260,7 +298,50 @@ fn run_api_tests() {
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "octave".to_string());
     assert_eq!(j["recipes"][0]["changes"][0]["summary"], "Recipe octave saved".to_string());
+}
 
+#[test]
+fn test_recipes_depsolve() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
+
+    // v0_recipes_depsolve()
+    let expected = include_str!("results/v0/recipes-depsolve.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/kubernetes");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected.to_string()));
+}
+
+#[test]
+fn test_v0_recipes() {
+    // NOTE All the recipe tests need to be in the same thread, otherwise they will
+    // interfere with each other
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
+
+    // v0_recipes_list()
+    // TODO Copy ./examples/recipes/ to a temporary directory
+
+    let expected_default = include_str!("results/v0/recipes-list.json").trim_right();
+    let expected_filter = include_str!("results/v0/recipes-list-filter.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/list/");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected_default.to_string()));
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/list?limit=2");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected_filter.to_string()));
 
     // v0_recipes_new()
     let recipe_json = include_str!("results/v0/recipes-new.json").trim_right();
@@ -274,15 +355,14 @@ fn run_api_tests() {
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some("{\"status\":true}".to_string()));
 
-    // v0_recipes_depsolve()
-    let expected = include_str!("results/v0/recipes-depsolve.json").trim_right();
-
-    let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/http-server");
+    // v0_recipes_delete
+    // Delete the test recipe created above
+    let mut req = MockRequest::new(Method::Delete, "/recipes/delete/recipe-test");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some(expected.to_string()));
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
 
     // v0_recipes_new_toml()
     // Update the example http-server recipe with some changes.
@@ -357,16 +437,6 @@ fn run_api_tests() {
 
     // Undo the change
     let mut req = MockRequest::new(Method::Post, format!("/recipes/undo/recipe-test/{}", commit_id));
-    let mut response = req.dispatch_with(&rocket);
-
-    assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
-
-
-    // v0_recipes_delete
-    // Delete the test recipe created above
-    let mut req = MockRequest::new(Method::Delete, "/recipes/delete/recipe-test");
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
