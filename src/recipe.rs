@@ -299,7 +299,7 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str, replace: bool) -> R
         }
     }
 
-    write(repo, &recipe, branch)
+    write(repo, &recipe, branch, None)
 }
 
 
@@ -320,7 +320,7 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str, replace: bool) -> R
 /// If the branch does not exist, it will be created. By convention the `master`
 /// branch is used for example recipes.
 ///
-pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, RecipeError> {
+pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&str>) -> Result<bool, RecipeError> {
     // Does the branch exist? If not, create it based on master
     match repo.find_branch(branch, BranchType::Local) {
         Ok(_) => {}
@@ -347,7 +347,16 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str) -> Result<bool, R
     };
     let tree = try!(repo.find_tree(tree_id));
     let sig = try!(Signature::now("bdcs-api-server", "user-email"));
-    let commit_msg = format!("Recipe {} saved", recipe.name);
+    let commit_msg = {
+        match message {
+            Some(msg) => {
+                format!("Recipe {} saved\n\n{}", recipe.name, msg)
+            }
+            None => {
+                format!("Recipe {} saved", recipe.name)
+            }
+        }
+    };
     let branch_ref = format!("refs/heads/{}", branch);
     try!(repo.commit(Some(&branch_ref), &sig, &sig, &commit_msg, &tree, &[&parent_commit]));
     debug!("Recipe commit:"; "branch" => branch, "recipe_name" => recipe.name, "commit_msg" => commit_msg);

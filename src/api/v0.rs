@@ -1209,7 +1209,7 @@ pub fn recipes_new_json(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<J
     info!("/recipes/new/ (JSON)"; "recipe.name" => recipe.name);
     // TODO Get the user's branch name. Use master for now.
 
-    let status = match recipe::write(&repo.repo(), &recipe, "master") {
+    let status = match recipe::write(&repo.repo(), &recipe, "master", None) {
         Ok(result) => result,
         Err(e) => {
             error!("recipes_new"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
@@ -1236,7 +1236,7 @@ pub fn recipes_new_toml(recipe: TOML<Recipe>, repo: State<RecipeRepo>) -> CORS<J
     info!("/recipes/new/ (TOML)"; "recipe.name" => recipe.name);
     // TODO Get the user's branch name. Use master for now.
 
-    let status = match recipe::write(&repo.repo(), &recipe, "master") {
+    let status = match recipe::write(&repo.repo(), &recipe, "master", None) {
         Ok(result) => result,
         Err(e) => {
             error!("recipes_new"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
