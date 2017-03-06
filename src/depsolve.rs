@@ -1,9 +1,6 @@
 use depclose::*;
-use itertools::*;
-use rpm::*;
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
+use std::collections::HashMap;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
@@ -103,24 +100,18 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignme
                         indices_to_remove.push(i);
                         changed = true;
                     }
-                },
-
-                _ => { }
+                }
             }
         }
 
         for i in indices_to_replace {
-            let mut expr_;
-            {
-                let expr = match *(exprs.index_mut(i)).borrow_mut() {
-                    DepExpression::And(ref mut and_list) => and_list.index(0).clone(),
-                    DepExpression::Or(ref mut or_list)   => or_list.index(0).clone(),
-                    _ => unreachable!()
-                };
-                expr_ = expr;
-            }
+            let expr = match *(exprs.index_mut(i)).borrow_mut() {
+                DepExpression::And(ref mut and_list) => and_list.index(0).clone(),
+                DepExpression::Or(ref mut or_list)   => or_list.index(0).clone(),
+                _ => unreachable!()
+            };
             exprs.remove(i);
-            exprs.insert(i, expr_);
+            exprs.insert(i, expr);
         }
 
         indices_to_remove.sort_by(|a, b| b.cmp(a));

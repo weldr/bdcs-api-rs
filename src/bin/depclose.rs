@@ -5,13 +5,11 @@ extern crate rusqlite;
 
 use bdcs::depclose::*;
 use bdcs::depsolve::*;
-use bdcs::rpm::Requirement;
 
 use r2d2_sqlite::SqliteConnectionManager;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::env;
 use std::process::exit;
-use std::str::FromStr;
 use std::rc::Rc;
 use std::cell::RefCell;
 

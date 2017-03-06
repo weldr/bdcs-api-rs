@@ -20,7 +20,6 @@ use rpm::*;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::slice::Iter;
 use std::str::FromStr;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -125,7 +124,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
                                              // convert the provides expression to a Requirement and return a (group_id, Requirement) tuple
                                              .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv))
                                              // filter out any that don't match version-wise
-                                             .filter(|&(ref group_id, ref provider_req)| provider_req.satisfies(&req))
+                                             .filter(|&(_, ref provider_req)| provider_req.satisfies(&req))
                                              // filter out any that don't match arch-wise
                                              .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches))
                                              // map the remaining providers to an expression, recursing to fetch the provider's requirements
@@ -136,7 +135,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
                                                      satisfied = true;
                                                      provider
                                                  },
-                                                 Err(e) => None
+                                                 Err(_) => None
                                              })
                                              .collect::<Vec<Rc<RefCell<DepExpression>>>>();
 
@@ -155,7 +154,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
                         satisfied = true;
                         provider
                     },
-                    Err(e) => None
+                    Err(_) => None
                 }).collect()
             },
             Err(e) => return Err(e.to_string())
