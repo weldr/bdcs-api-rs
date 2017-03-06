@@ -532,7 +532,7 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
 pub struct RecipeCommit {
     pub commit: String,
     pub time: String,
-    pub summary: String
+    pub message: String
 }
 
 /// List the commits for a recipe in a branch
@@ -581,7 +581,8 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
                 commits.push(RecipeCommit {
                                 commit: format!("{}", commit.id()),
                                 time: time_rfc2822(commit.time()),
-                                summary: format!("{}", commit.summary().unwrap_or("Missing"))
+                                message: format!("{}", commit.message().unwrap_or("Missing"))
+
                 });
             }
         }
