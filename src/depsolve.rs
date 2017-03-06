@@ -6,8 +6,8 @@ use std::ops::IndexMut;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-pub fn unit_propagation(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>) -> bool {
-    unit_propagation_helper(exprs, assignments, true)
+pub fn unit_propagation(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>) -> bool {
+    unit_propagation_helper(exprs, assignments, true, &mut 0)
 }
 
 // if assign is true, when a unit is found, process it and add it to the cache so that it will be propagated
@@ -25,7 +25,11 @@ pub fn unit_propagation(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignments
 // but we shouldn't do anything with And(D, C), since messing with D will mess with the Or(D, E)
 // branch. The And(D, C) portion could be false and the parent Or() expression can still be true,
 // so don't try to infer anything from those values.
-fn unit_propagation_helper(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>, assign: bool) -> bool {
+//
+// change_count is incremented every time a change is made to the assignments hash, and is compared
+// to the marker field in DepCell. This way if a given Rc<DepCell<DepExpression>> has already been
+// processed since the last assignments change, it does not need to be processed again.
+fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>, assign: bool, change_count: &mut i64) -> bool {
     let mut ever_changed = false;
 
     loop {
@@ -33,17 +37,23 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignme
         let mut indices_to_replace = Vec::new();
         let mut changed = false;
 
-        for (i, val) in exprs.iter().enumerate() {
+        for (i, ref mut val) in exprs.iter().enumerate() {
+            if val.marker.get() == *change_count {
+                continue;
+            }
+
             match *(val.borrow_mut()) {
                 DepExpression::Atom(ref a) => {
                     if !assignments.contains_key(&a) {
                         if assign {
                             assignments.insert(a.clone(), true);
+                            *change_count = *change_count + 1;
                             changed = true;
                             indices_to_remove.push(i);
                         }
                     } else if assignments.get(&a) == Some(&true) {
                         changed = true;
+                        *change_count = *change_count + 1;
                         indices_to_remove.push(i);
                     } else {
                         panic!("conflict resolving {}", a);
@@ -57,10 +67,12 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignme
                                 if assign {
                                     assignments.insert(a.clone(), false);
                                     changed = true;
+                                    *change_count = *change_count + 1;
                                     indices_to_remove.push(i);
                                 }
                             } else if assignments.get(&a) == Some(&false) {
                                 changed = true;
+                                *change_count = *change_count + 1;
                                 indices_to_remove.push(i);
                             } else {
                                 panic!("conflict resolving {}", a);
@@ -73,8 +85,9 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignme
 
                 DepExpression::And(ref mut and_list) => {
                     // recurse on this list of expressions
-                    if unit_propagation_helper(and_list, assignments, assign) {
+                    if unit_propagation_helper(and_list, assignments, assign, change_count) {
                         changed = true;
+                        *change_count = *change_count + 1;
                     }
 
                     // if there's only one thing left in the list, the And is actually just that
@@ -82,25 +95,35 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<RefCell<DepExpression>>>, assignme
                     if and_list.len() == 1 {
                         indices_to_replace.push(i);
                         changed = true;
+                        *change_count = *change_count + 1;
                     } else if and_list.is_empty() {
                         indices_to_remove.push(i);
                         changed = true;
+                        *change_count = *change_count + 1;
                     }
                 },
 
                 DepExpression::Or(ref mut or_list) => {
-                    if unit_propagation_helper(or_list, assignments, false) {
-                        changed = true;
-                    }
-
+                    // For or, check if there's only one thing first, so we don't waste time
+                    // processing the child with assign=false just to (potentially) redo it with
+                    // assign=true
                     if or_list.len() == 1 {
                         indices_to_replace.push(i);
+                        *change_count = *change_count + 1;
                         changed = true;
                     } else if or_list.is_empty() {
                         indices_to_remove.push(i);
                         changed = true;
+                        *change_count = *change_count + 1;
+                    } else if unit_propagation_helper(or_list, assignments, false, change_count) {
+                        changed = true;
+                        *change_count = *change_count + 1;
                     }
                 }
+            }
+
+            if changed {
+                val.marker.set(*change_count);
             }
         }
 

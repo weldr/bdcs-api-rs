@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::env;
 use std::process::exit;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 fn main() {
     let mut argv: Vec<String> = env::args().collect();
@@ -37,7 +36,7 @@ fn main() {
     };
 
     // Wrap the returned depexpression in the crud it needs
-    let mut exprs = vec![Rc::new(RefCell::new(depexpr))];
+    let mut exprs = vec![Rc::new(DepCell::new(depexpr))];
     let mut assignments = HashMap::new();
     unit_propagation(&mut exprs, &mut assignments);
  
