@@ -216,6 +216,10 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
 //
 //    PACKAGE_requires_1_provided_by_1 AND (required_package_provides_1 AND required_package_provides_2 AND ...) ...
 //
+// Obsoletes are special in that the expression matches the package name, not a provider name. To
+// handle this, in the provider list add a special Requirement of the form {name:"NAME: <name>", expr:Some(EqualTo, <version>)}
+// and do the same thing to the name when processing Obsoletes.
+//
 // Obsoletes and conflicts do not need to be further expanded. Any conflicting packages that
 // were closed over will be eliminated (or determined to be unresolvable) during depsolve.
 //
@@ -256,14 +260,41 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
             let mut group_provides = Vec::new();
             let mut group_obsoletes = Vec::new();
             let mut group_conflicts = Vec::new();
+            let mut name = None;
+            let mut version = None;
 
             for kv in group_key_vals.iter() {
                 match kv.key_value.as_str() {
                     "rpm-provide" => group_provides.push(kv_to_expr(kv)),
-                    "rpm-obsolete" => group_obsoletes.push(kv_to_not_expr(kv)),
                     "rpm-conflict" => group_conflicts.push(kv_to_not_expr(kv)),
+                    // obsolete matches the package name, not a provides, so handle it differently
+                    "rpm-obsolete" => match &kv.ext_value {
+                        &Some(ref ext_value) => match Requirement::from_str(ext_value.as_str()) {
+                            Ok(base_req) => {
+                                let new_req = Requirement{name: "PKG: ".to_string() + base_req.name.as_str(),
+                                                          expr: base_req.expr};
+                                group_obsoletes.push(Ok(Rc::new(DepCell::new(DepExpression::Not(Rc::new(DepCell::new(DepExpression::Atom(DepAtom::Requirement(new_req)))))))));
+                            },
+                            Err(e) => group_obsoletes.push(Err(e))
+                        },
+                        &None => group_obsoletes.push(Err("ext_value is not set".to_string()))
+                    },
+                    "name"         => name = Some(&kv.val_value),
+                    "version"      => version = Some(&kv.val_value),
                     _ => {}
                 }
+            }
+
+            match (name, version) {
+                (Some(name), Some(version)) => match EVR::from_str(version.as_str()) {
+                    Ok(evr) => { 
+                        let req = Requirement{name: "PKG: ".to_string() + name.as_str(),
+                                              expr: Some((ReqOperator::EqualTo, evr))};
+                        group_provides.push(Ok(Rc::new(DepCell::new(DepExpression::Atom(DepAtom::Requirement(req))))));
+                    },
+                    Err(e)  => group_provides.push(Err(e))
+                },
+                _ => ()
             }
 
             // Collect the Vec<Result<Expression, String>>s into a Result<Vec<Expression>, String>
