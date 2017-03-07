@@ -3,11 +3,11 @@ extern crate r2d2;
 extern crate r2d2_sqlite;
 extern crate rusqlite;
 
+use bdcs::db::*;
 use bdcs::depclose::*;
 use bdcs::depsolve::*;
 
 use r2d2_sqlite::SqliteConnectionManager;
-use std::collections::HashMap;
 use std::env;
 use std::process::exit;
 use std::rc::Rc;
@@ -37,11 +37,25 @@ fn main() {
 
     // Wrap the returned depexpression in the crud it needs
     let mut exprs = vec![Rc::new(DepCell::new(depexpr))];
-    let mut assignments = HashMap::new();
-    unit_propagation(&mut exprs, &mut assignments);
- 
-    println!("====== ASSIGNMENTS ======");
-    for a in assignments { println!("{:?}", a) }
-    println!("====== EXPRS ======");
-    for x in exprs { println!("{}", *(x.borrow())) }
+
+    match solve_dependencies(&conn, &mut exprs) {
+        Ok(ids) => { let mut results = Vec::new();
+                     for id in ids {
+                         match get_groups_id(&conn, &id) {
+                             // Commented out for the moment - just printing group names is easier
+                             // to debug.
+                             // Ok(Some(grp)) => { let mut details = get_projects_details(&conn, &[grp.name.as_str()], 0, -1).unwrap();
+                             //                    results.append(&mut details);
+                             //                  }
+                             Ok(Some(grp)) => { results.push(grp.name) }
+                             _ => { }
+                         }
+                     }
+
+                     for x in results {
+                         println!("{}", x);
+                     }
+                   }
+        Err(e)  => { println!("{}", e); }
+    }
 }

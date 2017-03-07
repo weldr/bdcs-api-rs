@@ -1,12 +1,35 @@
 use depclose::*;
 
+use rusqlite::Connection;
 use std::collections::HashMap;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-pub fn unit_propagation(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>) -> bool {
+pub fn solve_dependencies(conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpression>>>) -> Result<Vec<i64>, String> {
+    let mut assignments = HashMap::new();
+
+    unit_propagation(exprs, &mut assignments);
+
+    // FIXME:  For now, only return results if unit_propagation was able to do everything.  This
+    // should handle most basic cases.  More complicated cases will require real dependency
+    // solving.
+    if exprs.is_empty() {
+        // Take the DepAtom -> bool hash map and convert it to just a list of i64.  We only care
+        // about the GroupId for packages that will be installed.
+        let mut results = assignments.into_iter().filter_map(|x| match x {
+            (DepAtom::GroupId(i), true) => Some(i),
+            _ => None
+        }).collect();
+
+        return Ok(results);
+    } else {
+        return Err(String::from("Unsolved expressions"));
+    }
+}
+
+fn unit_propagation(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>) -> bool {
     unit_propagation_helper(exprs, assignments, true, &mut 0)
 }
 

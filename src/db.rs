@@ -768,6 +768,35 @@ pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) 
     Ok(contents)
 }
 
+/// Find a Group matching a group id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_id` - The id of the [Groups](struct.Groups.html) entry to get
+///
+/// # Returns
+///
+/// * A Result<Option> of [Groups](struct.Groups.html) for the matching `group_id`
+///
+pub fn get_groups_id(conn: &Connection, id: &i64) -> rusqlite::Result<Option<Groups>> {
+    let mut stmt = try!(conn.prepare("
+            select groups.*
+            from groups
+            where groups.id == :id"));
+    let mut rows = try!(stmt.query_named(&[(":id", id)]));
+    if let Some(row) = rows.next() {
+        let row = try!(row);
+        Ok(Some(Groups {
+                    id: row.get(0),
+                    name: row.get(1),
+                    group_type: row.get(2),
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Find all groups matching a vector of group names
 ///
 /// # Arguments
