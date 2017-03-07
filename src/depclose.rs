@@ -376,16 +376,18 @@ pub fn close_dependencies(conn: &Connection, arches: &Vec<String>, packages: &Ve
         // architecture.  This will really only matter when we are called with a library package,
         // which could have been built for several arches.  Binary packages are typically single
         // arch.
+        let mut group_list = Vec::new();
         match get_groups_name(conn, p, 0, -1) {
             Ok(groups) => { for grp in groups {
                                 if group_matches_arch(conn, grp.id, arches) {
-                                    req_list.push(try!(depclose_package(conn, arches, grp.id, &HashSet::new(), &mut cache)));
+                                    group_list.push(try!(depclose_package(conn, arches, grp.id, &HashSet::new(), &mut cache)));
                                 }
                             }
                           },
             Err(e)     => return Err(e.to_string())
         }
+        req_list.push(Rc::new(DepCell::new(DepExpression::Or(group_list))));
     }
 
-    Ok(DepExpression::Or(req_list))
+    Ok(DepExpression::And(req_list))
 }
