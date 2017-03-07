@@ -378,7 +378,11 @@ pub fn close_dependencies(conn: &Connection, arches: &Vec<String>, packages: &Ve
         // arch.
         let mut group_list = Vec::new();
         match get_groups_name(conn, p, 0, -1) {
-            Ok(groups) => { for grp in groups {
+            Ok(groups) => { if groups.is_empty() {
+                                return Err(format!("No package named {}", p));
+                            }
+
+                            for grp in groups {
                                 if group_matches_arch(conn, grp.id, arches) {
                                     group_list.push(try!(depclose_package(conn, arches, grp.id, &HashSet::new(), &mut cache)));
                                 }
