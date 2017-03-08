@@ -42,7 +42,7 @@ impl fmt::Display for DepAtom {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum DepExpression {
     Atom(DepAtom),
     And(Vec<Rc<DepCell<DepExpression>>>),
@@ -343,9 +343,17 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                 let req_expr  = Rc::new(DepCell::new(DepExpression::Atom(DepAtom::Requirement(r.clone()))));
                 match providers {
                     Some(provider_exp) => {
-                        if Rc::new(DepCell::new(DepExpression::Atom(DepAtom::GroupId(group_id)))) == provider_exp {
-                            parent_groups_copy.insert(group_id);
+                        {   // extra block to end this borrow
+                            match *(provider_exp.borrow()) {
+                                DepExpression::Atom(DepAtom::GroupId(provider_group_id)) => {
+                                    if group_id == provider_group_id {
+                                        parent_groups_copy.insert(group_id);
+                                    }
+                                },
+                                _ => ()
+                            }
                         }
+
                         group_requirements.push(Rc::new(DepCell::new(DepExpression::And(vec![req_expr, provider_exp]))));
                     },
                     None => ()
