@@ -103,7 +103,7 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) ->
 }
 
 // Given a requirement, find a list of groups providing it and return all of that as an expression
-fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
+fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>, self_id: i64) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
     // helper function for converting a (Group, KeyVal) to Option<(group_id, Requirement)>
     fn provider_to_requirement(group: &Groups, kv: &KeyVal) -> Option<(i64, Requirement)> {
         let ext_val = match &kv.ext_value {
@@ -140,26 +140,36 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
             // We have a vector of (Groups, KeyVal) pairs, not all of which match the
             // version portion of the requirement expression. We want the matching
             // providers as DepExpression values, with any unsolvable providers removed
-            let providers_checked = providers.iter()
-                                             // convert the provides expression to a Requirement and return a (group_id, Requirement) tuple
-                                             .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv))
-                                             // filter out any that don't match version-wise
-                                             .filter(|&(_, ref provider_req)| provider_req.satisfies(&req))
-                                             // filter out any that don't match arch-wise
-                                             .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches))
-                                             // map the remaining providers to an expression, recursing to fetch the provider's requirements
-                                             // any recursions that return Err unsatisfiable, so filter those out
-                                             .filter_map(|(group_id, _)| match depclose_provider(conn, arches, group_id, parents, cache) {
-                                                 Ok(provider) => {
-                                                     // mark the requirement as satisfied
-                                                     satisfied = true;
-                                                     provider
-                                                 },
-                                                 Err(_) => None
-                                             })
-                                             .collect::<Vec<Rc<DepCell<DepExpression>>>>();
+            let providers_checked_1 = providers.iter()
+                                               // convert the provides expression to a Requirement and return a (group_id, Requirement) tuple
+                                               .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv))
+                                               // filter out any that don't match version-wise
+                                               .filter(|&(_, ref provider_req)| provider_req.satisfies(&req))
+                                               // filter out any that don't match arch-wise
+                                               .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches));
 
-            providers_checked
+            // pause here to see if the group we're collecting requirements for satisfies its own requirement
+            // basically do .any() but don't consume the iterator
+            let mut self_satisfied = false;
+            let providers_checked_2: Vec<(i64, Requirement)> = providers_checked_1.filter(|&(group_id, _)| {
+                if group_id == self_id {
+                    self_satisfied = true;
+                }
+                true
+            }).collect();
+            if self_satisfied {
+                return Ok(None);
+            }
+            // map the remaining providers to an expression, recursing to fetch the provider's requirements
+            // any recursions that return Err unsatisfiable, so filter those out
+            providers_checked_2.iter().filter_map(|&(group_id, _)| match depclose_provider(conn, arches, group_id, parents, cache) {
+                Ok(provider) => {
+                    // mark the requirement as satisfied
+                    satisfied = true;
+                    provider
+                },
+                Err(_) => None
+            }).collect::<Vec<Rc<DepCell<DepExpression>>>>()
         },
         Err(e) => return Err(e.to_string())
     };
@@ -329,7 +339,7 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                 // This isn't perfect, since there can still be extra copies depending on the order
                 // things are processed in, but it should cut way down on extra copies of
                 // everything.
-                let providers = try!(req_providers(conn, arches, r, &parent_groups_copy, cache));
+                let providers = try!(req_providers(conn, arches, r, &parent_groups_copy, cache, group_id));
                 let req_expr  = Rc::new(DepCell::new(DepExpression::Atom(DepAtom::Requirement(r.clone()))));
                 match providers {
                     Some(provider_exp) => {
