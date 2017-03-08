@@ -233,7 +233,7 @@ impl Requirement {
 
         // unpack the expression parts
         // If either half is missing the expression, it's a match
-        let (provides_operator, provides_evr, requires_operator, requires_evr) = 
+        let (provides_operator, provides_evr, requires_operator, requires_evr) =
             match (&self.expr, &requires.expr) {
                 (&None, _) => return true,
                 (_, &None) => return true,
@@ -259,7 +259,7 @@ impl Requirement {
         match provides_evr.cmp(requires_evr) {
             // true if Provides: >[=] x || Requires: <[=] y
             Ordering::Less    => provides_operator == &Ordering::Greater || requires_operator == &Ordering::Less,
-                
+
             // true if Provides <[=] x || Requires: >[=] y
             Ordering::Greater => provides_operator == &Ordering::Less || requires_operator == &Ordering::Greater,
 
@@ -308,7 +308,7 @@ pub fn vercmp(v1: &str, v2: &str) -> Ordering {
     }
 
     // Is there a way to compose ! and the is_* functions?
-    fn not_is_digit(c: char) -> bool { 
+    fn not_is_digit(c: char) -> bool {
         !(c.is_ascii() && c.is_digit(10))
     }
     fn not_is_alphabetic(c: char) -> bool {
@@ -377,7 +377,7 @@ pub fn vercmp(v1: &str, v2: &str) -> Ordering {
 }
 
 #[test]
-fn test_evr_ord() -> () {
+fn test_evr_ord() {
     fn reverse_ord(o: Ordering) -> Ordering {
         match o {
             Ordering::Greater => Ordering::Less,
@@ -415,14 +415,14 @@ fn test_evr_ord() -> () {
 }
 
 #[test]
-fn test_evr_format() -> () {
+fn test_evr_format() {
     let show_test_cases = [
         (EVR {epoch: None, version: String::from("1.0"), release: String::from("1")},    "1.0-1"),
         (EVR {epoch: Some(0), version: String::from("1.0"), release: String::from("1")}, "0:1.0-1"),
         (EVR {epoch: Some(1), version: String::from("1.0"), release: String::from("1")}, "1:1.0-1"),
 
         (EVR {epoch: Some(8), version: String::from("3.6.9"), release: String::from("11.fc100")}, "8:3.6.9-11.fc100"),
-        
+
         // empty versions aren't allowed on the parse side, but make sure they at least don't blow up
         (EVR {epoch: None, version: String::from(""), release: String::from("")},                 ""),
         (EVR {epoch: Some(8), version: String::from(""), release: String::from("")},              "8:"),
@@ -448,7 +448,7 @@ mod test_evr_parse {
     }
 
     #[test]
-    fn good_tests() -> () {
+    fn good_tests() {
         let parse_test_cases = [
             ("1.0-11.fc100",   EVR {epoch: None, version: String::from("1.0"), release: String::from("11.fc100")}),
             ("0:1.0-11.fc100", EVR {epoch: Some(0), version: String::from("1.0"), release: String::from("11.fc100")}),
@@ -464,82 +464,82 @@ mod test_evr_parse {
 
     #[test]
     #[should_panic]
-    fn missing_epoch() -> () {
+    fn missing_epoch() {
         parse_evr(":1.0-11.fc100");
     }
 
     #[test]
     #[should_panic]
-    fn missing_version() -> () {
+    fn missing_version() {
         parse_evr("0:-11.fc100");
     }
 
     #[test]
     #[should_panic]
-    fn missing_release() -> () {
+    fn missing_release() {
         parse_evr("0:1.0-");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_epoch_1() -> () {
+    fn invalid_epoch_1() {
         // can't be negative
         parse_evr("-1:1.0-100.fc11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_epoch_2() -> () {
+    fn invalid_epoch_2() {
         // non numeric
         parse_evr("A:1.0-100.fc11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_epoch_3() -> () {
+    fn invalid_epoch_3() {
         // overflow u32
         parse_evr("8589934592:1.0-100.fc11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_version_1() -> () {
+    fn invalid_version_1() {
         parse_evr("0:1.0:0-100.fc11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_version_2() -> () {
+    fn invalid_version_2() {
         parse_evr("0:1.0&0-100.fc11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_version_3() -> () {
+    fn invalid_version_3() {
         parse_evr("0:1.0🌮0-100.fc11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_release_1() -> () {
+    fn invalid_release_1() {
         parse_evr("0:1.0-100.fc:11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_release_2() -> () {
+    fn invalid_release_2() {
         parse_evr("0:1.0-100.fc&11");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_release_3() -> () {
+    fn invalid_release_3() {
         parse_evr("0:1.0-100.fc🌮11");
     }
 }
 
 #[test]
-fn test_operator_display() -> () {
+fn test_operator_display() {
     assert_eq!(format!("{}", ReqOperator::GreaterThanEqual), ">=");
     assert_eq!(format!("{}", ReqOperator::GreaterThan),      ">");
     assert_eq!(format!("{}", ReqOperator::EqualTo),          "=");
@@ -551,14 +551,14 @@ fn test_operator_display() -> () {
 mod test_reqoperator_parse {
     use rpm::ReqOperator;
     fn parse_reqoperator(s: &str) -> ReqOperator {
-        match s.parse::<ReqOperator>() {
+        match s.parse() {
             Ok(evr)  => evr,
             Err(err) => panic!("Failed to parse {}: {}", s, err)
         }
     }
 
     #[test]
-    fn good_tests() -> () {
+    fn good_tests() {
         assert_eq!(parse_reqoperator(">="), ReqOperator::GreaterThanEqual);
         assert_eq!(parse_reqoperator(">"),  ReqOperator::GreaterThan);
         assert_eq!(parse_reqoperator("="),  ReqOperator::EqualTo);
@@ -568,25 +568,25 @@ mod test_reqoperator_parse {
 
     #[test]
     #[should_panic]
-    fn empty_test() -> () {
+    fn empty_test() {
         parse_reqoperator("");
     }
 
     #[test]
     #[should_panic]
-    fn extra_data() -> () {
+    fn extra_data() {
         parse_reqoperator(">=🌮");
     }
 
     #[test]
     #[should_panic]
-    fn invalid_data() -> () {
+    fn invalid_data() {
         parse_reqoperator("🌮");
     }
 }
 
 #[test]
-fn test_reqoperator_cmp() -> () {
+fn test_reqoperator_cmp() {
     assert!(ReqOperator::GreaterThanEqual == Ordering::Greater);
     assert!(ReqOperator::GreaterThanEqual == Ordering::Equal);
     assert!(ReqOperator::GreaterThanEqual != Ordering::Less);
@@ -609,7 +609,7 @@ fn test_reqoperator_cmp() -> () {
 }
 
 #[test]
-fn test_requirement_format() -> () {
+fn test_requirement_format() {
     // assume if one operator works they all work
     let format_test_cases = [
         (Requirement {name: String::from("libthing"), expr: None}, "libthing"),
@@ -622,7 +622,7 @@ fn test_requirement_format() -> () {
 }
 
 #[test]
-fn test_requirement_parse() -> () {
+fn test_requirement_parse() {
     let parse_test_cases = [
         (Requirement {name: String::from("libthing"), expr: None}, "libthing"),
         (Requirement {name: String::from("libthing"), expr: Some((ReqOperator::GreaterThanEqual, EVR {epoch: None, version: String::from("1.0"), release: String::from("1")}))}, "libthing >= 1.0-1"),
@@ -634,7 +634,7 @@ fn test_requirement_parse() -> () {
 }
 
 #[test]
-fn satisfies_tests() -> () {
+fn satisfies_tests() {
     // provides, requires, true/false
     let test_cases = [
         ("no", "match", false),
@@ -642,7 +642,7 @@ fn satisfies_tests() -> () {
         ("thing",          "thing",          true),
         ("thing",          "thing >= 1.0-1", true),
         ("thing >= 1.0-1", "thing",          true),
-        
+
         ("thing = 1.0-1",  "thing = 1.0-1",  true),
         ("thing = 1.0-1",  "thing >= 1.0-1", true),
         ("thing = 1.0-1",  "thing > 1.0-1",  false),
@@ -759,8 +759,8 @@ fn satisfies_tests() -> () {
     ];
 
     for &(s1, s2, result) in test_cases.iter() {
-        let r1 = s1.parse::<Requirement>().unwrap();
-        let r2 = s2.parse::<Requirement>().unwrap();
+        let r1:Requirement = s1.parse().unwrap();
+        let r2:Requirement = s2.parse().unwrap();
         if r1.satisfies(&r2) != result {
             panic!("Failed to satisfy: Provides: {}, Requires: {}, result: {}", r1, r2, result);
         }
@@ -768,7 +768,7 @@ fn satisfies_tests() -> () {
 }
 
 #[test]
-fn test_vercmp() -> () {
+fn test_vercmp() {
     // These are from tests/rpmvercmp.at in the rpm source
     let vercmp_test_cases = [
         ("1.0", "1.0", Ordering::Equal),
