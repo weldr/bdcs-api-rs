@@ -386,7 +386,7 @@ fn test_evr_ord() {
         }
     }
 
-    let evr_test_cases = [
+    let evr_test_cases = vec![
         (EVR {epoch: None, version: String::from("1.0"), release: String::from("1")},    EVR {epoch: None, version: String::from("1.0"), release: String::from("1")}, Ordering::Equal),
         (EVR {epoch: Some(0), version: String::from("1.0"), release: String::from("1")}, EVR {epoch: None, version: String::from("1.0"), release: String::from("1")}, Ordering::Equal),
         (EVR {epoch: Some(1), version: String::from("1.0"), release: String::from("1")}, EVR {epoch: None, version: String::from("1.0"), release: String::from("1")}, Ordering::Greater),
@@ -401,7 +401,7 @@ fn test_evr_ord() {
         (EVR {epoch: Some(8), version: String::from(""),      release: String::from("11.fc100")}, EVR {epoch: Some(8),  version: String::from(""),      release: String::from("11.fc100")}, Ordering::Equal)
     ];
 
-    for &(ref e1, ref e2, result) in evr_test_cases.iter() {
+    for (e1, e2, result) in evr_test_cases {
         // Test both the ordering and the reverse
         assert_eq!(e1.cmp(&e2), result);
         assert_eq!(e2.cmp(&e1), reverse_ord(result));
@@ -416,7 +416,7 @@ fn test_evr_ord() {
 
 #[test]
 fn test_evr_format() {
-    let show_test_cases = [
+    let show_test_cases = vec![
         (EVR {epoch: None, version: String::from("1.0"), release: String::from("1")},    "1.0-1"),
         (EVR {epoch: Some(0), version: String::from("1.0"), release: String::from("1")}, "0:1.0-1"),
         (EVR {epoch: Some(1), version: String::from("1.0"), release: String::from("1")}, "1:1.0-1"),
@@ -432,7 +432,7 @@ fn test_evr_format() {
         (EVR {epoch: Some(8), version: String::from("3.6.9"), release: String::from("")},         "8:3.6.9"),
     ];
 
-    for &(ref e1, s) in show_test_cases.iter() {
+    for (e1, s) in show_test_cases {
         assert_eq!(format!("{}", e1), s);
     };
 }
@@ -449,7 +449,7 @@ mod test_evr_parse {
 
     #[test]
     fn good_tests() {
-        let parse_test_cases = [
+        let parse_test_cases = vec![
             ("1.0-11.fc100",   EVR {epoch: None, version: String::from("1.0"), release: String::from("11.fc100")}),
             ("0:1.0-11.fc100", EVR {epoch: Some(0), version: String::from("1.0"), release: String::from("11.fc100")}),
             ("8:1.0-11.fc100", EVR {epoch: Some(8), version: String::from("1.0"), release: String::from("11.fc100")}),
@@ -457,7 +457,7 @@ mod test_evr_parse {
             ("8:1.0",          EVR {epoch: Some(8), version: String::from("1.0"), release: String::from("")}),
         ];
 
-        for &(s, ref e1) in parse_test_cases.iter() {
+        for (s, e1) in parse_test_cases {
             assert!(e1.eq(&parse_evr(s)));
         };
     }
@@ -611,32 +611,32 @@ fn test_reqoperator_cmp() {
 #[test]
 fn test_requirement_format() {
     // assume if one operator works they all work
-    let format_test_cases = [
+    let format_test_cases = vec![
         (Requirement {name: String::from("libthing"), expr: None}, "libthing"),
         (Requirement {name: String::from("libthing"), expr: Some((ReqOperator::GreaterThanEqual, EVR {epoch: None, version: String::from("1.0"), release: String::from("1")}))}, "libthing >= 1.0-1"),
     ];
 
-    for &(ref r, s) in format_test_cases.iter() {
+    for (r, s) in format_test_cases {
         assert_eq!(format!("{}", r), s);
     }
 }
 
 #[test]
 fn test_requirement_parse() {
-    let parse_test_cases = [
+    let parse_test_cases = vec![
         (Requirement {name: String::from("libthing"), expr: None}, "libthing"),
         (Requirement {name: String::from("libthing"), expr: Some((ReqOperator::GreaterThanEqual, EVR {epoch: None, version: String::from("1.0"), release: String::from("1")}))}, "libthing >= 1.0-1"),
     ];
 
-    for &(ref r, s) in parse_test_cases.iter() {
-        assert_eq!(&s.parse::<Requirement>().unwrap(), r);
+    for (r, s) in parse_test_cases {
+        assert_eq!(s.parse::<Requirement>().unwrap(), r);
     }
 }
 
 #[test]
 fn satisfies_tests() {
     // provides, requires, true/false
-    let test_cases = [
+    let test_cases = vec![
         ("no", "match", false),
 
         ("thing",          "thing",          true),
@@ -758,7 +758,7 @@ fn satisfies_tests() {
         ("thing > 1.0",    "thing < 9.0-1",  true),
     ];
 
-    for &(s1, s2, result) in test_cases.iter() {
+    for (s1, s2, result) in test_cases {
         let r1:Requirement = s1.parse().unwrap();
         let r2:Requirement = s2.parse().unwrap();
         if r1.satisfies(&r2) != result {
@@ -770,7 +770,7 @@ fn satisfies_tests() {
 #[test]
 fn test_vercmp() {
     // These are from tests/rpmvercmp.at in the rpm source
-    let vercmp_test_cases = [
+    let vercmp_test_cases = vec![
         ("1.0", "1.0", Ordering::Equal),
         ("1.0", "2.0", Ordering::Less),
         ("2.0", "1.0", Ordering::Greater),
@@ -859,7 +859,7 @@ fn test_vercmp() {
         ("1.0~rc1", "1.0~rc1~git123", Ordering::Greater)
     ];
 
-    for &(s1, s2, result) in vercmp_test_cases.iter() {
+    for (s1, s2, result) in vercmp_test_cases {
         assert_eq!(vercmp(&s1, &s2), result);
     };
 }
