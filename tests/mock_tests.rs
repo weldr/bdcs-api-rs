@@ -88,8 +88,8 @@ fn write_config() {
 fn mock_route() {
     assert_eq!(FRAMEWORK.initialized, true);
 
-    let expected_default = include_str!("results/v0/route.json");
-    let expected_filter = include_str!("results/v0/route-filter.json");
+    let expected_default = include_str!("results/v0/route.json").trim_right();
+    let expected_filter = include_str!("results/v0/route-filter.json").trim_right();
 
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![mock::static_route, mock::static_route_filter]);
@@ -113,8 +113,8 @@ fn mock_route() {
 fn mock_route_param() {
     assert_eq!(FRAMEWORK.initialized, true);
 
-    let expected_default = include_str!("results/v0/route-param.json");
-    let expected_filter = include_str!("results/v0/route-param-filter.json");
+    let expected_default = include_str!("results/v0/route-param.json").trim_right();
+    let expected_filter = include_str!("results/v0/route-param-filter.json").trim_right();
 
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![mock::static_route_param, mock::static_route_param_filter]);
@@ -138,8 +138,8 @@ fn mock_route_param() {
 fn mock_route_action() {
     assert_eq!(FRAMEWORK.initialized, true);
 
-    let expected_default = include_str!("results/v0/route-action.json");
-    let expected_filter = include_str!("results/v0/route-action-filter.json");
+    let expected_default = include_str!("results/v0/route-action.json").trim_right();
+    let expected_filter = include_str!("results/v0/route-action-filter.json").trim_right();
 
     // Mount the API and run a request against it
     let rocket = rocket::ignite().mount("/", routes![mock::static_route_action, mock::static_route_action_filter]);

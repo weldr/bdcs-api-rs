@@ -286,9 +286,9 @@ fn test_v0_recipes_changes() {
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "kubernetes".to_string());
-    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe kubernetes saved".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe kubernetes, version 0.0.1 saved".to_string());
     assert_eq!(j["recipes"][1]["name"], "octave".to_string());
-    assert_eq!(j["recipes"][1]["changes"][0]["message"], "Recipe octave saved".to_string());
+    assert_eq!(j["recipes"][1]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
 
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?limit=1");
     let mut response = req.dispatch_with(&rocket);
@@ -297,7 +297,7 @@ fn test_v0_recipes_changes() {
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "octave".to_string());
-    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe octave saved".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
 }
 
 #[test]
@@ -386,7 +386,7 @@ fn test_v0_recipes() {
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
-    assert_eq!(j["recipes"][0]["changes"][1]["message"], "Recipe http-server saved".to_string());
+    assert_eq!(j["recipes"][0]["changes"][1]["message"], "Recipe http-server, version 0.0.1 saved".to_string());
 
     // Convert serde::Value to a &str
     let commit_id = match j["recipes"][0]["changes"][1]["commit"].as_str() {
@@ -403,9 +403,10 @@ fn test_v0_recipes() {
     assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
     assert_eq!(j["recipes"][0]["from"], commit_id);
     assert_eq!(j["recipes"][0]["to"], "NEWEST".to_string());
-    assert_eq!(j["recipes"][0]["diff"][8], "-name = \"php\"".to_string());
-    assert_eq!(j["recipes"][0]["diff"][14], "+name = \"ruby\"".to_string());
-    assert_eq!(j["recipes"][0]["diff"][15], "+version = \"2.0.0.598\"".to_string());
+    assert_eq!(j["recipes"][0]["diff"][8], "+version = \"0.0.2\"".to_string());
+    assert_eq!(j["recipes"][0]["diff"][16], "-name = \"php\"".to_string());
+    assert_eq!(j["recipes"][0]["diff"][22], "+name = \"ruby\"".to_string());
+    assert_eq!(j["recipes"][0]["diff"][23], "+version = \"2.0.0.598\"".to_string());
 
     // v0_recipes_undo()
     // First write some changes to the recipe
