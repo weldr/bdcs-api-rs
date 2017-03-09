@@ -35,6 +35,7 @@ use chrono::{DateTime, NaiveDateTime, FixedOffset};
 use git2::{self, BranchType, Commit, DiffFormat, DiffOptions, Oid, ObjectType};
 use git2::{Repository, Signature, Time};
 use glob::{self, glob};
+use semver;
 use toml;
 
 
@@ -62,6 +63,7 @@ pub enum RecipeError {
     Utf8(str::Utf8Error),
     TomlSer(toml::ser::Error),
     TomlDe(toml::de::Error),
+    SemVerError(semver::SemVerError),
     RecipeName,
     Branch,
     ParseTOML
@@ -103,6 +105,12 @@ impl From<toml::de::Error> for RecipeError {
     }
 }
 
+impl From<semver::SemVerError> for RecipeError {
+    fn from(err: semver::SemVerError) -> RecipeError {
+        RecipeError::SemVerError(err)
+    }
+}
+
 
 /// Welder Recipe
 ///
@@ -116,15 +124,50 @@ pub struct Recipe {
     pub name: String,
     pub description: Option<String>,
     #[serde(default)]
+    pub version: String,
+    #[serde(default)]
     pub modules: Vec<Modules>,
     #[serde(default)]
     pub packages: Vec<Packages>
 }
 
 impl Recipe {
+    /// Convert the recipe name to a filename
     fn filename(&self) -> Result<String, RecipeError> {
         recipe_filename(&self.name)
     }
+
+    /// Convert the version string to a SemVer Version
+    fn version(&self) -> Result<semver::Version, RecipeError> {
+        Ok(try!(semver::Version::parse(&self.version)))
+    }
+
+    /// Increment the patch number (z in x.y.z)
+    fn increment_patch(&mut self) -> Result<(), RecipeError> {
+        let mut version = try!(semver::Version::parse(&self.version));
+        version.increment_patch();
+        self.version = version.to_string();
+        Ok(())
+    }
+
+    /// Increment the minor number (y in x.y.z), and set z=0
+    #[allow(dead_code)]
+    fn increment_minor(&mut self) -> Result<(), RecipeError> {
+        let mut version = try!(semver::Version::parse(&self.version));
+        version.increment_minor();
+        self.version = version.to_string();
+        Ok(())
+    }
+
+    /// Increment the major number (x in x.y.z) and set z=0
+    #[allow(dead_code)]
+    fn increment_major(&mut self) -> Result<(), RecipeError> {
+        let mut version = try!(semver::Version::parse(&self.version));
+        version.increment_major();
+        self.version = version.to_string();
+        Ok(())
+    }
+
 }
 
 /// Recipe Modules
@@ -333,11 +376,38 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&
     let branch_id  = try_opt!(try!(repo.find_branch(branch, BranchType::Local)).get().target(), Ok(false));
     debug!("Branch {}'s id is {}", branch, branch_id);
 
+    // Make a copy so we can bump the version if needed
+    let mut recipe = recipe.clone();
+
+    // If the new recipe has an empty version, set it to 0.0.1
+    if recipe.version == "" {
+        recipe.version = "0.0.1".to_string();
+    }
+
+    // If it has an invalid semver in version, return an error.
+    let new_version = try!(semver::Version::parse(&recipe.version));
+
+    // Read the previous version of this recipe, compare its .version to the new one.
+    // If they are the same bump the patch level before saving the new one.
+    match read(repo, &recipe.name, branch, None) {
+        Ok(last_recipe) => {
+            match last_recipe.version() {
+                Ok(last_version) => {
+                    if last_version == new_version {
+                        try!(recipe.increment_patch())
+                    }
+                }
+                Err(_) => {}
+            }
+        }
+        Err(_) => {}
+    }
+
     let parent_commit = try!(repo.find_commit(branch_id));
     let blob_id = {
         // NOTE toml::to_string() can fail depending on which struct elements are empty
         // we use try_from to work around this by converting to a Value first.
-        let recipe_toml = try!(toml::Value::try_from(recipe));
+        let recipe_toml = try!(toml::Value::try_from(&recipe));
         try!(repo.blob(recipe_toml.to_string().as_bytes()))
     };
     let tree_id = {

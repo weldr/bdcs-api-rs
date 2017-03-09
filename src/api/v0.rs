@@ -831,6 +831,7 @@ pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON
 ///         {
 ///             "name": "http-server",
 ///             "description": "An example http server with PHP and MySQL support.",
+///             "version": "0.0.1",
 ///             "modules": [
 ///                 {
 ///                     "name": "httpd",
@@ -1152,6 +1153,16 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 /// The body of the POST should be a valid Recipe in JSON format. If it cannot be parsed an
 /// error 400 will be returned.
 ///
+/// ## Recipe Version
+///
+/// The recipe version must be a valid [semver](http://www.semver.org) formatted version, blank, or missing.
+/// If the version is valid, and matches the previously saved version, it will have the patch
+/// number (z in x.y.z) incremented automatically.
+///
+/// If the version is missing or blank it will be set to "0.0.1"
+///
+/// If the new version doesn't match the last saved version, the new version will be used.
+///
 /// # Examples
 ///
 /// ## POST body
@@ -1160,6 +1171,7 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 /// {
 ///     "name": "http-server",
 ///     "description": "An example http server with PHP and MySQL support.",
+///     "version": "0.0.1",
 ///     "modules": [
 ///         {
 ///             "name": "httpd",
