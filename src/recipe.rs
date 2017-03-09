@@ -420,10 +420,10 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&
     let commit_msg = {
         match message {
             Some(msg) => {
-                format!("Recipe {} saved\n\n{}", recipe.name, msg)
+                format!("Recipe {}, version {} saved\n\n{}", recipe.name, recipe.version, msg)
             }
             None => {
-                format!("Recipe {} saved", recipe.name)
+                format!("Recipe {}, version {} saved", recipe.name, recipe.version)
             }
         }
     };
