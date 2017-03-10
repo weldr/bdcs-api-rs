@@ -284,6 +284,34 @@ pub fn get_pkg_files_name(conn: &Connection, pkgname: &str) -> rusqlite::Result<
     Ok(contents)
 }
 
+/// List contents of a package given by group id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_id` - The id of the group to query
+///
+/// # Returns
+///
+/// * A Vector of PathBuf entries containing the full path of all of the files included
+///   in the package.
+///
+pub fn get_group_files_name(conn: &Connection, group_id: i64) -> rusqlite::Result<Vec<PathBuf>> {
+    let mut stmt = try!(conn.prepare("
+        select files.path
+        from files, group_files
+        on files.id == group_files.file_id
+        where group_files.group_id == :groupId
+    "));
+    let rows = try!(stmt.query_map_named(
+        &[(":groupId", &group_id)],
+        |row| {
+            let path: String = row.get(0);
+            PathBuf::from(path)
+        }));
+    rows.collect()
+}
+
 // Use a package struct to describe the package?
 // How to make these queries easier to expose as a library?
 

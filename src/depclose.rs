@@ -20,6 +20,7 @@ use rpm::*;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
 use std::rc::Rc;
@@ -180,6 +181,12 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
 
     // If the requirement looks like a filename, check for groups providing the file *in addition to* rpm-provide
     if req.name.starts_with('/') {
+        // check if the file is provided by this package
+        match get_group_files_name(conn, self_id) {
+            Ok(lst) => if lst.contains(&PathBuf::from(&req.name)) { return Ok(None); },
+            Err(e) => return Err(e.to_string())
+        };
+
         let mut file_providers = match get_groups_filename(conn, req.name.as_str()) {
             Ok(groups) => {
                 // Unlike group_providers, there are no versions to care about here
