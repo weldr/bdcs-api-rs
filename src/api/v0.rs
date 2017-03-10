@@ -22,16 +22,15 @@
 //!  - Return summaries about available projects
 //!  - [Example JSON](fn.projects_list.html#examples)
 //!  - [Optional filter parameters](../index.html#optional-filter-parameters)
-//! * `/api/v0/projects/info/<projects>
+//! * `/api/v0/projects/info/<projects>`
 //!  - Return detailed information about the project, all of its builds, and the sources of the
 //!    builds.
 //!  - [Example JSON](fn.projects_info.html#examples)
-//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
 //! * `/api/v0/modules/list`
 //!  - Return a list of available modules
 //!  - [Example JSON](fn.modules_list.html#examples)
 //!  - [Optional filter parameters](../index.html#optional-filter-parameters)
-//! * `/api/v0/modules/info/<modules>
+//! * `/api/v0/modules/info/<modules>`
 //!  - Return detailed information about a module.
 //!  - [Example JSON](fn.modules_info.html#examples)
 //!  - [Optional filter parameters](../index.html#optional-filter-parameters)
@@ -54,12 +53,12 @@
 //! * POST `/api/v0/recipes/new`
 //!  - Create or update a recipe.
 //!  - The body of the post is a JSON representation of the recipe, using the same format
-//!    received by ``/api/v0/recipes/info/<recipes>`
+//!    received by `/api/v0/recipes/info/<recipes>`
 //!  - [Example JSON](fn.recipes_new.html#examples)
 //! * DELETE `/api/v0/recipes/delete/<recipe>`
 //!  - Delete the named recipe from the repository
 //!  - [Example JSON](fn.recipes_delete.html#examples)
-//! * POST /api/v0/recipes/undo/<recipe>/<commit>
+//! * POST `/api/v0/recipes/undo/<recipe>/<commit>`
 //!  - Revert a recipe to a previous commit
 //!  - [Example JSON](fn.recipes_undo.html#examples)
 //!
@@ -415,28 +414,9 @@ pub fn projects_list(db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<Pr
 #[derive(Debug,Serialize)]
 pub struct ProjectsInfoResponse {
     projects: Vec<ProjectInfo>,
-    offset:   i64,
-    limit:    i64
 }
 
-/// Handler for `/projects/info/` with offset and limit arguments.
-///
-/// This calls [projects_info](fn.projects_info.html) with the optional `offset` and/or `limit`
-/// values.
-#[get("/projects/info/<projects>?<filter>")]
-pub fn projects_info_filter(projects: &str, filter: Filter, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
-    projects_info(projects, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
-}
-
-/// Handler for `/projects/list` without arguments.
-///
-/// This calls [projects_info](fn.projects_info.html) with the default `offset` and `limit` values.
-#[get("/projects/info/<projects>", rank=2)]
-pub fn projects_info_default(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
-    projects_info(projects, db, OFFSET, LIMIT)
-}
-
-
+/// Handler for `/projects/info`
 /// Return detailed information about a list of project names filtered by limit and/or offset
 ///
 /// # Arguments
@@ -498,14 +478,13 @@ pub fn projects_info_default(projects: &str, db: State<DBPool>) -> CORS<JSON<Pro
 /// }
 /// ```
 ///
-pub fn projects_info(projects: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ProjectsInfoResponse>> {
-    info!("/projects/info/"; "projects" => projects, "offset" => offset, "limit" => limit);
+#[get("/projects/info/<projects>")]
+pub fn projects_info(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
+    info!("/projects/info/"; "projects" => projects);
     let projects: Vec<&str> = projects.split(",").collect();
-    let result = get_projects_details(&db.conn(), &projects, offset, limit);
+    let result = get_projects_details(&db.conn(), &projects, 0, i64::max_value());
     CORS(JSON(ProjectsInfoResponse {
             projects: result.unwrap_or(vec![]),
-            offset: offset,
-            limit: limit
     }))
 }
 
