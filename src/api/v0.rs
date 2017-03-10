@@ -315,7 +315,9 @@ pub struct ComposeTypesResponse {
 pub fn compose_types() -> CORS<JSON<ComposeTypesResponse>> {
     info!("/compose/types");
     let mut types = Vec::new();
-    types.push(ComposeTypes::new("iso", true));
+    types.push(ComposeTypes::new("kickstart", true));
+    types.push(ComposeTypes::new("ostree", false));
+    types.push(ComposeTypes::new("iso", false));
     types.push(ComposeTypes::new("disk-image", false));
     types.push(ComposeTypes::new("fs-image", false));
     types.push(ComposeTypes::new("ami", false));
