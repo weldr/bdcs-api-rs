@@ -129,10 +129,10 @@ impl FromStr for EVR {
 
         // check for illegal characters
         if s_version.contains(illegal_char) {
-            return Err(String::from(format!("Illegal character in version {}", s_version)));
+            return Err(String::from(format!("{}: Illegal character in version {}", s, s_version)));
         }
         if s_release.contains(illegal_char) {
-            return Err(String::from("Illegal character in release"));
+            return Err(String::from(format!("{}: Illegal character in release {}", s, s_release)));
         }
 
         Ok(EVR {epoch: epoch, version: String::from(s_version), release: String::from(s_release)})
