@@ -43,6 +43,7 @@
 //! * `/api/v0/recipes/changes/<recipes>`
 //!  - Return the commit history of the recipes
 //!  - [Example JSON](fn.recipes_changes.html#examples)
+//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
 //! * `/api/v0/recipes/diff/<recipe>/<from_commit>/<to_commit>`
 //!  - Return the diff between the two recipe commits. Set to_commit to NEWEST to use the newest commit.
 //!  - [Example JSON](fn.recipes_diff.html#examples)
@@ -968,7 +969,7 @@ pub fn recipes_changes(recipe_names: &str, offset: i64, limit: i64, repo: State<
     for name in recipe_names.split(",") {
         match recipe::commits(&repo.repo(), &name, "master") {
             Ok(mut commits) => {
-                commits.truncate(limit as usize);
+                commits = commits.into_iter().skip(offset as usize).take(limit as usize).collect();
                 result.push(RecipeCommitInfo {
                                 name: name.to_string(),
                                 changes: commits

@@ -308,6 +308,15 @@ fn test_v0_recipes_changes() {
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "octave".to_string());
     assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?offset=1&limit=1");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "octave".to_string());
+    assert_eq!(j["recipes"][0]["changes"], Value::Array(vec![]));
 }
 
 #[test]
