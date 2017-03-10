@@ -33,7 +33,6 @@
 //! * `/api/v0/modules/info/<modules>`
 //!  - Return detailed information about a module.
 //!  - [Example JSON](fn.modules_info.html#examples)
-//!  - [Optional filter parameters](../index.html#optional-filter-parameters)
 //! * `/api/v0/recipes/list`
 //!  - List the names of the available recipes
 //!  - [Example JSON](fn.recipes_list.html#examples)
@@ -495,27 +494,9 @@ pub fn projects_info(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInf
 #[derive(Debug,Serialize)]
 pub struct ModulesInfoResponse {
     modules:  Vec<GroupDeps>,
-    offset:   i64,
-    limit:    i64
-}
-
-/// Handler for `/modules/info/` with offset and limit arguments.
-///
-/// This calls [modules_info](fn.modules_info.html) with the optional `offset` and/or `limit`
-/// values.
-#[get("/modules/info/<modules>?<filter>")]
-pub fn modules_info_filter(modules: &str, filter: Filter, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
-    modules_info(modules, db, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT))
 }
 
 /// Handler for `/modules/info/` without arguments.
-///
-/// This calls [modules_info](fn.modules_info.html) with the default `offset` and `limit` values.
-#[get("/modules/info/<modules>", rank=2)]
-pub fn modules_info_default(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
-    modules_info(modules, db, OFFSET, LIMIT)
-}
-
 /// Return detailed information about a list of module names filtered by limit and/or offset
 ///
 /// # Arguments
@@ -553,14 +534,13 @@ pub fn modules_info_default(modules: &str, db: State<DBPool>) -> CORS<JSON<Modul
 /// }
 /// ```
 ///
-pub fn modules_info(modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesInfoResponse>> {
-    info!("/modules/info/"; "modules" => modules, "offset" => offset, "limit" => limit);
+#[get("/modules/info/<modules>", rank=2)]
+pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
+    info!("/modules/info/"; "modules" => modules);
     let modules: Vec<&str> = modules.split(",").collect();
-    let result = get_groups_deps_vec(&db.conn(), &modules, offset, limit);
+    let result = get_groups_deps_vec(&db.conn(), &modules, 0, i64::max_value());
     CORS(JSON(ModulesInfoResponse {
             modules: result.unwrap_or(vec![]),
-            offset: offset,
-            limit: limit
     }))
 }
 
