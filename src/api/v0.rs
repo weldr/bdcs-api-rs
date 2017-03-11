@@ -559,7 +559,8 @@ pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoRe
 pub struct ModulesListResponse {
     modules: Vec<Groups>,
     offset:  i64,
-    limit:   i64
+    limit:   i64,
+    total:   i64
 }
 
 /// Handler for `/modules/list/` with module names, offset, and limit arguments.
@@ -633,7 +634,8 @@ pub fn modules_list_noargs_default(db: State<DBPool>) -> CORS<JSON<ModulesListRe
 ///         }
 ///     ],
 ///     "offset": 0,
-///     "limit": 20
+///     "limit": 20,
+///     "total": 4
 /// }
 /// ```
 ///
@@ -648,17 +650,14 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
     result.sort();
     // Groups includes the unique id, so dedupe using the name.
     result.dedup_by(|a, b| a.name.eq(&b.name));
+    let total = result.len() as i64;
 
-    // Remove 'offset' items
-    for _ in 0..cmp::min(offset as usize, result.len()) {
-        result.remove(0);
-    }
-    result.truncate(limit as usize);
-
+    result = result.into_iter().skip(offset as usize).take(limit as usize).collect();
     CORS(JSON(ModulesListResponse {
             modules: result,
-            offset: offset,
-            limit: limit
+            offset:  offset,
+            limit:   limit,
+            total:   total
     }))
 }
 
