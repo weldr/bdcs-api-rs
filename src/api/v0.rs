@@ -677,7 +677,8 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
 pub struct RecipesListResponse {
     recipes: Vec<String>,
     offset:  i64,
-    limit:   i64
+    limit:   i64,
+    total:   i64
 }
 
 /// Handler for `/recipes/list/` with offset and limit arguments.
@@ -725,7 +726,8 @@ pub fn recipes_list_default(repo: State<RecipeRepo>) -> CORS<JSON<RecipesListRes
 ///         "octave",
 ///     ],
 ///     "offset": 0,
-///     "limit": 20
+///     "limit": 20,
+///     "total": 6
 /// }
 /// ```
 ///
@@ -736,11 +738,13 @@ pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JS
     let mut result = recipe::list(&repo.repo(), "master", None).unwrap_or(vec![]);
     result.sort();
     result.dedup();
+    let total = result.len() as i64;
     result.truncate(limit as usize);
     CORS(JSON(RecipesListResponse {
             recipes: result,
-            offset: offset,
-            limit: limit
+            offset:  offset,
+            limit:   limit,
+            total:   total
     }))
 }
 
