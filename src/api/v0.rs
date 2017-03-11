@@ -339,8 +339,9 @@ pub fn compose_types() -> CORS<JSON<ComposeTypesResponse>> {
 #[derive(Serialize)]
 pub struct ProjectsResponse {
     projects: Vec<Projects>,
-    offset: i64,
-    limit: i64
+    offset:   i64,
+    limit:    i64,
+    total:    i64
 }
 
 /// Handler for `/projects/list` with offset and limit arguments.
@@ -393,17 +394,23 @@ pub fn projects_list_default(db: State<DBPool>) -> CORS<JSON<ProjectsResponse>> 
 ///         ...
 ///     ],
 ///     "offset": 0,
-///     "limit": 20
+///     "limit": 20,
+///     "total": 1
 /// }
 /// ```
 ///
 pub fn projects_list(db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ProjectsResponse>> {
     info!("/projects/list"; "offset" => offset, "limit" => limit);
-    let result = get_projects_name(&db.conn(), "*", offset, limit);
+    let (total, projects) = match get_projects_name(&db.conn(), "*", offset, limit) {
+        Ok((total, projects)) => (total, projects),
+        Err(_) => (0, vec![])
+    };
+
     CORS(JSON(ProjectsResponse {
-            projects: result.unwrap_or(vec![]),
-            offset: offset,
-            limit: limit
+            projects: projects,
+            offset:   offset,
+            limit:    limit,
+            total:    total
     }))
 }
 

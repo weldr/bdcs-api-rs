@@ -567,7 +567,20 @@ pub fn get_groups_filename(conn: &Connection, filename: &str) -> rusqlite::Resul
 ///
 /// * A Vector of [Projects](struct.Projects.html) for the matching project name/glob
 ///
-pub fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Projects>> {
+pub fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i64) -> rusqlite::Result<(i64, Vec<Projects>)> {
+    let mut stmt = try!(conn.prepare("
+            select count(*)
+            from projects
+            where projects.name GLOB :project"));
+    let mut rows = try!(stmt.query_named(&[(":project", &project)]));
+    let total = match rows.next() {
+        Some(row) => match row {
+            Ok(r) => r.get(0),
+            Err(_) => 0
+        },
+        None => 0
+    };
+
     let mut stmt = try!(conn.prepare("
             select projects.*
             from projects
@@ -587,7 +600,7 @@ pub fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i
                         upstream_vcs: row.get(5)
                     });
     }
-    Ok(contents)
+    Ok((total, contents))
 }
 
 /// Find all sources matching a source id
@@ -959,7 +972,7 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
 
     // If the group has a projects entry get extra details for it
     let d = match get_projects_name(conn, group, 0, 1) {
-        Ok(mut r) => r.pop(),
+        Ok((_, mut r)) => r.pop(),
         Err(_) => None
     };
     match d {
@@ -1174,7 +1187,7 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str], offset: i64, l
     let mut project_list: Vec<ProjectInfo> = Vec::new();
     for project_name in projects {
         let projs = match get_projects_name(conn, project_name, offset, limit) {
-            Ok(p) => p,
+            Ok((_, p)) => p,
             Err(_) => { continue; }
         };
 
