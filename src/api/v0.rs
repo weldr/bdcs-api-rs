@@ -871,8 +871,9 @@ pub struct RecipesChangesResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RecipeCommitInfo {
-    name: String,
-    changes: Vec<RecipeCommit>
+    name:    String,
+    changes: Vec<RecipeCommit>,
+    total:   i64
 }
 
 /// Handler for `/recipes/changes/` with offset and limit arguments.
@@ -904,6 +905,9 @@ pub fn recipes_changes_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<J
 ///
 /// * JSON response with recipe changes.
 ///
+/// The changes for each listed recipe will have offset and limit applied to them.
+/// This means that there will be cases where changes will be empty, when offset > total
+/// for the recipe.
 ///
 /// # Examples
 ///
@@ -923,7 +927,8 @@ pub fn recipes_changes_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<J
 ///                     "time": "Wed,  1 Mar 2017 09:28:53 -0800",
 ///                     "summary": "Recipe nfs-server saved"
 ///                 }
-///             ]
+///             ],
+///             "total": 2
 ///         },
 ///         {
 ///             "name": "ruby",
@@ -938,7 +943,8 @@ pub fn recipes_changes_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<J
 ///                     "time": "Wed,  1 Mar 2017 13:31:19 -0800",
 ///                     "summary": "Recipe ruby saved"
 ///                 }
-///             ]
+///             ],
+///             "total": 2
 ///         }
 ///     ],
 ///     "offset": 0,
@@ -954,10 +960,12 @@ pub fn recipes_changes(recipe_names: &str, offset: i64, limit: i64, repo: State<
     for name in recipe_names.split(",") {
         match recipe::commits(&repo.repo(), &name, "master") {
             Ok(mut commits) => {
+                let total = commits.len() as i64;
                 commits = commits.into_iter().skip(offset as usize).take(limit as usize).collect();
                 result.push(RecipeCommitInfo {
                                 name: name.to_string(),
-                                changes: commits
+                                changes: commits,
+                                total: total
                 });
             },
             Err(e) => {
