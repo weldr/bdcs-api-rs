@@ -1,4 +1,4 @@
-/// TOML FromData and Responder for use with Rocket
+//! TOML FromData and Responder for use with Rocket
 
 // Copyright (C) 2016-2017 Red Hat, Inc.
 //

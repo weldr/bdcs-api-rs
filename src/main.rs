@@ -19,7 +19,8 @@
 //! * `--host` - IP to bind to, defaults to `127.0.0.1`
 //! * `--port` - Port to use, defaults to `4000`
 //! * `--log` - Path to logfile, which uses the slog JSON format. Defaults to `/var/log/bdcs-api.log`
-//! * `DB` - path to the metadata sqlite database created by the Haskell bdcs utility.
+//! * `--mockfiles` - Path to JSON files used for `/api/mock/` paths. Defaults to `/var/tmp/bdcs-mockfiles/`
+//! * `DB` - Path to the metadata sqlite database created by the Haskell bdcs utility.
 //! * `RECIPES` - Path to the directory holding the TOML formatted recipes.
 //!
 

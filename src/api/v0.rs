@@ -1006,8 +1006,6 @@ pub struct RecipeDiffInfo {
 /// * `recipe_name` - Recipe name
 /// * `from_commit` - The older commit to caclulate the difference from
 /// * `to_commit` - The newer commit to calculate the diff. to or NEWEST
-/// * `offset` - Number of results to skip before returning results. Default is 0.
-/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
 ///
 /// # Response
 ///
