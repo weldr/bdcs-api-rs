@@ -63,7 +63,7 @@ impl TestFramework {
                                             v0::modules_info,
                                             v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
                                             v0::recipes_list_default, v0::recipes_list_filter,
-                                            v0::recipes_info_default, v0::recipes_info_filter,
+                                            v0::recipes_info,
                                             v0::recipes_changes_default, v0::recipes_changes_filter,
                                             v0::recipes_diff,
                                             v0::recipes_new_json, v0::recipes_new_toml,
@@ -262,11 +262,7 @@ fn test_v0_recipes_info() {
     let ref rocket = FRAMEWORK.rocket;
 
     // v0_recipes_info()
-    // TODO Copy ./examples/recipes/ to a temporary directory
-
     let expected_default = include_str!("results/v0/recipes-info.json").trim_right();
-    let expected_filter = include_str!("results/v0/recipes-info-filter.json").trim_right();
-
 
     let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,kubernetes");
     let mut response = req.dispatch_with(&rocket);
@@ -274,13 +270,6 @@ fn test_v0_recipes_info() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
-
-    let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,kubernetes,octave?limit=2");
-    let mut response = req.dispatch_with(&rocket);
-
-    assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string());
-    assert_eq!(body_str, Some(expected_filter.to_string()));
 }
 
 #[test]

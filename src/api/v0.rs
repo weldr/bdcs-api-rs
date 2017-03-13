@@ -85,8 +85,6 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
-use std::cmp;
-
 use rocket::State;
 use rocket_contrib::JSON;
 
@@ -755,33 +753,14 @@ pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JS
 #[derive(Debug, Serialize)]
 pub struct RecipesInfoResponse {
     recipes: Vec<Recipe>,
-    offset:  i64,
-    limit:   i64
 }
 
-/// Handler for `/recipes/info/` with offset and limit arguments.
-///
-/// This calls [recipes_info](fn.recipes_info.html) with the optional `offset` and/or `limit`
-/// values.
-#[get("/recipes/info/<recipes>?<filter>")]
-pub fn recipes_info_filter(recipes: &str, filter: Filter, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
-    recipes_info(recipes, filter.offset.unwrap_or(OFFSET), filter.limit.unwrap_or(LIMIT), repo)
-}
 
 /// Handler for `/recipes/info/` without arguments.
-///
-/// This calls [recipes_info](fn.recipes_info.html) with the default `offset` and `limit` values.
-#[get("/recipes/info/<recipes>", rank=2)]
-pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
-    recipes_info(recipes, OFFSET, LIMIT, repo)
-}
-
 /// Return the contents of a recipe or list of recipes
 ///
 /// # Arguments
 ///
-/// * `offset` - Number of results to skip before returning results. Default is 0.
-/// * `limit` - Maximum number of results to return. It may return less. Default is 20.
 /// * `recipe_names` - Comma separated list of recipe names to return
 ///
 /// # Response
@@ -840,29 +819,25 @@ pub fn recipes_info_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<JSON
 ///             ]
 ///         }
 ///     ],
-///     "offset": 0,
-///     "limit": 20
 /// }
 /// ```
 ///
-pub fn recipes_info(recipe_names: &str, offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
-    info!("/recipes/info/ (JSON)"; "recipe_names" => recipe_names, "offset" => offset, "limit" => limit);
+#[get("/recipes/info/<recipe_names>")]
+pub fn recipes_info(recipe_names: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
+    info!("/recipes/info/ (JSON)"; "recipe_names" => recipe_names);
     // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
-    for name in recipe_names.split(",").take(limit as usize) {
+    for name in recipe_names.split(",") {
         let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
             result.push(recipe);
         });
     }
     result.sort();
     result.dedup();
-    result.truncate(limit as usize);
 
     CORS(JSON(RecipesInfoResponse {
         recipes: result,
-        offset:  offset,
-        limit:   limit
     }))
 }
 
