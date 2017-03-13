@@ -1,5 +1,7 @@
 # BDCS API Library and Server
 
+[![Build Status](https://travis-ci.org/weldr/bdcs-api-rs.svg?branch=master)](https://travis-ci.org/weldr/bdcs-api-rs)
+
 This codebase is the BDCS API server, it handles API requests for project
 information, recipes, and image composing.
 

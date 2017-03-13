@@ -1,0 +1,12 @@
+language: rust
+cache: cargo
+rust:
+  - nightly
+before_install:
+    - sudo apt-get install libssh2-1-dev
+script:
+  - RUST_BACKTRACE=1 cargo test
+notifications:
+  email:
+    on_failure: change
+    on_success: change
