@@ -130,7 +130,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
 
         let requirement = match Requirement::from_str(ext_val.as_str()) {
             Ok(req) => req,
-            Err(_)  => return None
+            Err(_)  => Requirement{name: ext_val.clone(), expr: None}
         };
 
         Some((group.id, requirement))
@@ -281,7 +281,11 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
             // map a key/value pair into a Requirement
             fn kv_to_expr(kv: &KeyVal) -> Result<Rc<DepCell<DepExpression>>, String> {
                 match &kv.ext_value {
-                    &Some(ref ext_value) => Ok(wrap_requirement(try!(Requirement::from_str(ext_value.as_str())))),
+                    &Some(ref ext_value) => { match Requirement::from_str(ext_value.as_str()) {
+                                                  Ok(s)  => Ok(wrap_requirement(s)),
+                                                  Err(_) => Ok(wrap_requirement(Requirement{name: ext_value.clone(), expr: None}))
+                                              }
+                                            }
                     &None                => Err(String::from("ext_value is not set"))
                 }
             }
@@ -345,7 +349,10 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
     let group_requirements = match get_requirements_group_id(conn, group_id) {
         Ok(requirements) => {
             // Map the data from the Requirements table into a rpm Requirement
-            let gr_reqs: Vec<Requirement> = try!(requirements.iter().map(|r| Requirement::from_str(r.req_expr.as_str())).collect());
+            let gr_reqs: Vec<Requirement> = requirements.iter().map(|r| match Requirement::from_str(r.req_expr.as_str()) {
+                                                                            Ok(req) => req,
+                                                                            Err(_)  => Requirement{name: r.req_expr.clone(), expr: None}
+                                                                        }).collect();
 
             // for each requirement, create an expression of (requirement AND requirement_providers)
             let mut group_requirements: Vec<Rc<DepCell<DepExpression>>> = Vec::new();
