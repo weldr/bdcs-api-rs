@@ -638,7 +638,7 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
 
     let mut commits = Vec::new();
     for id in revwalk {
-        let mut commit = try!(repo.find_commit(try!(id)));
+        let commit = try!(repo.find_commit(try!(id)));
         let tree = try!(commit.tree());
         let tree_entry = tree.get_name(&filename);
         if tree_entry.is_some() {
