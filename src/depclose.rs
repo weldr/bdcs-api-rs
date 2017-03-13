@@ -179,14 +179,21 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
             }
             // map the remaining providers to an expression, recursing to fetch the provider's requirements
             // any recursions that return Err unsatisfiable, so filter those out
-            providers_checked_2.iter().filter_map(|&(group_id, _)| match depclose_provider(conn, arches, group_id, parents, cache) {
-                Ok(provider) => {
+            providers_checked_2.iter().filter_map(|&(group_id, ref req)| match depclose_provider(conn, arches, group_id, parents, cache) {
+                Ok(Some(provider)) => {
                     // mark the requirement as satisfied
                     satisfied = true;
-                    provider
+                    match get_groups_id(conn, &group_id) {
+                        Ok(Some(grp)) => Some((grp.name.clone(), provider)),
+                        _ => None
+                    }
                 },
-                Err(_) => None
-            }).collect::<Vec<Rc<DepCell<DepExpression>>>>()
+                Ok(None) => {
+                    satisfied = true;
+                    None
+                },
+                _ => None
+            }).collect::<Vec<(String, Rc<DepCell<DepExpression>>)>>()
         },
         Err(e) => return Err(e.to_string())
     };
@@ -203,11 +210,15 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
             Ok(groups) => {
                 // Unlike group_providers, there are no versions to care about here
                 groups.iter().filter_map(|ref group| match depclose_provider(conn, arches, group.id, parents, cache) {
-                    Ok(provider) => {
+                    Ok(Some(provider)) => {
                         satisfied = true;
-                        provider
+                        Some((group.name.clone(), provider))
                     },
-                    Err(_) => None
+                    Ok(None) => {
+                        satisfied = true;
+                        None
+                    },
+                    _ => None
                 }).collect()
             },
             Err(e) => return Err(e.to_string())
@@ -223,10 +234,13 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
         Ok(None)
     } else if group_providers.len() == 1 {
         // Only one provider, return it
-        Ok(Some(group_providers[0].clone()))
+        Ok(Some(group_providers[0].1.clone()))
     } else {
-        // a choice among more than one provider
-        Ok(Some(wrap_depexpression(DepExpression::Or(group_providers))))
+        // FIXME:  Multiple providers - arbitrarily pick one.  For now we are just doing that lame
+        // shortest package name thing.  Note that returning all options as an Or here will result
+        // in unit_propagation hanging for unknown reasons.
+        let min = group_providers.iter().min_by(|&&(ref name_a, _), &&(ref name_b, _)| name_a.len().cmp(&name_b.len())).unwrap();
+        Ok(Some(min.1.clone()))
     }
 }
 
