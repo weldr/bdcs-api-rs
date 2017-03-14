@@ -26,6 +26,9 @@
 //!  - Return detailed information about the project, all of its builds, and the sources of the
 //!    builds.
 //!  - [Example JSON](fn.projects_info.html#examples)
+//! * `/api/v0/projects/depsolve/<projects>`
+//!  - Returns the dependencies for the listed projects
+//!  - [Example JSON](fn.projects_depsolve.html#examples)
 //! * `/api/v0/modules/list`
 //!  - Return a list of available modules
 //!  - [Example JSON](fn.modules_list.html#examples)
@@ -85,14 +88,21 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
+use std::cmp;
+use std::rc::Rc;
+
 use rocket::State;
 use rocket_contrib::JSON;
+use rusqlite::Connection;
 
 // bdcs database functions
 use db::*;
+use depclose::*;
+use depsolve::*;
 use recipe::{self, RecipeRepo, Recipe, RecipeCommit};
 use api::{CORS, Filter, Format, OFFSET, LIMIT};
 use api::toml::TOML;
+
 
 
 /// Test the connection to the API
@@ -491,6 +501,87 @@ pub fn projects_info(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInf
     CORS(JSON(ProjectsInfoResponse {
             projects: result.unwrap_or(vec![]),
     }))
+}
+
+
+/// Hold the JSON response for /projects/depsolve/
+#[derive(Debug,Serialize)]
+pub struct ProjectsDepsolveResponse {
+    projects: Vec<PackageNEVRA>
+}
+
+/// Handler for `/projects/depsolve`
+/// Depsolve a list of package
+///
+/// # Arguments
+///
+/// * `projects` - Comma separated list of project names
+/// * `db` - Database pool
+///
+/// # Response
+///
+/// * JSON response with a list of {'name': value, 'summary': value} entries inside {"projects":[]}
+///
+///
+///
+/// # Examples
+///
+/// ```json
+/// {
+///     "projects": [
+///         {
+///             "name": "acl",
+///             "epoch": 0,
+///             "version": "2.2.51",
+///             "release": "12.el7",
+///             "arch": "x86_64"
+///         },
+///         {
+///             "name": "apr",
+///             "epoch": 0,
+///             "version": "1.4.8",
+///             "release": "3.el7",
+///             "arch": "x86_64"
+///         },
+///         ...
+///     ]
+/// }
+/// ```
+#[get("/projects/depsolve/<projects>")]
+pub fn projects_depsolve(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsDepsolveResponse>> {
+    info!("/projects/depsolve/"; "projects" => projects);
+    let projects: Vec<String> = projects.split(",").map(|s| String::from(s)).collect();
+
+    let mut pkg_nevras = depsolve_helper(&db.conn(), &projects);
+    pkg_nevras.sort();
+
+    CORS(JSON(ProjectsDepsolveResponse {
+        projects: pkg_nevras
+    }))
+ }
+
+fn depsolve_helper(conn: &Connection, projects: &Vec<String>) -> Vec<PackageNEVRA> {
+    // depclose the given projects into a big ol' depexpr
+    let depexpr = match close_dependencies(conn, &vec!(String::from("x86_64")), projects) {
+        Ok(d) => d,
+        Err(e) => {
+            error!("close_dependencies"; "projects" => format!("{:?}", projects), "error" => e);
+            return vec![];
+        }
+    };
+
+    // Wrap the returned depexpression in the crud it needs
+    let mut exprs = vec![Rc::new(DepCell::new(depexpr))];
+
+    match solve_dependencies(conn, &mut exprs) {
+        Ok(ids) => {
+            return pkg_nevra_groups_vec(conn, &ids);
+        },
+        Err(e) => {
+            error!("Error depsolving"; "pkgs" => format!("{:?}", projects), "error" => e);
+            return vec![];
+        }
+    }
 }
 
 
@@ -1314,10 +1405,10 @@ pub fn recipes_undo(recipe_name: &str, commit: &str, repo: State<RecipeRepo>) ->
 /// A Recipe and its dependencies
 #[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct RecipeDeps {
-    recipe: Recipe,
-    modules: Vec<GroupDeps>,
+    recipe:       Recipe,
+    modules:      Vec<PackageNEVRA>,
+    dependencies: Vec<PackageNEVRA>
 }
-
 
 /// Hold the JSON response for /recipes/depsolve/
 #[derive(Debug, Serialize)]
@@ -1333,9 +1424,13 @@ pub struct RecipesDepsolveResponse {
 ///
 /// # Response
 ///
-/// * JSON response like: {"recipes": [{"recipe": {RECIPE}, "modules": [DEPS]}]}
+/// * JSON response like:
+///   `{"recipes": [{"recipe": {RECIPE}, "modules": [NEVRA, ...], "dependencies": [NEVRA, ...]}]}`
 ///   Where RECIPE is the same JSON you would get from a /recipes/info/ query
-///   and DEPS are the same as what you would get from a /modules/info/ query.
+///   NEVRA Is the name and version of a project build. modules are the versions chosen for the
+///   modules and packages listed in the recipe. dependencies are all the dependencies needed to
+///   satisfy the recipe.
+///   Detailed info about the selected project can be requested with /modules/info/<name>
 ///
 /// # Panics
 ///
@@ -1354,32 +1449,39 @@ pub struct RecipesDepsolveResponse {
 ///             [SAME CONTENT AS /recipes/info]
 ///             },
 ///             "modules": [
-///                 {
-///                     "name": "httpd",
-///                     "summary": "Apache HTTP Server",
-///                     "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
-///                     "homepage": "http://httpd.apache.org/",
-///                     "upstream_vcs": "UPSTREAM_VCS",
-///                     "projects": []
-///                 },
-///                 {
-///                     "name": "mod_auth_kerb",
-///                     "summary": "Kerberos authentication module for HTTP",
-///                     "description": "mod_auth_kerb is module for the Apache HTTP Server designed to\nprovide Kerberos authentication over HTTP.  The module supports the\nNegotiate authentication method, which performs full Kerberos\nauthentication based on ticket exchanges.",
-///                     "homepage": "http://modauthkerb.sourceforge.net/",
-///                     "upstream_vcs": "UPSTREAM_VCS",
-///                     "projects": [
-///                         {
-///                             "name": "httpd",
-///                             "summary": "Apache HTTP Server",
-///                             "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
-///                             "homepage": "http://httpd.apache.org/",
-///                             "upstream_vcs": "UPSTREAM_VCS"
-///                         }
-///                     ]
-///                 },
-///                 ...
-///             ]
+///                {
+///                    "name": "httpd",
+///                    "epoch": 0,
+///                    "version": "2.4.6",
+///                    "release": "40.el7",
+///                    "arch": "x86_64"
+///                },
+///                {
+///                    "name": "mod_auth_kerb",
+///                    "epoch": 0,
+///                    "version": "5.4",
+///                    "release": "28.el7",
+///                    "arch": "x86_64"
+///                },
+///                ...
+///             ],
+///             "dependencies": [
+///                {
+///                    "name": "acl",
+///                    "epoch": 0,
+///                    "version": "2.2.51",
+///                    "release": "12.el7",
+///                    "arch": "x86_64"
+///                },
+///                {
+///                    "name": "apr",
+///                    "epoch": 0,
+///                    "version": "1.4.8",
+///                    "release": "3.el7",
+///                    "arch": "x86_64"
+///                },
+///                ...
+///             ],
 ///         }
 ///     ]
 /// }
@@ -1392,26 +1494,38 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
     let mut result = Vec::new();
     for name in recipe_names.split(",") {
         let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
-            let mut modules = Vec::new();
-            for module in recipe.clone().modules {
-                match get_group_deps(&db.conn(), &module.name) {
-                    Ok(r) => modules.push(r),
-                    Err(_) => {}
-                }
-            }
+            let mut projects = Vec::new();
+            projects.extend(recipe.clone().modules.iter().map(|m| m.name.clone()));
+            projects.extend(recipe.clone().packages.iter().map(|p| p.name.clone()));
+            projects.sort();
+            projects.dedup();
 
-            for package in recipe.clone().packages {
-                match get_group_deps(&db.conn(), &package.name) {
-                    Ok(r) => modules.push(r),
-                    Err(_) => {}
-                }
+            debug!("recipes_depsolve"; "projs" => format!("{:?}", projects));
+            // deps for the whole recipe
+            let mut pkg_nevras = depsolve_helper(&db.conn(), &projects);
+            pkg_nevras.sort();
+
+            // Get the version chosen for each individual recipe module/package
+            let mut recipe_nevras = Vec::new();
+            for proj in projects {
+                recipe_nevras.push(
+                    match pkg_nevras.binary_search_by_key(&proj, |ref s| s.name.clone()) {
+                        Ok(idx) => pkg_nevras[idx].clone(),
+                        Err(_) => PackageNEVRA {
+                            name:    proj,
+                            epoch:   0,
+                            version: "UNKNOWN".to_string(),
+                            release: "".to_string(),
+                            arch:    "".to_string()
+                        }
+                });
             }
-            modules.sort();
-            modules.dedup();
+            recipe_nevras.sort();
 
             result.push(RecipeDeps {
-                            recipe: recipe,
-                            modules: modules
+                recipe:       recipe,
+                modules:      recipe_nevras,
+                dependencies: pkg_nevras
             });
         });
     }

@@ -31,6 +31,7 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 
 use r2d2;
@@ -1115,6 +1116,74 @@ pub fn get_provider_groups(conn: &Connection, thing: &str) -> rusqlite::Result<V
                        }));
     }
     Ok(contents)
+}
+
+
+// Package NEVRA from a Group's KeyVal entries.
+#[derive(Debug, Clone, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct PackageNEVRA {
+    pub name:    String,
+    pub epoch:   i64,
+    pub version: String,
+    pub release: String,
+    pub arch:    String
+}
+
+impl fmt::Display for PackageNEVRA {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.epoch {
+            0 => write!(f, "{}-{}-{}.{}", self.name, self.version, self.release, self.arch),
+            _ => write!(f, "{}-{}:{}-{}.{}", self.name, self.epoch, self.version, self.release, self.arch)
+        }
+    }
+}
+
+
+/// Get the package NEVRA associated with a group id
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_id` - The group id to lookup
+///
+/// # Returns
+///
+/// * A PackageNEVRA struct or None
+pub fn pkg_nevra_group_id(conn: &Connection, group_id: i64) -> Option<PackageNEVRA> {
+    let kvs = match get_groups_kv_group_id(&conn, group_id) {
+        Ok(k) => k,
+        Err(_) => { return None; }
+    };
+    let mut group_md = keyval_hash(&kvs);
+
+    Some(PackageNEVRA {
+        name:    try_opt!(group_md.remove("name"), None).0,
+        epoch:   group_md.remove("epoch").and_then(|e| e.0.parse().ok()).unwrap_or(0),
+        version: try_opt!(group_md.remove("version"), None).0,
+        release: try_opt!(group_md.remove("release"), None).0,
+        arch:    try_opt!(group_md.remove("arch"), None).0
+    })
+}
+
+/// Get package NEVRA's associated with a vec of group ids
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `groups` - A Vec of group ids to look up
+///
+/// # Returns
+///
+/// * A Vec of PackageNEVRA structs.
+pub fn pkg_nevra_groups_vec(conn: &Connection, groups: &Vec<i64>) -> Vec<PackageNEVRA> {
+    let mut results = Vec::new();
+    for group_id in groups {
+        match pkg_nevra_group_id(&conn, *group_id) {
+            Some(r) => results.push(r),
+            None => {}
+        }
+    }
+    results
 }
 
 

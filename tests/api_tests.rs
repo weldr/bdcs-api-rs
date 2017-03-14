@@ -60,6 +60,7 @@ impl TestFramework {
                                             v0::compose_types,
                                             v0::projects_list_default, v0::projects_list_filter,
                                             v0::projects_info,
+                                            v0::projects_depsolve,
                                             v0::modules_info,
                                             v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
                                             v0::recipes_list_default, v0::recipes_list_filter,
@@ -197,6 +198,23 @@ fn test_v0_projects_list() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_filter.to_string()));
+}
+
+// NOTE the minimal database doesn't depsolve, so this checks for an empty response
+#[test]
+fn test_projects_depsolve() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let ref rocket = FRAMEWORK.rocket;
+
+    // v0_projects_depsolve()
+    let expected = include_str!("results/v0/projects-depsolve.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Get, "/projects/depsolve/bash");
+    let mut response = req.dispatch_with(&rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected.to_string()));
 }
 
 #[test]
