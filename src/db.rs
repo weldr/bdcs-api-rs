@@ -964,7 +964,7 @@ pub struct GroupDeps {
 /// The group name does *not* support GLOBS. If you need to search for a glob pattern, first do a
 /// [get_groups_name](fn.get_groups_name.html) and then pass them to [get_groups_deps_vec](fn.get_groups_deps_vec.html)
 ///
-pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<GroupDeps> {
+pub fn get_group_deps(conn: &Connection, group: &str) -> rusqlite::Result<GroupDeps> {
     let summary;
     let description;
     let homepage;
@@ -997,8 +997,8 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
             from projects, group_requirements, groups, requirements
             on projects.name == requirements.req_expr and requirements.id == group_requirements.req_id
                 and group_requirements.group_id == groups.id
-            where groups.name == :group ORDER BY projects.name LIMIT :limit OFFSET :offset"));
-    let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
+            where groups.name == :group ORDER BY projects.name"));
+    let mut rows = try!(stmt.query_named(&[(":group", &group)]));
 
     let mut group_deps = Vec::new();
     while let Some(row) = rows.next() {
@@ -1031,17 +1031,15 @@ pub fn get_group_deps(conn: &Connection, group: &str, offset: i64, limit: i64) -
 ///
 /// * `conn` - The database connection
 /// * `group` - The name of the group, glob search patterns allowed
-/// * `offset` - Number of results to skip before returning `limit`
-/// * `limit` - Maximum number of results to return
 ///
 /// # Returns
 ///
 /// * A Vector of [GroupDeps](struct.GroupDeps.html) for the matching group names
 ///
-pub fn get_groups_deps_vec(conn: &Connection, groups: &[&str], offset: i64, limit: i64) -> rusqlite::Result<Vec<GroupDeps>> {
+pub fn get_groups_deps_vec(conn: &Connection, groups: &[&str]) -> rusqlite::Result<Vec<GroupDeps>> {
     let mut results = Vec::new();
     for group_name in groups {
-        match get_group_deps(conn, group_name, offset, limit) {
+        match get_group_deps(conn, group_name) {
             Ok(r) => results.push(r),
             Err(_) => {}
         }

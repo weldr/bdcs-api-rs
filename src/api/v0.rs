@@ -544,7 +544,7 @@ pub struct ModulesInfoResponse {
 pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules);
     let modules: Vec<&str> = modules.split(",").collect();
-    let result = get_groups_deps_vec(&db.conn(), &modules, 0, i64::max_value());
+    let result = get_groups_deps_vec(&db.conn(), &modules);
     CORS(JSON(ModulesInfoResponse {
             modules: result.unwrap_or(vec![]),
     }))
@@ -1394,14 +1394,14 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
         let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
             let mut modules = Vec::new();
             for module in recipe.clone().modules {
-                match get_group_deps(&db.conn(), &module.name, 0, i64::max_value()) {
+                match get_group_deps(&db.conn(), &module.name) {
                     Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
             }
 
             for package in recipe.clone().packages {
-                match get_group_deps(&db.conn(), &package.name, 0, i64::max_value()) {
+                match get_group_deps(&db.conn(), &package.name) {
                     Ok(r) => modules.push(r),
                     Err(_) => {}
                 }
