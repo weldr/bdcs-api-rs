@@ -183,6 +183,25 @@ impl KeyVal {
     }
 }
 
+/// Convert a Vec of KeyVal values into a HashMap
+///
+/// # Arguments
+///
+/// * `kvs` - a vector of KeyVal structs.
+///
+/// # Returns
+///
+/// * HashMap of Key, (Value, Ext Value)
+///
+///
+fn keyval_hash(kvs: &Vec<KeyVal>) -> HashMap<String, (String, Option<String>)> {
+    let mut hash: HashMap<String, (String, Option<String>)> = HashMap::new();
+    for kv in kvs {
+        hash.entry(kv.key_value.clone()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
+    }
+    return hash;
+}
+
 /// `Projects` related key:value
 #[derive(Debug)]
 pub struct ProjectKeyValues {
@@ -1112,7 +1131,7 @@ pub struct ProjectInfo {
     description: String,
     homepage: Option<String>,
     upstream_vcs: String,
-    metadata: Option<HashMap<String, String>>,
+    metadata: Option<HashMap<String, (String, Option<String>)>>,
     builds: Option<Vec<BuildInfo>>,
 }
 
@@ -1125,7 +1144,7 @@ pub struct BuildInfo {
     changelog: String,
     build_config_ref: String,
     build_env_ref: String,
-    metadata: Option<HashMap<String, String>>,
+    metadata: Option<HashMap<String, (String, Option<String>)>>,
     source: Option<SourceInfo>,
 }
 
@@ -1134,7 +1153,7 @@ pub struct SourceInfo {
     license: String,
     version: String,
     source_ref: String,
-    metadata: Option<HashMap<String, String>>
+    metadata: Option<HashMap<String, (String, Option<String>)>>
 }
 
 
@@ -1164,14 +1183,11 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
                 Err(_) => vec![]
             };
             for build in builds {
-                let mut source_metadata: HashMap<String, String> = HashMap::new();
                 let kvs = match get_source_kv_source_id(&conn, build.source_id) {
                     Ok(k) => k,
                     Err(_) => vec![]
                 };
-                for kv in kvs {
-                    source_metadata.entry(kv.key_value).or_insert(kv.val_value);
-                }
+                let source_metadata = keyval_hash(&kvs);
                 let source_info = match get_source_id(conn, build.source_id) {
                     Ok(source) => if let Some(source) = source {
                         Some(SourceInfo {
@@ -1185,14 +1201,11 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
                     },
                     Err(_) => None
                 };
-                let mut build_metadata: HashMap<String, String> = HashMap::new();
                 let kvs = match get_build_kv_build_id(conn, build.id) {
                     Ok(k) => k,
                     Err(_) => vec![]
                 };
-                for kv in kvs {
-                    build_metadata.entry(kv.key_value).or_insert(kv.val_value);
-                }
+                let build_metadata = keyval_hash(&kvs);
                 build_list.push(BuildInfo {
                                     epoch:            build.epoch,
                                     release:          build.release,
@@ -1206,14 +1219,11 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
                 });
             }
 
-            let mut proj_metadata: HashMap<String, String> = HashMap::new();
             let kvs = match get_project_kv_project_id(conn, proj.id) {
                 Ok(k) => k,
                 Err(_) => vec![]
             };
-            for kv in kvs {
-                proj_metadata.entry(kv.key_value).or_insert(kv.val_value);
-            }
+            let proj_metadata = keyval_hash(&kvs);
             project_list.push(ProjectInfo {
                                   name:         proj.name,
                                   summary:      proj.summary,
