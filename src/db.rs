@@ -1174,17 +1174,15 @@ pub struct SourceInfo {
 /// # Arguments
 ///
 /// * `projects` - A Vector of the project names, glob search patterns allowed
-/// * `offset` - Number of results to skip before returning `limit`
-/// * `limit` - Maximum number of results to return
 ///
 /// # Returns
 ///
 /// * A Vector of [ProjectInfo](struct.ProjectInfo.html) for the matching project names
 ///
-pub fn get_projects_details(conn: &Connection, projects: &[&str], offset: i64, limit: i64) -> rusqlite::Result<Vec<ProjectInfo>> {
+pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::Result<Vec<ProjectInfo>> {
     let mut project_list: Vec<ProjectInfo> = Vec::new();
     for project_name in projects {
-        let projs = match get_projects_name(conn, project_name, offset, limit) {
+        let projs = match get_projects_name(conn, project_name, 0, i64::max_value()) {
             Ok((_, p)) => p,
             Err(_) => { continue; }
         };

@@ -487,7 +487,7 @@ pub struct ProjectsInfoResponse {
 pub fn projects_info(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
     info!("/projects/info/"; "projects" => projects);
     let projects: Vec<&str> = projects.split(",").collect();
-    let result = get_projects_details(&db.conn(), &projects, 0, i64::max_value());
+    let result = get_projects_details(&db.conn(), &projects);
     CORS(JSON(ProjectsInfoResponse {
             projects: result.unwrap_or(vec![]),
     }))

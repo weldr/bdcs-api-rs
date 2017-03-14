@@ -45,7 +45,7 @@ fn main() {
                          match get_groups_id(&conn, &id) {
                              // Commented out for the moment - just printing group names is easier
                              // to debug.
-                             // Ok(Some(grp)) => { let mut details = get_projects_details(&conn, &[grp.name.as_str()], 0, -1).unwrap();
+                             // Ok(Some(grp)) => { let mut details = get_projects_details(&conn, &[grp.name.as_str()]).unwrap();
                              //                    results.append(&mut details);
                              //                  }
                              Ok(Some(grp)) => { results.push(grp.name) }
