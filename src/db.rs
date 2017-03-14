@@ -166,6 +166,23 @@ pub struct KeyVal {
     pub ext_value: Option<String>
 }
 
+impl KeyVal {
+    /// Convert a row of rusqlite data to a KeyVal struct starting at offset idx.
+    fn from_row_idx(row: &rusqlite::Row, idx: i32) -> KeyVal {
+        KeyVal {
+            id: row.get(idx),
+            key_value: row.get(idx+1),
+            val_value: row.get(idx+2),
+            ext_value: row.get(idx+3)
+        }
+    }
+
+    /// Convert a row of rusqlite data to a KeyVal struct starting at offset 0.
+    fn from_row(row: &rusqlite::Row) -> KeyVal {
+        KeyVal::from_row_idx(row, 0)
+    }
+}
+
 /// `Projects` related key:value
 #[derive(Debug)]
 pub struct ProjectKeyValues {
@@ -696,20 +713,8 @@ pub fn get_project_kv_project_id(conn: &Connection, project_id: i64) -> rusqlite
             from project_key_values, key_val
             on key_val.id == project_key_values.key_val_id
             where project_key_values.package_id == :project_id"));
-    let mut rows = try!(stmt.query_named(&[(":project_id", &project_id)]));
-
-    let mut contents = Vec::new();
-    while let Some(row) = rows.next() {
-        let row = try!(row);
-        // Sure would be nice not to use indexes here!
-        contents.push(KeyVal {
-                        id: row.get(0),
-                        key_value: row.get(1),
-                        val_value: row.get(2),
-                        ext_value: row.get(3),
-                    });
-    }
-    Ok(contents)
+    let rows = try!(stmt.query_map_named(&[(":project_id", &project_id)], KeyVal::from_row));
+    rows.collect()
 }
 
 /// Get key:value data for the sources based on source id
@@ -729,20 +734,8 @@ pub fn get_source_kv_source_id(conn: &Connection, source_id: i64) -> rusqlite::R
             from source_key_values, key_val
             on key_val.id == source_key_values.key_val_id
             where source_key_values.source_id == :source_id"));
-    let mut rows = try!(stmt.query_named(&[(":source_id", &source_id)]));
-
-    let mut contents = Vec::new();
-    while let Some(row) = rows.next() {
-        let row = try!(row);
-        // Sure would be nice not to use indexes here!
-        contents.push(KeyVal {
-                        id: row.get(0),
-                        key_value: row.get(1),
-                        val_value: row.get(2),
-                        ext_value: row.get(3),
-                    });
-    }
-    Ok(contents)
+    let rows = try!(stmt.query_map_named(&[(":source_id", &source_id)], KeyVal::from_row));
+    rows.collect()
 }
 
 
@@ -763,20 +756,8 @@ pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Resu
             from build_key_values, key_val
             on key_val.id == build_key_values.key_val_id
             where build_key_values.build_id == :build_id"));
-    let mut rows = try!(stmt.query_named(&[(":build_id", &build_id)]));
-
-    let mut contents = Vec::new();
-    while let Some(row) = rows.next() {
-        let row = try!(row);
-        // Sure would be nice not to use indexes here!
-        contents.push(KeyVal {
-                        id: row.get(0),
-                        key_value: row.get(1),
-                        val_value: row.get(2),
-                        ext_value: row.get(3),
-                    });
-    }
-    Ok(contents)
+    let rows = try!(stmt.query_map_named(&[(":build_id", &build_id)], KeyVal::from_row));
+    rows.collect()
 }
 
 
@@ -882,20 +863,8 @@ pub fn get_groups_kv_group_id(conn: &Connection, group_id: i64) -> rusqlite::Res
             from group_key_values, key_val
             on key_val.id == group_key_values.key_val_id
             where group_key_values.group_id == :group_id"));
-    let mut rows = try!(stmt.query_named(&[(":group_id", &group_id)]));
-
-    let mut contents = Vec::new();
-    while let Some(row) = rows.next() {
-        let row = try!(row);
-        // Sure would be nice not to use indexes here!
-        contents.push(KeyVal {
-                        id: row.get(0),
-                        key_value: row.get(1),
-                        val_value: row.get(2),
-                        ext_value: row.get(3),
-                    });
-    }
-    Ok(contents)
+    let rows = try!(stmt.query_map_named(&[(":group_id", &group_id)], KeyVal::from_row));
+    rows.collect()
 }
 
 
