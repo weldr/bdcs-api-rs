@@ -552,8 +552,7 @@ pub fn projects_depsolve(projects: &str, db: State<DBPool>) -> CORS<JSON<Project
     info!("/projects/depsolve/"; "projects" => projects);
     let projects: Vec<String> = projects.split(",").map(|s| String::from(s)).collect();
 
-    let mut pkg_nevras = depsolve_helper(&db.conn(), &projects);
-    pkg_nevras.sort();
+    let pkg_nevras = depsolve_helper(&db.conn(), &projects);
 
     CORS(JSON(ProjectsDepsolveResponse {
         projects: pkg_nevras
@@ -575,7 +574,9 @@ fn depsolve_helper(conn: &Connection, projects: &Vec<String>) -> Vec<PackageNEVR
 
     match solve_dependencies(conn, &mut exprs) {
         Ok(ids) => {
-            return pkg_nevra_groups_vec(conn, &ids);
+            let mut nevras = pkg_nevra_groups_vec(conn, &ids);
+            nevras.sort();
+            return nevras;
         },
         Err(e) => {
             error!("Error depsolving"; "pkgs" => format!("{:?}", projects), "error" => e);
@@ -587,10 +588,21 @@ fn depsolve_helper(conn: &Connection, projects: &Vec<String>) -> Vec<PackageNEVR
 
 // /modules/info/<modules>
 
+/// Module info and dependencies
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ModuleInfoDeps {
+    pub name:         String,
+    pub summary:      String,
+    pub description:  String,
+    pub homepage:     Option<String>,
+    pub upstream_vcs: String,
+    pub dependencies: Vec<PackageNEVRA>
+}
+
 /// Hold the JSON response for /modules/info/
 #[derive(Debug,Serialize)]
 pub struct ModulesInfoResponse {
-    modules:  Vec<GroupDeps>,
+    modules:  Vec<ModuleInfoDeps>,
 }
 
 /// Handler for `/modules/info/` without arguments.
@@ -623,21 +635,55 @@ pub struct ModulesInfoResponse {
 ///             "description": "The Apache HTTP Server is a powerful, efficient, and extensible\nweb server.",
 ///             "homepage": "http://httpd.apache.org/",
 ///             "upstream_vcs": "UPSTREAM_VCS",
-///             "projects": []
+///             "dependencies": [
+///                 {
+///                     "name": "acl",
+///                     "epoch": 0,
+///                     "version": "2.2.51",
+///                     "release": "12.el7",
+///                     "arch": "x86_64"
+///                 },
+///                 {
+///                     "name": "apr",
+///                     "epoch": 0,
+///                     "version": "1.4.8",
+///                     "release": "3.el7",
+///                     "arch": "x86_64"
+///                 },
+///                 ...
+///             ]
 ///         }
-///     ],
-///     "offset": 0,
-///     "limit": 20
+///     ]
 /// }
 /// ```
 ///
-#[get("/modules/info/<modules>", rank=2)]
+#[get("/modules/info/<modules>")]
 pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules);
-    let modules: Vec<&str> = modules.split(",").collect();
-    let result = get_groups_deps_vec(&db.conn(), &modules);
+    let modules: Vec<String> = modules.split(",").map(|s| String::from(s)).collect();
+
+    let mut result = Vec::new();
+    for m in modules {
+        match get_projects_name(&db.conn(), &m, 0, i64::max_value()) {
+            Ok((_, p)) => {
+                let deps = depsolve_helper(&db.conn(), &vec![m]);
+                result.push(ModuleInfoDeps {
+                    name:         p[0].name.clone(),
+                    summary:      p[0].summary.clone(),
+                    description:  p[0].description.clone(),
+                    homepage:     p[0].homepage.clone(),
+                    upstream_vcs: p[0].upstream_vcs.clone(),
+                    dependencies: deps
+                });
+            }
+            Err(e) => {
+                error!("Error looking up module info"; "module" => m, "error" => format!("{:?}", e));
+            }
+        }
+    }
+
     CORS(JSON(ModulesInfoResponse {
-            modules: result.unwrap_or(vec![]),
+            modules: result,
     }))
 }
 
@@ -1502,8 +1548,7 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
 
             debug!("recipes_depsolve"; "projs" => format!("{:?}", projects));
             // deps for the whole recipe
-            let mut pkg_nevras = depsolve_helper(&db.conn(), &projects);
-            pkg_nevras.sort();
+            let pkg_nevras = depsolve_helper(&db.conn(), &projects);
 
             // Get the version chosen for each individual recipe module/package
             let mut recipe_nevras = Vec::new();
