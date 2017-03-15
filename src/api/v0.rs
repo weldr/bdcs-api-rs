@@ -665,7 +665,7 @@ pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoRe
     let mut result = Vec::new();
     for m in modules {
         match get_projects_name(&db.conn(), &m, 0, i64::max_value()) {
-            Ok((_, p)) => {
+            Ok((1, p)) => {
                 let deps = depsolve_helper(&db.conn(), &vec![m]);
                 result.push(ModuleInfoDeps {
                     name:         p[0].name.clone(),
@@ -676,6 +676,8 @@ pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoRe
                     dependencies: deps
                 });
             }
+            Ok((0,_)) => {}
+            Ok((_,_)) => {}
             Err(e) => {
                 error!("Error looking up module info"; "module" => m, "error" => format!("{:?}", e));
             }
