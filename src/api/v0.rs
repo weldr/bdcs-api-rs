@@ -88,7 +88,6 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
-use std::cmp;
 use std::rc::Rc;
 
 use rocket::State;
@@ -230,6 +229,7 @@ pub fn compose_status() -> CORS<&'static str> {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("/compose/status/<id>")]
+#[allow(unused_variables)]
 pub fn compose_status_id(id: &str) -> CORS<&'static str> {
     CORS("Unimplemented")
 }
@@ -252,6 +252,7 @@ pub fn compose_status_id(id: &str) -> CORS<&'static str> {
 /// * Pass it the id of a running compose
 ///
 #[get("/compose/log/<kbytes>")]
+#[allow(unused_variables)]
 pub fn compose_log(kbytes: usize) -> CORS<&'static str> {
     CORS("Unimplemented")
 }

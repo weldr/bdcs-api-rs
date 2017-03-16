@@ -475,7 +475,7 @@ pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -
 ///
 /// * A Result with a Vector of Strings or a RecipeError
 ///
-pub fn list(repo: &Repository, branch: &str, commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
+pub fn list(repo: &Repository, branch: &str, _commit: Option<&str>) -> Result<Vec<String>, RecipeError> {
     let mut recipes = Vec::new();
 
     // TODO use commit instead of branch head if it isn't None

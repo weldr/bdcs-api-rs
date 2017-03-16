@@ -6,7 +6,7 @@ use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
 
-pub fn solve_dependencies(conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpression>>>) -> Result<Vec<i64>, String> {
+pub fn solve_dependencies(_conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpression>>>) -> Result<Vec<i64>, String> {
     let mut assignments = HashMap::new();
 
     unit_propagation(exprs, &mut assignments);
