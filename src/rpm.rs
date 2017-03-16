@@ -225,18 +225,33 @@ impl fmt::Display for Requirement {
 impl FromStr for Requirement {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split_str = s.split_whitespace();
-        let name = split_str.next().ok_or("Missing requirement name")?;
-        let expr = match split_str.next() {
-            Some(oper) => Some((oper.parse::<ReqOperator>()?,
-                                split_str.next().ok_or("Missing version in requirement expression")?.parse::<EVR>()?)),
-            None       => None
-        };
+        Ok(Self::from(s))
+    }
+}
 
-        // Make sure that the whole string has been read
-        match split_str.next() {
-            None    => Ok(Requirement{name: String::from(name), expr: expr}),
-            Some(_) => Err(String::from("Extra data after version"))
+impl<'a>  From<&'a str> for Requirement {
+    // If anything goes wrong, stuff the whole thing in name
+    // This way expressions with unparseable versions will be matched against that exact string
+    fn from(s: &str) -> Self {
+        fn try_from(s: &str) -> Result<Requirement, String> {
+            let mut split_str = s.split_whitespace();
+            let name = split_str.next().ok_or("Missing requirement name")?;
+            let expr = match split_str.next() {
+                Some(oper) => Some((oper.parse::<ReqOperator>()?,
+                                    split_str.next().ok_or("Missing version in requirement expression")?.parse::<EVR>()?)),
+                None       => None
+            };
+
+            // Make sure that the whole string has been read
+            match split_str.next() {
+                None    => Ok(Requirement{name: String::from(name), expr: expr}),
+                Some(_) => Err(String::from("Extra data after version"))
+            }
+        }
+
+        match try_from(s) {
+            Ok(req) => req,
+            Err(_)  => Requirement{name: s.to_string(), expr: None}
         }
     }
 }
