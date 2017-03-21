@@ -273,15 +273,15 @@ impl Requirement {
         };
 
         // Special case, oh boy!
-        // If the epochs and versions match, one side has no release, and that side is =, >=, or <=, it's a match.
+        // If the epochs and versions match, one (and only one) side has no release, and that side is =, >=, or <=, it's a match.
         // e.g. Provides: whatever <= 1.0, Requires: whatever >= 1.0-9
         if provides_evr.epoch.unwrap_or(0) == requires_evr.epoch.unwrap_or(0) &&
                 provides_evr.version == requires_evr.version {
-            if provides_operator == &Ordering::Equal && provides_evr.release == "" {
+            if provides_operator == &Ordering::Equal && provides_evr.release == "" && requires_evr.release != "" {
                 return true;
             }
 
-            if requires_operator == &Ordering::Equal && requires_evr.release == "" {
+            if requires_operator == &Ordering::Equal && requires_evr.release == "" && provides_evr.release != "" {
                 return true;
             }
         }
