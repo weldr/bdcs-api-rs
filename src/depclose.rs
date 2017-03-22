@@ -175,7 +175,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
             }
             // map the remaining providers to an expression, recursing to fetch the provider's requirements
             // any recursions that return Err unsatisfiable, so filter those out
-            providers_checked_2.iter().filter_map(|&(group_id, ref req)| match depclose_provider(conn, arches, group_id, parents, cache) {
+            providers_checked_2.iter().filter_map(|&(group_id, _)| match depclose_provider(conn, arches, group_id, parents, cache) {
                 Ok(Some(provider)) => {
                     // mark the requirement as satisfied
                     satisfied = true;
@@ -334,7 +334,7 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
 
             match (name, version) {
                 (Some(name), Some(version)) => match EVR::from_str(version.as_str()) {
-                    Ok(evr) => { 
+                    Ok(evr) => {
                         let req = Requirement{name: "PKG: ".to_string() + name.as_str(),
                                               expr: Some((ReqOperator::EqualTo, evr))};
                         group_provides.push(Ok(wrap_requirement(req)));
@@ -372,7 +372,7 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                 // requirements.
                 // For instance, if our expression so far is something like:
                 //    (req_1 AND (groupid=47 AND group_47_reqs)) AND (req_2 ...)
-                // 
+                //
                 // and req_2 is also satisified by groupid=47, we don't need another copy of
                 // groupid=47 and its requirements.
                 //

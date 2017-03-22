@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 pub fn solve_dependencies(conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpression>>>) -> Result<Vec<i64>, String> {
     let mut assignments = HashMap::new();
@@ -18,7 +17,7 @@ pub fn solve_dependencies(conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpre
     if exprs.is_empty() {
         // Take the DepAtom -> bool hash map and convert it to just a list of i64.  We only care
         // about the GroupId for packages that will be installed.
-        let mut results = assignments.into_iter().filter_map(|x| match x {
+        let results = assignments.into_iter().filter_map(|x| match x {
             (DepAtom::GroupId(i), true) => Some(i),
             _ => None
         }).collect();
