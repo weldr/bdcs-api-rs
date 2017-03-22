@@ -19,6 +19,12 @@ directory:
 
 `rustup override set nightly`
 
+### Required Host Packages
+The host will need to have the following packages installed before building or running the bdcs-api-server
+* openssl-devel
+* sqlite-devel
+* cmake
+
 Running it directly on port 4000, using /var/tmp/recipes/ for recipe storage
 looks like this:
 
