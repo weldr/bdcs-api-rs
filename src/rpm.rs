@@ -27,10 +27,6 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::str::FromStr;
 
-#[cfg(test)]
-#[path = "./rpm_test.rs"]
-mod rpm_test;
-
 /// Representation of epoch-version-release data
 #[derive(Clone, Debug, Hash)]
 pub struct EVR {

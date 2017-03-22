@@ -17,9 +17,11 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use rusqlite::{self, Connection};
+extern crate bdcs;
+extern crate rusqlite;
+
+use rusqlite::Connection;
 use std::collections::HashSet;
-use std::hash::Hash;
 
 // id-less data types for creating test data
 pub struct TestKeyValues {
@@ -324,7 +326,7 @@ create table build_signatures (
     build_id integer references build(id) not null,
     signature_type text not null,
     signature_data blob not null
-);  
+);
 create index build_signatures_build_id_idx on build_signatures(build_id);
 
 create table file_types (
@@ -461,116 +463,110 @@ COMMIT;
 }
 
 // order doesn't usually matter for comparing database results, so take that out of the equation
-pub fn compare_no_order<T>(v1: Vec<T>, v2: Vec<T>) -> bool where T: Hash + Eq {
-    let h1: HashSet<&T> = v1.iter().collect();
-    let h2: HashSet<&T> = v2.iter().collect();
-    h1 == h2
+macro_rules! assert_eq_no_order {
+    ($a:expr, $b:expr) => {
+        {
+            let v1: Vec<_> = $a;
+            let v2: Vec<_> = $b;
+            assert_eq!(v1.iter().collect::<HashSet<_>>(),
+                       v2.iter().collect::<HashSet<_>>());
+        }
+    }
 }
 
 // get_pkg_files_name: return a list of files associated with a given packageName=<val> key/val pair
-#[cfg(test)]
-mod test_get_pkg_files_name {
-    use db::*;
-    use self::db_test::*;
-    use std::path::PathBuf;
+use bdcs::db::*;
+use std::path::PathBuf;
 
-    fn test_db_1() -> rusqlite::Result<Connection> {
-        create_test_db(vec![
-                       TestData::Groups(TestGroups{name: "group-one".to_string(),
-                                                   group_type: "rpm".to_string(),
-                                                   files: vec![TestFiles{path: "/one/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
-                                                                         file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
-                                                                         mtime: 0, symlink_target: None, 
-                                                                         key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-one".to_string(), ext_value: None}]},
-                                                               TestFiles{path: "/one/2".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
-                                                                         file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
-                                                                         mtime: 0, symlink_target: None, 
-                                                                         key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-one".to_string(), ext_value: None}]}],
-                                                   children: vec![],
-                                                   key_vals: vec![],
-                                                   requirements: vec![]}),
-                       TestData::Groups(TestGroups{name: "group-two".to_string(),
-                                                   group_type: "rpm".to_string(),
-                                                   files: vec![TestFiles{path: "/two/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
-                                                                         file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
-                                                                         mtime: 0, symlink_target: None,
-                                                                         key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-two".to_string(), ext_value: None}]},
-                                                               TestFiles{path: "/two/2".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
-                                                                         file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
-                                                                         mtime: 0, symlink_target: None, 
-                                                                         key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-two".to_string(), ext_value: None}]}],
-                                                   children: vec![],
-                                                   key_vals: vec![],
-                                                   requirements: vec![]})
-                           ])
-    }
+fn test_db_1() -> rusqlite::Result<Connection> {
+    create_test_db(vec![
+                   TestData::Groups(TestGroups{name: "group-one".to_string(),
+                                               group_type: "rpm".to_string(),
+                                               files: vec![TestFiles{path: "/one/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
+                                                                     file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
+                                                                     mtime: 0, symlink_target: None,
+                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-one".to_string(), ext_value: None}]},
+                                                           TestFiles{path: "/one/2".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
+                                                                     file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
+                                                                     mtime: 0, symlink_target: None,
+                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-one".to_string(), ext_value: None}]}],
+                                               children: vec![],
+                                               key_vals: vec![],
+                                               requirements: vec![]}),
+                   TestData::Groups(TestGroups{name: "group-two".to_string(),
+                                               group_type: "rpm".to_string(),
+                                               files: vec![TestFiles{path: "/two/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
+                                                                     file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
+                                                                     mtime: 0, symlink_target: None,
+                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-two".to_string(), ext_value: None}]},
+                                                           TestFiles{path: "/two/2".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
+                                                                     file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
+                                                                     mtime: 0, symlink_target: None,
+                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "group-two".to_string(), ext_value: None}]}],
+                                               children: vec![],
+                                               key_vals: vec![],
+                                               requirements: vec![]})
+                       ])
+}
 
-    #[test]
-    fn test_empty() -> () {
-        let conn = create_test_db(vec![]).unwrap();
-        let test_data: Vec<PathBuf> = vec![];
-        assert_eq!(get_pkg_files_name(&conn, "whatever").unwrap(), test_data);
-    }
+#[test]
+fn test_get_pkg_empty() -> () {
+    let conn = create_test_db(vec![]).unwrap();
+    let test_data: Vec<PathBuf> = vec![];
+    assert_eq!(get_pkg_files_name(&conn, "whatever").unwrap(), test_data);
+}
 
-    #[test]
-    fn test_data_1() -> () {
-        let conn = test_db_1().unwrap();
-        let test_data = vec![PathBuf::from("/one/1"), PathBuf::from("/one/2")];
-        let test_result = get_pkg_files_name(&conn, "group-one").unwrap();
+#[test]
+fn test_data_1() -> () {
+    let conn = test_db_1().unwrap();
+    let test_data = vec![PathBuf::from("/one/1"), PathBuf::from("/one/2")];
+    let test_result = get_pkg_files_name(&conn, "group-one").unwrap();
 
-        assert!(compare_no_order(test_data, test_result));
-    }
+    assert_eq_no_order!(test_data, test_result);
+}
 
-    #[test]
-    fn test_data_2() -> () {
-        let conn = test_db_1().unwrap();
-        let test_data = vec![PathBuf::from("/two/1"), PathBuf::from("/two/2")];
-        let test_result = get_pkg_files_name(&conn, "group-two").unwrap();
+#[test]
+fn test_data_2() -> () {
+    let conn = test_db_1().unwrap();
+    let test_data = vec![PathBuf::from("/two/1"), PathBuf::from("/two/2")];
+    let test_result = get_pkg_files_name(&conn, "group-two").unwrap();
 
-        assert!(compare_no_order(test_data, test_result));
-    }
+    assert_eq_no_order!(test_data, test_result);
 }
 
 // get_pkg_files_nevra: return a list of files associated with a given build, selected by the NEVRA of the build
-#[cfg(test)]
-mod test_get_pkg_files_nevra {
-    use db::*;
-    use self::db_test::*;
-    use std::path::PathBuf;
+fn test_db_2() -> rusqlite::Result<Connection> {
+    create_test_db(vec![
+                   TestData::Projects(TestProjects{name: "project-one".to_string(), summary: "".to_string(), description: "".to_string(),
+                                                   homepage: None, upstream_vcs: "".to_string(), key_vals: vec![],
+                                                   sources: vec![
+                                                       TestSources{version: "1.47".to_string(),
+                                                                   license: "".to_string(), source_ref: "".to_string(), key_vals: vec![],
+                                                                   builds: vec![
+                                                                       TestBuilds{epoch: 1, release: "1".to_string(), arch: "x86_64".to_string(),
+                                                                                  build_time: "".to_string(), changelog: vec![], build_config_ref: "".to_string(),
+                                                                                  build_env_ref: "".to_string(), signatures: vec![], key_vals: vec![],
+                                                                                  files: vec![
+                                                                                      TestFiles{path: "/r1/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
+                                                                                                file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
+                                                                                                mtime: 0, symlink_target: None,
+                                                                                                key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "project-one".to_string(), ext_value: None}]}
+                                                                                              ]}
+                                                                               ]}
+                                                                ]})
+                       ])
+}
 
-    fn test_db_1() -> rusqlite::Result<Connection> {
-        create_test_db(vec![
-                       TestData::Projects(TestProjects{name: "project-one".to_string(), summary: "".to_string(), description: "".to_string(),
-                                                       homepage: None, upstream_vcs: "".to_string(), key_vals: vec![],
-                                                       sources: vec![
-                                                           TestSources{version: "1.47".to_string(),
-                                                                       license: "".to_string(), source_ref: "".to_string(), key_vals: vec![],
-                                                                       builds: vec![
-                                                                           TestBuilds{epoch: 1, release: "1".to_string(), arch: "x86_64".to_string(),
-                                                                                      build_time: "".to_string(), changelog: vec![], build_config_ref: "".to_string(),
-                                                                                      build_env_ref: "".to_string(), signatures: vec![], key_vals: vec![],
-                                                                                      files: vec![
-                                                                                          TestFiles{path: "/r1/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
-                                                                                                    file_mode: 0o644, file_user: "".to_string(), file_group: "".to_string(), file_size: 0,
-                                                                                                    mtime: 0, symlink_target: None,
-                                                                                                    key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: "project-one".to_string(), ext_value: None}]}
-                                                                                                  ]}
-                                                                                   ]}
-                                                                    ]})
-                           ])
-    }
+#[test]
+fn test_empty() -> () {
+    let conn = create_test_db(vec![]).unwrap();
+    let test_data: Vec<PathBuf> = vec![];
+    assert_eq_no_order!(get_pkg_files_nevra(&conn, "whatever", 0, "0", "0", "x86_64").unwrap(), test_data);
+}
 
-    #[test]
-    fn test_empty() -> () {
-        let conn = create_test_db(vec![]).unwrap();
-        let test_data: Vec<PathBuf> = vec![];
-        assert_eq!(get_pkg_files_nevra(&conn, "whatever", 0, "0", "0", "x86_64").unwrap(), test_data);
-    }
-
-    #[test]
-    fn test_data_1() -> () {
-        let conn = test_db_1().unwrap();
-        let test_data = vec![PathBuf::from("/r1/1")];
-        assert!(compare_no_order(get_pkg_files_nevra(&conn, "project-one", 1, "1.47", "1", "x86_64").unwrap(), test_data));
-    }
+#[test]
+fn test_data_3() -> () {
+    let conn = test_db_2().unwrap();
+    let test_data = vec![PathBuf::from("/r1/1")];
+    assert_eq_no_order!(get_pkg_files_nevra(&conn, "project-one", 1, "1.47", "1", "x86_64").unwrap(), test_data);
 }

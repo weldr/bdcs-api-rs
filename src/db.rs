@@ -38,11 +38,6 @@ use r2d2;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{self, Connection};
 
-#[cfg(test)]
-#[path = "./db_test.rs"]
-pub mod db_test;
-
-
 /// Database pool connection, used with Rocket's managed state system
 pub struct DBPool(r2d2::Pool<SqliteConnectionManager>);
 impl DBPool {

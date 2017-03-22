@@ -17,11 +17,19 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use depclose::*;
+extern crate bdcs;
+extern crate rusqlite;
 
-use db::db_test::*;
-use rpm::{Requirement, EVR};
-use rusqlite::{self, Connection};
+use std::str::FromStr;
+use std::rc::Rc;
+
+use bdcs::depclose::*;
+
+mod db;
+
+use db::*;
+use bdcs::rpm::{Requirement, ReqOperator, EVR};
+use rusqlite::Connection;
 
 pub struct TestPkg {
     pub name: String,
@@ -72,7 +80,7 @@ pub fn create_test_packages(data: Vec<TestPkg>) -> rusqlite::Result<Connection> 
         for c in pkg.conflicts.iter() {
             key_vals.push(TestKeyValues{key_value: "rpm-conflict".to_string(), val_value: c.name.clone(), ext_value: Some(c.to_string())});
         }
-        
+
         let requirements: Vec<TestRequirements> = pkg.requires.iter().map(|r| TestRequirements{req_language: "RPM".to_string(), req_context: "Runtime".to_string(),
                                                                                                req_strength: "Must".to_string(), req_expr: r.to_string()}).collect();
 
@@ -142,46 +150,40 @@ pub fn get_nevra_group_id(conn: &Connection, name: &str, epoch: Option<u32>, ver
 }
 
 // shorthand for boxing up a type
-pub fn rc(expr: DepExpression) -> Rc<DepCell<DepExpression>> {
+fn rc(expr: DepExpression) -> Rc<DepCell<DepExpression>> {
     Rc::new(DepCell::new(expr))
 }
 
-#[cfg(test)]
-mod test_depclose {
-    use depclose::*;
-    use self::depclose_test::*;
+fn test_data() -> rusqlite::Result<Connection> {
+    create_test_packages(vec![
+        // provides itself, doesn't require anything
+        testpkg("singleton", None, "1.0", "1", "x86_64",
+                vec!["singleton = 1.0-1"],
+                vec![],
+                vec![],
+                vec![])
+    ])
+}
 
-    fn test_data() -> rusqlite::Result<Connection> {
-        create_test_packages(vec![
-            // provides itself, doesn't require anything
-            testpkg("singleton", None, "1.0", "1", "x86_64",
-                    vec!["singleton = 1.0-1"],
-                    vec![],
-                    vec![],
-                    vec![])
-        ])
-    }
-
-    #[test]
-    fn test_singleton() -> () {
-        let conn = test_data().unwrap();
-        let test_result =
-            DepExpression::And(vec![            // And of all packages requested
-                rc(DepExpression::Or(vec![      // Or of each package matching a single name
-                    rc(DepExpression::And(vec![ // actual package
-                        // self
-                        rc(DepExpression::Atom(DepAtom::GroupId(get_nevra_group_id(&conn, "singleton", None, "1.0", "1", "x86_64")))),
-                        // provides
-                        rc(DepExpression::And(vec![
-                            rc(DepExpression::Atom(DepAtom::Requirement(req("singleton = 1.0-1")))),
-                            // special one for Obsoletes matches
-                            rc(DepExpression::Atom(DepAtom::Requirement(Requirement{name: "PKG: singleton".to_string(),
-                                                                                    expr: Some((ReqOperator::EqualTo, EVR::from_str("1.0").unwrap()))})))
-                        ]))
+#[test]
+fn test_singleton() -> () {
+    let conn = test_data().unwrap();
+    let test_result =
+        DepExpression::And(vec![            // And of all packages requested
+            rc(DepExpression::Or(vec![      // Or of each package matching a single name
+                rc(DepExpression::And(vec![ // actual package
+                    // self
+                    rc(DepExpression::Atom(DepAtom::GroupId(get_nevra_group_id(&conn, "singleton", None, "1.0", "1", "x86_64")))),
+                    // provides
+                    rc(DepExpression::And(vec![
+                        rc(DepExpression::Atom(DepAtom::Requirement(req("singleton = 1.0-1")))),
+                        // special one for Obsoletes matches
+                        rc(DepExpression::Atom(DepAtom::Requirement(Requirement{name: "PKG: singleton".to_string(),
+                                                                                expr: Some((ReqOperator::EqualTo, EVR::from_str("1.0").unwrap()))})))
                     ]))
                 ]))
-            ]);
+            ]))
+        ]);
 
-        assert!(cmp_expression(&test_result, &close_dependencies(&conn, &vec!["x86_64".to_string()], &vec!["singleton".to_string()]).unwrap()));
-    }
+    assert!(cmp_expression(&test_result, &close_dependencies(&conn, &vec!["x86_64".to_string()], &vec!["singleton".to_string()]).unwrap()));
 }

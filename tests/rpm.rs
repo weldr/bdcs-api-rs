@@ -17,7 +17,10 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use rpm::*;
+extern crate bdcs;
+
+use bdcs::rpm::{self, EVR, ReqOperator, Requirement, vercmp};
+use std::cmp::Ordering;
 
 #[test]
 fn test_evr_ord() {

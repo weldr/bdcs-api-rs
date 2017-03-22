@@ -27,10 +27,6 @@ use std::rc::Rc;
 use std::cell::{Cell, RefCell};
 use std::ops::Deref;
 
-#[cfg(test)]
-#[path = "./depclose_test.rs"]
-mod depclose_test;
-
 // TODO might need to mess with the type for depsolve
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DepAtom {
