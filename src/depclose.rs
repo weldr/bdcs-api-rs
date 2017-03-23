@@ -86,15 +86,15 @@ impl<T> Deref for DepCell<T> {
 }
 
 fn wrap_depexpression(expr: DepExpression) -> Rc<DepCell<DepExpression>> {
-    return Rc::new(DepCell::new(expr));
+    Rc::new(DepCell::new(expr))
 }
 
 fn wrap_atom(atom: DepAtom) -> Rc<DepCell<DepExpression>> {
-    return wrap_depexpression(DepExpression::Atom(atom));
+    wrap_depexpression(DepExpression::Atom(atom))
 }
 
 fn wrap_requirement(req: Requirement) -> Rc<DepCell<DepExpression>> {
-    return wrap_atom(DepAtom::Requirement(req));
+    wrap_atom(DepAtom::Requirement(req))
 }
 
 fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) -> bool {
@@ -109,9 +109,9 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) ->
                          }
                      }
 
-                     return false
+                     false
                    },
-        Err(_) => return false
+        Err(_) => false
     }
 }
 

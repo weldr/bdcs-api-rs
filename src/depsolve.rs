@@ -22,9 +22,9 @@ pub fn solve_dependencies(conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpre
             _ => None
         }).collect();
 
-        return Ok(results);
+        Ok(results)
     } else {
-        return Err(String::from("Unsolved expressions"));
+        Err(String::from("Unsolved expressions"))
     }
 }
 

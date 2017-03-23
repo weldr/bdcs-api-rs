@@ -195,7 +195,7 @@ fn keyval_hash(kvs: &Vec<KeyVal>) -> HashMap<String, (String, Option<String>)> {
     for kv in kvs {
         hash.entry(kv.key_value.clone()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
     }
-    return hash;
+    hash
 }
 
 /// `Projects` related key:value

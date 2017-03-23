@@ -576,7 +576,7 @@ fn depsolve_helper(conn: &Connection, projects: &Vec<String>) -> Vec<PackageNEVR
         Ok(ids) => {
             let mut nevras = pkg_nevra_groups_vec(conn, &ids);
             nevras.sort();
-            return nevras;
+            nevras
         },
         Err(e) => {
             error!("Error depsolving"; "pkgs" => format!("{:?}", projects), "error" => e);
