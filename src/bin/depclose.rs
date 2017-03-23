@@ -39,24 +39,13 @@ fn main() {
     // Wrap the returned depexpression in the crud it needs
     let mut exprs = vec![Rc::new(DepCell::new(depexpr))];
 
-    match solve_dependencies(&conn, &mut exprs) {
-        Ok(ids) => { let mut results = Vec::new();
-                     for id in ids {
-                         match get_groups_id(&conn, &id) {
-                             // Commented out for the moment - just printing group names is easier
-                             // to debug.
-                             // Ok(Some(grp)) => { let mut details = get_projects_details(&conn, &[grp.name.as_str()]).unwrap();
-                             //                    results.append(&mut details);
-                             //                  }
-                             Ok(Some(grp)) => { results.push(grp.name) }
-                             _ => { }
-                         }
-                     }
+    let results:Vec<bdcs::db::Groups> = solve_dependencies(&conn, &mut exprs)
+        .unwrap_or_else(|e| exit_error!(1, e)).iter()
+        .map(|id| get_groups_id(&conn, id))
+        .filter_map(|grp_res| grp_res.unwrap_or(None))
+        .collect();
 
-                     for x in results {
-                         println!("{}", x);
-                     }
-                   }
-        Err(e)  => { println!("{}", e); }
+    for grp in results {
+        println!("{}", grp.name);
     }
 }
