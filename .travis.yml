@@ -5,8 +5,11 @@ rust:
   - nightly
 before_install:
     - sudo apt-get install libssh2-1-dev
+env:
+  - _CMD=test
+  - _CMD=clippy
 script:
-  - RUST_BACKTRACE=1 cargo test --features "strict"
+  - make $_CMD
 notifications:
   email:
     on_failure: change
