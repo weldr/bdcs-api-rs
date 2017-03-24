@@ -570,3 +570,31 @@ fn test_data_3() -> () {
     let test_data = vec![PathBuf::from("/r1/1")];
     assert_eq_no_order!(get_pkg_files_nevra(&conn, "project-one", 1, "1.47", "1", "x86_64").unwrap(), test_data);
 }
+
+fn test_db_3() -> rusqlite::Result<Connection> {
+    create_test_db(&[
+                   TestData::Groups(
+                       TestGroups{name: "test-package".to_string(),
+                                  group_type: "rpm".to_string(),
+                                  files: vec![],
+                                  children: vec![],
+                                  key_vals: vec![
+                                      TestKeyValues{key_value: "name".to_string(),
+                                                    val_value: "test-package".to_string(),
+                                                    ext_value: None}
+                                  ],
+                                  requirements: vec![]})
+    ])
+}
+
+#[test]
+fn test_get_group_by_name_match() {
+    let conn = test_db_3().unwrap();
+    assert_eq!(get_groups_by_name(&conn, "test-package", "rpm").unwrap().len(), 1);
+}
+
+#[test]
+fn test_get_group_by_name_empty() {
+    let conn = test_db_3().unwrap();
+    assert_eq!(get_groups_by_name(&conn, "no-package", "rpm").unwrap().len(), 0);
+}

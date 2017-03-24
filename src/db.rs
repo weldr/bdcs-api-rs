@@ -344,6 +344,34 @@ pub fn get_group_files_name(conn: &Connection, group_id: i64) -> rusqlite::Resul
     rows.collect()
 }
 
+/// Fetch groups with a given name
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group_name` - The group name
+/// * `group_type` - The type of group, e.g. "rpm"
+///
+/// # Returns
+///
+/// * A Vector of group ids
+pub fn get_groups_by_name (conn: &Connection, group_name: &str, group_type: &str) -> rusqlite::Result<Vec<i64>> {
+    let mut stmt = try!(conn.prepare("
+        select groups.id
+        from groups, group_key_values, key_val
+        on groups.id == group_key_values.group_id and
+           key_val.id == group_key_values.key_val_id
+        where groups.group_type == :type
+          and key_val.key_value == 'name'
+          and key_val.val_value == :name
+    "));
+    let rows = try!(stmt.query_map_named(
+            &[(":name", &group_name),
+              (":type", &group_type)],
+            |row| row.get(0)));
+    rows.collect()
+}
+
 // Use a package struct to describe the package?
 // How to make these queries easier to expose as a library?
 
