@@ -10,7 +10,6 @@ use bdcs::depsolve::*;
 use r2d2_sqlite::SqliteConnectionManager;
 use std::env;
 use std::process::exit;
-use std::rc::Rc;
 
 macro_rules! exit_error {
     ($rc:expr, $msg:expr) => ( { println!("error: {}", $msg); exit($rc); } )
@@ -36,8 +35,8 @@ fn main() {
     let depexpr = close_dependencies(&conn, &[String::from("x86_64")], &argv)
         .unwrap_or_else(|e| exit_error!(1, e));
 
-    // Wrap the returned depexpression in the crud it needs
-    let mut exprs = vec![Rc::new(DepCell::new(depexpr))];
+    // Wrap the returned depexpression in a Vector
+    let mut exprs = vec![depexpr];
 
     let results:Vec<bdcs::db::Groups> = solve_dependencies(&conn, &mut exprs)
         .unwrap_or_else(|e| exit_error!(1, e)).iter()

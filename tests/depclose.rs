@@ -18,45 +18,41 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 extern crate bdcs;
-extern crate rusqlite;
-
-use std::str::FromStr;
 
 use bdcs::depclose::*;
-use bdcs::rpm::{Requirement, ReqOperator, EVR};
-use bdcs::test_helper::*;
-use rusqlite::Connection;
 
-fn test_data() -> rusqlite::Result<Connection> {
-    create_test_packages(&[
-        // provides itself, doesn't require anything
-        testpkg("singleton", None, "1.0", "1", "x86_64",
-                &["singleton = 1.0-1"],
-                &[],
-                &[],
-                &[])
-    ])
+#[test]
+fn test_depexpression_display_atom() {
+    assert_eq!(DepExpression::Atom(5).to_string(), "5");
 }
 
 #[test]
-fn test_singleton() -> () {
-    let conn = test_data().unwrap();
-    let test_result =
-        DepExpression::And(vec![            // And of all packages requested
-            rc(DepExpression::Or(vec![      // Or of each package matching a single name
-                rc(DepExpression::And(vec![ // actual package
-                    // self
-                    rc(DepExpression::Atom(DepAtom::GroupId(get_nevra_group_id(&conn, "singleton", None, "1.0", "1", "x86_64")))),
-                    // provides
-                    rc(DepExpression::And(vec![
-                        rc(DepExpression::Atom(DepAtom::Requirement(req("singleton = 1.0-1")))),
-                        // special one for Obsoletes matches
-                        rc(DepExpression::Atom(DepAtom::Requirement(Requirement{name: "PKG: singleton".to_string(),
-                                                                                expr: Some((ReqOperator::EqualTo, EVR::from_str("1.0").unwrap()))})))
-                    ]))
-                ]))
-            ]))
-        ]);
+fn test_depexpression_display_not() {
+    assert_eq!(DepExpression::Not(5).to_string(), "NOT 5");
+}
 
-    assert!(cmp_expression(&test_result, &close_dependencies(&conn, &["x86_64".to_string()], &["singleton".to_string()]).unwrap()));
+#[test]
+fn test_display_and() {
+    assert_eq!(DepExpression::And(vec![]).to_string(), "()");
+    assert_eq!(DepExpression::And(vec![DepExpression::Atom(5)]).to_string(), "(5)");
+    assert_eq!(DepExpression::And(vec![DepExpression::Atom(5), DepExpression::Atom(6)]).to_string(), "(5 AND 6)");
+}
+
+#[test]
+fn test_depexpression_display_or() {
+    assert_eq!(DepExpression::Or(vec![]).to_string(), "()");
+    assert_eq!(DepExpression::Or(vec![DepExpression::Atom(5)]).to_string(), "(5)");
+    assert_eq!(DepExpression::Or(vec![DepExpression::Atom(5), DepExpression::Atom(6)]).to_string(), "(5 OR 6)");
+}
+
+#[test]
+fn test_depexpression_display_combo() {
+    assert_eq!(DepExpression::And(vec![DepExpression::And(vec![DepExpression::Atom(1), DepExpression::Atom(2), DepExpression::Atom(3)]),
+                                       DepExpression::Atom(4),
+                                       DepExpression::Or(vec![DepExpression::Atom(5), DepExpression::Atom(6)]),
+                                       DepExpression::Or(vec![DepExpression::And(vec![DepExpression::Atom(7), DepExpression::Atom(8), DepExpression::Atom(9)]),
+                                                              DepExpression::And(vec![DepExpression::Atom(10), DepExpression::Not(11)]),
+                                                              DepExpression::Atom(12)]),
+                                       DepExpression::Not(13)]).to_string(),
+               "((1 AND 2 AND 3) AND 4 AND (5 OR 6) AND ((7 AND 8 AND 9) OR (10 AND NOT 11) OR 12) AND NOT 13)");
 }

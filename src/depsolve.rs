@@ -3,10 +3,8 @@ use depclose::*;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::ops::Index;
-use std::ops::IndexMut;
-use std::rc::Rc;
 
-pub fn solve_dependencies(_conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpression>>>) -> Result<Vec<i64>, String> {
+pub fn solve_dependencies(_conn: &Connection, exprs: &mut Vec<DepExpression>) -> Result<Vec<i64>, String> {
     let mut assignments = HashMap::new();
 
     unit_propagation(exprs, &mut assignments);
@@ -15,10 +13,10 @@ pub fn solve_dependencies(_conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpr
     // should handle most basic cases.  More complicated cases will require real dependency
     // solving.
     if exprs.is_empty() {
-        // Take the DepAtom -> bool hash map and convert it to just a list of i64.  We only care
+        // Take the GroupId -> bool hash map and convert it to just a list of i64.  We only care
         // about the GroupId for packages that will be installed.
         let results = assignments.into_iter().filter_map(|x| match x {
-            (DepAtom::GroupId(i), true) => Some(i),
+            (i, true) => Some(i),
             _ => None
         }).collect();
 
@@ -28,8 +26,8 @@ pub fn solve_dependencies(_conn: &Connection, exprs: &mut Vec<Rc<DepCell<DepExpr
     }
 }
 
-fn unit_propagation(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>) -> bool {
-    unit_propagation_helper(exprs, assignments, true, &mut 0)
+fn unit_propagation(exprs: &mut Vec<DepExpression>, assignments: &mut HashMap<GroupId, bool>) -> bool {
+    unit_propagation_helper(exprs, assignments, true)
 }
 
 // if assign is true, when a unit is found, process it and add it to the cache so that it will be propagated
@@ -47,11 +45,7 @@ fn unit_propagation(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &m
 // but we shouldn't do anything with And(D, C), since messing with D will mess with the Or(D, E)
 // branch. The And(D, C) portion could be false and the parent Or() expression can still be true,
 // so don't try to infer anything from those values.
-//
-// change_count is incremented every time a change is made to the assignments hash, and is compared
-// to the marker field in DepCell. This way if a given Rc<DepCell<DepExpression>> has already been
-// processed since the last assignments change, it does not need to be processed again.
-fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignments: &mut HashMap<DepAtom, bool>, assign: bool, change_count: &mut i64) -> bool {
+fn unit_propagation_helper(exprs: &mut Vec<DepExpression>, assignments: &mut HashMap<GroupId, bool>, assign: bool) -> bool {
     let mut ever_changed = false;
 
     loop {
@@ -59,54 +53,43 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
         let mut indices_to_replace = Vec::new();
         let mut changed = false;
 
-        for (i, ref mut val) in exprs.iter().enumerate() {
-            if val.marker.get() == *change_count {
-                continue;
-            }
-
-            match *(val.borrow_mut()) {
-                DepExpression::Atom(ref a) => {
-                    if !assignments.contains_key(a) {
+        for (i, val) in exprs.into_iter().enumerate() {
+            match *val {
+                DepExpression::Atom(ref id) => {
+                    if !assignments.contains_key(id) {
                         if assign {
-                            assignments.insert(a.clone(), true);
-                            *change_count += 1;
+                            assignments.insert(*id, true);
                             changed = true;
                             indices_to_remove.push(i);
                         }
-                    } else if assignments.get(a) == Some(&true) {
+                    } else if assignments.get(id) == Some(&true) {
                         changed = true;
-                        *change_count += 1;
                         indices_to_remove.push(i);
                     } else {
-                        panic!("conflict resolving {}", a);
+                        panic!("conflict resolving {}", id);
                     }
                 },
 
-                DepExpression::Not(ref rc) => {
-                    if let DepExpression::Atom(ref a) = *(rc.borrow()) {
-                        if !assignments.contains_key(a) {
-                            if assign {
-                                assignments.insert(a.clone(), false);
-                                changed = true;
-                                *change_count += 1;
-                                indices_to_remove.push(i);
-                            }
-                        } else if assignments.get(a) == Some(&false) {
+                DepExpression::Not(ref id) => {
+                    if !assignments.contains_key(id) {
+                        if assign {
+                            assignments.insert(*id, false);
                             changed = true;
-                            *change_count += 1;
                             indices_to_remove.push(i);
-                        } else {
-                            panic!("conflict resolving {}", a);
                         }
+                    } else if assignments.get(id) == Some(&false) {
+                        changed = true;
+                        indices_to_remove.push(i);
+                    } else {
+                        panic!("conflict resolving {}", id);
                     }
                     // TODO else?
                 },
 
                 DepExpression::And(ref mut and_list) => {
                     // recurse on this list of expressions
-                    if unit_propagation_helper(and_list, assignments, assign, change_count) {
+                    if unit_propagation_helper(and_list, assignments, assign) {
                         changed = true;
-                        *change_count += 1;
                     }
 
                     // if there's only one thing left in the list, the And is actually just that
@@ -114,11 +97,9 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                     if and_list.len() == 1 {
                         indices_to_replace.push(i);
                         changed = true;
-                        *change_count += 1;
                     } else if and_list.is_empty() {
                         indices_to_remove.push(i);
                         changed = true;
-                        *change_count += 1;
                     }
                 },
 
@@ -128,28 +109,22 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                     // assign=true
                     if or_list.len() == 1 {
                         indices_to_replace.push(i);
-                        *change_count += 1;
                         changed = true;
                     } else if or_list.is_empty() {
                         indices_to_remove.push(i);
                         changed = true;
-                        *change_count += 1;
-                    } else if unit_propagation_helper(or_list, assignments, false, change_count) {
+                    // Can't get rid of it completely, so look for known units inside the Or that can be removed
+                    } else if unit_propagation_helper(or_list, assignments, false) {
                         changed = true;
-                        *change_count += 1;
                     }
                 }
-            }
-
-            if changed {
-                val.marker.set(*change_count);
             }
         }
 
         for i in indices_to_replace {
-            let expr = match *(exprs.index_mut(i)).borrow_mut() {
-                DepExpression::And(ref mut and_list) => and_list.index(0).clone(),
-                DepExpression::Or(ref mut or_list)   => or_list.index(0).clone(),
+            let expr = match *exprs.index(i) {
+                DepExpression::And(ref and_list) => and_list.index(0).clone(),
+                DepExpression::Or(ref or_list)   => or_list.index(0).clone(),
                 _ => unreachable!()
             };
             exprs.remove(i);

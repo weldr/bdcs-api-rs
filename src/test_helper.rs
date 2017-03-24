@@ -20,8 +20,6 @@
 use rusqlite::{self, Connection};
 
 use rpm::*;
-use depclose::*;
-use std::rc::Rc;
 use std::str::FromStr;
 
 // structs and functions for creating in-memory databases
@@ -529,39 +527,6 @@ pub fn create_test_packages(data: &[TestPkg]) -> rusqlite::Result<Connection> {
     create_test_db(&data.iter().map(pkg_to_group).collect::<Vec<TestData>>())
 }
 
-// O(n^2) cmp function because RefCell makes everything terrible
-pub fn cmp_expression(e1: &DepExpression, e2: &DepExpression) -> bool {
-    match (e1, e2) {
-        (&DepExpression::Atom(ref a1), &DepExpression::Atom(ref a2)) => a1 == a2,
-        (&DepExpression::Not(ref n1), &DepExpression::Not(ref n2)) => {
-            let e_sub_1 = n1.borrow();
-            let e_sub_2 = n2.borrow();
-            cmp_expression(&e_sub_1, &e_sub_2)
-        },
-        (&DepExpression::And(ref lst1), &DepExpression::And(ref lst2)) |
-        (&DepExpression::Or(ref lst1), &DepExpression::Or(ref lst2)) => {
-            if lst1.len() != lst2.len() {
-                return false;
-            }
-
-            for r1 in lst1.iter() {
-                let l1 = r1.borrow();
-                let cmp_result = lst2.iter().any(|r2| {
-                    let l2 = r2.borrow();
-                    cmp_expression(&l1, &l2)
-                });
-
-                if !cmp_result {
-                    return false;
-                }
-            }
-
-            true
-        },
-        _ => false
-    }
-}
-
 // something like this should probably be in db.rs at some point
 pub fn get_nevra_group_id(conn: &Connection, name: &str, epoch: Option<u32>, version: &str, release: &str, arch: &str) -> i64 {
     conn.query_row_named("
@@ -584,9 +549,4 @@ pub fn get_nevra_group_id(conn: &Connection, name: &str, epoch: Option<u32>, ver
           (":release", &(release.to_string())),
           (":arch", &(arch.to_string()))],
         |row| row.get(0)).unwrap()
-}
-
-// shorthand for boxing up a type
-pub fn rc(expr: DepExpression) -> Rc<DepCell<DepExpression>> {
-    Rc::new(DepCell::new(expr))
 }

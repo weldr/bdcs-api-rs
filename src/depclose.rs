@@ -20,81 +20,33 @@ use rpm::*;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::path::PathBuf;
 use std::str::FromStr;
 use itertools::Itertools;
-use std::rc::Rc;
-use std::cell::{Cell, RefCell};
-use std::ops::Deref;
 
-// TODO might need to mess with the type for depsolve
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum DepAtom {
-    GroupId(i64),
-    Requirement(Requirement)
-}
+pub type GroupId = i64;
 
-impl fmt::Display for DepAtom {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            DepAtom::GroupId(i)            => write!(f, "groupid={}", i),
-            DepAtom::Requirement(ref r)    => write!(f, "({})", r)
-        }
-    }
-}
-
+/// A dependency expression
 #[derive(Debug, Clone)]
 pub enum DepExpression {
-    Atom(DepAtom),
-    And(Vec<Rc<DepCell<DepExpression>>>),
-    Or(Vec<Rc<DepCell<DepExpression>>>),
-    Not(Rc<DepCell<DepExpression>>)
+    Atom(GroupId),
+    Not(GroupId),
+    And(Vec<DepExpression>),
+    Or(Vec<DepExpression>)
 }
 
 impl fmt::Display for DepExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            DepExpression::Atom(ref req)    => write!(f, "{}", req),
-            DepExpression::And(ref lst)     => { let strs: String = lst.iter().map(|x| x.borrow().to_string()).intersperse(String::from(" AND ")).collect();
-                                                 write!(f, "{}", strs)
-                                               },
-            DepExpression::Or(ref lst)      => { let strs: String = lst.iter().map(|x| x.borrow().to_string()).intersperse(String::from(" OR ")).collect();
-                                                 write!(f, "{}", strs)
-                                               },
-            DepExpression::Not(ref expr)    => write!(f, "NOT {}", *(expr.borrow()))
+            DepExpression::Atom(ref id) =>  write!(f, "{}", id),
+            DepExpression::And(ref lst) =>  { let strs: String = lst.iter().map(|x| x.to_string()).intersperse(" AND ".to_string()).collect();
+                                              write!(f, "({})", strs)
+                                            },
+            DepExpression::Or(ref lst) =>   { let strs: String = lst.iter().map(|x| x.to_string()).intersperse(" OR ".to_string()).collect();
+                                              write!(f, "({})", strs)
+                                            },
+            DepExpression::Not(ref id) => write!(f, "NOT {}", id)
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct DepCell<T> {
-    pub marker: Cell<i64>,
-    pub cell: RefCell<T>
-}
-
-impl<T> DepCell<T> {
-    pub fn new(value: T) -> DepCell<T> {
-        DepCell {marker: Cell::new(-1), cell: RefCell::new(value) }
-    }
-}
-
-impl<T> Deref for DepCell<T> {
-    type Target = RefCell<T>;
-    fn deref(&self) -> &RefCell<T> {
-        &self.cell
-    }
-}
-
-fn wrap_depexpression(expr: DepExpression) -> Rc<DepCell<DepExpression>> {
-    Rc::new(DepCell::new(expr))
-}
-
-fn wrap_atom(atom: DepAtom) -> Rc<DepCell<DepExpression>> {
-    wrap_depexpression(DepExpression::Atom(atom))
-}
-
-fn wrap_requirement(req: Requirement) -> Rc<DepCell<DepExpression>> {
-    wrap_atom(DepAtom::Requirement(req))
 }
 
 fn group_matches_arch(conn: &Connection, group_id: i64, arches: &[String]) -> bool {
@@ -111,314 +63,291 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &[String]) -> bo
     }
 }
 
-// Given a requirement, find a list of groups providing it and return all of that as an expression
-fn req_providers(conn: &Connection, arches: &[String], req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>, self_id: i64) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
-    // helper function for converting a (Group, KeyVal) to Option<(group_id, Requirement)>
-    fn provider_to_requirement(group: &Groups, kv: &KeyVal) -> Option<(i64, Requirement)> {
-        let ext_val = match kv.ext_value {
-            Some(ref ext_val) => ext_val,
-            None => return None
-        };
+// Helper function for convert a (Group, KeyVal) provider pair to a requirement
+fn provider_to_requirement(group: &Groups, kv: &KeyVal) -> Result<(GroupId, Requirement), String> {
+    let ext_val = match kv.ext_value {
+        Some(ref ext_val) => ext_val,
+        None => return Err("ext_value not set".to_string())
+    };
+    Ok((group.id, Requirement::from(ext_val.as_str())))
+}
 
-        let requirement = match Requirement::from_str(ext_val.as_str()) {
-            Ok(req) => req,
-            Err(_)  => Requirement{name: ext_val.clone(), expr: None}
-        };
+// Helper function to convert a GroupId into a name = EVR Requirement
+fn group_id_to_requirement(conn: &Connection, group_id: GroupId) -> Result<(GroupId, Requirement), String> {
+    let mut name = None;
+    let mut epoch = None;
+    let mut version = None;
+    let mut release = None;
 
-        Some((group.id, requirement))
-    }
-
-    // gather child requirements if necessary
-    fn depclose_provider(conn: &Connection, arches: &[String], group_id: i64, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
-        if parents.contains(&group_id) {
-            // This requirement is already satisfied, return
-            Ok(None)
-        } else {
-            let provider_expr = try!(depclose_package(conn, arches, group_id, parents, cache));
-            cache.insert(group_id, provider_expr.clone());
-            Ok(Some(provider_expr))
-        }
-    }
-
-    // flag to indicate that the requirement is satisfied via a parent of this expression, even if
-    // the requirement list comes out empty
-    let mut satisfied = false;
-
-    let mut group_providers = match get_provider_groups(conn, req.name.as_str()) {
-        Ok(providers) => {
-            // We have a vector of (Groups, KeyVal) pairs, not all of which match the
-            // version portion of the requirement expression. We want the matching
-            // providers as DepExpression values, with any unsolvable providers removed
-            let providers_checked_1 = providers.iter()
-                                               // convert the provides expression to a Requirement and return a (group_id, Requirement) tuple
-                                               .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv))
-                                               // filter out any that don't match version-wise
-                                               .filter(|&(_, ref provider_req)| provider_req.satisfies(req))
-                                               // filter out any that don't match arch-wise
-                                               .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches));
-
-            // pause here to see if the group we're collecting requirements for satisfies its own requirement
-            // basically do .any() but don't consume the iterator
-            let mut self_satisfied = false;
-            let providers_checked_2: Vec<(i64, Requirement)> = providers_checked_1.filter(|&(group_id, _)| {
-                if group_id == self_id {
-                    self_satisfied = true;
+    let group_key_vals_result = get_groups_kv_group_id(conn, group_id);
+    match group_key_vals_result {
+        Ok(group_key_vals) => {
+            for kv in group_key_vals {
+                match kv.key_value.as_str() {
+                    "name"    => name =    Some(kv.val_value),
+                    "version" => version = Some(kv.val_value),
+                    "epoch"   => epoch =   Some(kv.val_value),
+                    "release" => release = Some(kv.val_value),
+                    _         => ()
                 }
-                true
-            }).collect();
-            if self_satisfied {
-                return Ok(None);
             }
-            // map the remaining providers to an expression, recursing to fetch the provider's requirements
-            // any recursions that return Err unsatisfiable, so filter those out
-            providers_checked_2.iter().filter_map(|&(group_id, _)| match depclose_provider(conn, arches, group_id, parents, cache) {
-                Ok(Some(provider)) => {
-                    // mark the requirement as satisfied
-                    satisfied = true;
-                    match get_groups_id(conn, &group_id) {
-                        Ok(Some(grp)) => Some((grp.name.clone(), provider)),
-                        _ => None
-                    }
-                },
-                Ok(None) => {
-                    satisfied = true;
-                    None
-                },
-                _ => None
-            }).collect::<Vec<(String, Rc<DepCell<DepExpression>>)>>()
+        },
+        Err(e) => return Err(e.to_string())
+    }
+
+    // Everything is required except epoch
+    let name_val = try!(name.ok_or("No name set"));
+    let version_val = try!(version.ok_or("No version set"));
+    let release_val = try!(release.ok_or("No release set"));
+
+    // Epoch, if set, has to be parseable as a u32
+    let epoch_val = match epoch {
+        Some(e) => Some(try!(u32::from_str(e.as_str()).map_err(|_| "Unable to parse epoch"))),
+        None    => None
+    };
+
+    Ok((group_id,
+        Requirement{name: name_val, expr: Some((ReqOperator::EqualTo, EVR{epoch: epoch_val, version: version_val, release: release_val}))})
+       )
+}
+
+// Given an obsolete, return a list of matching groups ids
+// Unlike requires and conflicts, this matches against RPM name instead of rpm-provide
+fn req_obsolete_ids(conn: &Connection, arches: &[String], req: &Requirement) -> Result<Vec<GroupId>, String> {
+    let obsolete_providers = match get_groups_by_name(conn, req.name.as_str(), "rpm") {
+        Ok(group_ids) => {
+            // For each group, create a <name> = [epoch:]<version>-<release> Requirement
+            let group_requirements: Vec<(GroupId, Requirement)> = try!(group_ids
+                .iter()
+                // Filter out the ones that don't match by arch
+                .filter(|&id| group_matches_arch(conn, *id, arches))
+                // Map the ids to Result<(GroupId, Requirement), String> and take care of the error case
+                .map(|id| group_id_to_requirement(conn, *id))
+                .collect());
+
+            group_requirements
+                .into_iter()
+                // Filter out the ones that don't match by arch or version
+                .filter(|&(_, ref conflict_req)| req.satisfies(conflict_req))
+                // Pull out just the group ids
+                .map(|(ref group_id, _)| *group_id)
+                .collect()
         },
         Err(e) => return Err(e.to_string())
     };
+
+    Ok(obsolete_providers)
+}
+
+// Given a requirement, return a list of groups that satisfy the requirement
+fn req_provider_ids(conn: &Connection, arches: &[String], req: &Requirement) -> Result<Vec<GroupId>, String> {
+    let mut group_providers = Vec::new();
+
+    // Find matches in the rpm-provide data
+    match get_provider_groups(conn, req.name.as_str()) {
+        Ok(providers) => {
+            // We have a vector of (Groups, KeyVal) pairs, not all of which match the
+            // version portion of the requirement expression.
+            let providers_checked = providers.iter()
+                                    // convert the pair of db records to (GroupId, Requirement), removing any providers that can't be parsed
+                                    .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv).ok())
+                                    // filter out any that don't match version-wise
+                                    .filter(|&(_, ref provider_req)| provider_req.satisfies(req))
+                                    // filter out any that don't match arch-wise
+                                    .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches))
+                                    // and pull out just the remaining group ids
+                                    .map(|(ref group_id, _)| *group_id);
+
+            group_providers.extend(providers_checked);
+        },
+        Err(e) => return Err(e.to_string())
+    }
 
     // If the requirement looks like a filename, check for groups providing the file *in addition to* rpm-provide
     if req.name.starts_with('/') {
-        // check if the file is provided by this package
-        match get_group_files_name(conn, self_id) {
-            Ok(lst) => if lst.contains(&PathBuf::from(&req.name)) { return Ok(None); },
-            Err(e) => return Err(e.to_string())
-        };
-
-        let mut file_providers = match get_groups_filename(conn, req.name.as_str()) {
+        match get_groups_filename(conn, req.name.as_str()) {
             Ok(groups) => {
                 // Unlike group_providers, there are no versions to care about here
-                groups.iter().filter_map(|group| match depclose_provider(conn, arches, group.id, parents, cache) {
-                    Ok(Some(provider)) => {
-                        satisfied = true;
-                        Some((group.name.clone(), provider))
-                    },
-                    Ok(None) => {
-                        satisfied = true;
-                        None
-                    },
-                    _ => None
-                }).collect()
-            },
+                let providers_checked = groups.iter()
+                                              // check if the arch matches
+                                              .filter(|&group| group_matches_arch(conn, group.id, arches))
+                                              // pull out just the id
+                                              .map(|group| group.id);
+                group_providers.extend(providers_checked);
+            }
             Err(e) => return Err(e.to_string())
-        };
-        group_providers.append(&mut file_providers);
+        }
     }
 
-    if group_providers.is_empty() && !satisfied {
-        // If there are no providers for the requirement, the requirement is unsatisfied, and that's an error
-        Err(format!("Unable to satisfy requirement {}", req))
-    } else if group_providers.is_empty() {
-        // Requirement satisfied through a parent, but nothing new to add
-        Ok(None)
-    } else if group_providers.len() == 1 {
-        // Only one provider, return it
-        Ok(Some(group_providers[0].1.clone()))
-    } else {
-        // FIXME:  Multiple providers - arbitrarily pick one.  For now we are just doing that lame
-        // shortest package name thing.  Note that returning all options as an Or here will result
-        // in unit_propagation hanging for unknown reasons.
-        let min = group_providers.iter().min_by(|&&(ref name_a, _), &&(ref name_b, _)| name_a.len().cmp(&name_b.len())).unwrap();
-        Ok(Some(min.1.clone()))
-    }
+    // sort, dedup, and return
+    group_providers.sort();
+    group_providers.dedup();
+    Ok(group_providers)
 }
 
+// depclose a single group id
 // The expression for a package and its dependencies is:
-// PACKAGE_group_id AND (PACKAGE_provides_1 AND PACKAGE_provides_2 AND ...) AND
-//                      (PACKAGE_requires_1 AND PACKAGE_requires_2 AND ...) AND
-//                      (NOT PACKAGE_obsoletes_1 AND NOT PACKAGE_obsoletes_2 AND ...) AND
-//                      (NOT PACKAGE_conflicts_1 AND NOT PACKAGE_conflicts_2 AND ...)
+// PACKAGE_group_id AND requirement_1 AND requirement_2 ...
 //
-// for each requires, this expands to a list of packages that provide the given requires expression
-//   PACKAGE_requires_1 AND (PACKAGE_requires_1_provided_by_1 OR PACKAGES_requires_1_provided_by_2 OR ...)
+// each requirement may be satisfied by more than one group_id, which is expressed as 
 //
-// Each of the requires_provided_by atoms is a group id with a provides that satisfies the
-// given requires. For each of these group ids, if the group has already been closed over in a
-// parent of this expression, it's done. This check needs to be only on the parents, since the
-// group id could exist in another branch of an OR. The child requirements for the group need to be
-// in both branches, in case one of them gets eliminated during the solving step.
+//    (requirement_1_provider_1 OR requirement_1_provider 2 ... )
 //
-// Otherwise, recurse on the group and the requires_provided_by_atom expands to:
+// This function recurses on groups selected as requirements, stopping when it detects a cycle via
+// the parents HashSet. So, supposing there are packages:
 //
-//    PACKAGE_requires_1_provided_by_1 AND (required_package_provides_1 AND required_package_provides_2 AND ...) ...
+//   A Requires B
+//   B Requires C
+//   C Requires A
 //
-// Obsoletes are special in that the expression matches the package name, not a provider name. To
-// handle this, in the provider list add a special Requirement of the form {name:"NAME: <name>", expr:Some(EqualTo, <version>)}
-// and do the same thing to the name when processing Obsoletes.
-//
-// Obsoletes and conflicts do not need to be further expanded. Any conflicting packages that
-// were closed over will be eliminated (or determined to be unresolvable) during depsolve.
-//
-// The end result is a boolean expression containing a mix of Requirements and group ids. The final
-// result of depsolving will be a list of group ids. Each of the group id atoms is AND'd with its
-// requirements so that during unit propagation a group id can only be removed from the expression
-// if everything it needs can be removed from the expression, so that a group id is effectively the
-// thing that can be turned on or off during solving.
-
-fn depclose_package(conn: &Connection, arches: &[String], group_id: i64, parent_groups: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Rc<DepCell<DepExpression>>, String> {
-    // If this value is cached, return it
-    if let Some(expr) = cache.get(&group_id) {
-        return Ok(expr.clone());
+// Calling depclose on A will recurse on B with a parents of {A}, recurse on C with a parents of
+// {A,B}, and then finish since A is already being depclosed in this expression.
+fn depclose_package(conn: &Connection, arches: &[String], group_id: GroupId, parents: &HashSet<GroupId>, cache: &mut HashMap<GroupId, DepExpression>) -> Result<DepExpression, String> {
+    fn kv_to_req(kv: &KeyVal) -> Result<Requirement, String> {
+        match kv.ext_value {
+            Some(ref ext_value) => Ok(Requirement::from(ext_value.as_str())),
+            None => Err("ext_value is not set".to_string())
+        }
     }
 
-    // TODO a functional hashmap or something similar would be super handy here
+    let mut group_requirements: Vec<DepExpression> = Vec::new();
+
+    // If this value is cached, return it
+    if let Some(expr) = cache.get(&group_id) {
+        return Ok(expr.clone())
+    }
+
+    // TODO a functional hashap or something similar would be super handy here
     // add this group to the parent groups, so that a cycle doesn't try to recurse on this group again
-    let mut parent_groups_copy = parent_groups.clone();
+    let mut parent_groups_copy = parents.clone();
     parent_groups_copy.insert(group_id);
 
     // Get all of the key/val based data we need
-    // TODO would be nice to have a function or change this one to specify a key or keys, so we're not
-    // getting all key/val data
-    let (group_provides, group_obsoletes, group_conflicts) = match get_groups_kv_group_id(conn, group_id) {
-        Ok(group_key_vals) => {
-            // map a key/value pair into a Requirement
-            fn kv_to_expr(kv: &KeyVal) -> Result<Rc<DepCell<DepExpression>>, String> {
-                match kv.ext_value {
-                    Some(ref ext_value) => { match Requirement::from_str(ext_value.as_str()) {
-                                                Ok(s)  => Ok(wrap_requirement(s)),
-                                                Err(_) => Ok(wrap_requirement(Requirement{name: ext_value.clone(), expr: None}))
-                                             }
-                                           }
-                    None                => Err(String::from("ext_value is not set"))
-                }
-            }
-
-            fn kv_to_not_expr(kv: &KeyVal) -> Result<Rc<DepCell<DepExpression>>, String> {
-                Ok(wrap_depexpression(DepExpression::Not(try!(kv_to_expr(kv)))))
-            }
-
-            let mut group_provides = Vec::new();
-            let mut group_obsoletes = Vec::new();
-            let mut group_conflicts = Vec::new();
-            let mut name = None;
-            let mut version = None;
-
-            for kv in &group_key_vals {
+    // TODO maybe make a new version of get_groups_kv_group_id that takes the key(s?) as an argument
+    let mut conflicts = Vec::new();
+    let mut obsoletes = Vec::new();
+    match get_groups_kv_group_id(conn, group_id) {
+        Ok(ref group_key_vals) => {
+            for kv in group_key_vals.iter() {
                 match kv.key_value.as_str() {
-                    "rpm-provide" => group_provides.push(kv_to_expr(kv)),
-                    "rpm-conflict" => group_conflicts.push(kv_to_not_expr(kv)),
-                    // obsolete matches the package name, not a provides, so handle it differently
-                    "rpm-obsolete" => match kv.ext_value {
-                        Some(ref ext_value) => match Requirement::from_str(ext_value.as_str()) {
-                            Ok(base_req) => {
-                                let new_req = Requirement{name: "PKG: ".to_string() + base_req.name.as_str(),
-                                                          expr: base_req.expr};
-                                group_obsoletes.push(Ok(wrap_depexpression(DepExpression::Not(wrap_requirement(new_req)))));
-                            },
-                            Err(e) => group_obsoletes.push(Err(e))
-                        },
-                        None => group_obsoletes.push(Err("ext_value is not set".to_string()))
-                    },
-                    "name"         => name = Some(&kv.val_value),
-                    "version"      => version = Some(&kv.val_value),
-                    _ => {}
+                    "rpm-conflict" => conflicts.push(try!(kv_to_req(kv))),
+                    "rpm-obsolete" => obsoletes.push(try!(kv_to_req(kv))),
+                    _              => ()
                 }
             }
-
-            if let (Some(name), Some(version)) = (name, version) {
-                match EVR::from_str(version.as_str()) {
-                    Ok(evr) => {
-                        let req = Requirement{name: "PKG: ".to_string() + name.as_str(),
-                                              expr: Some((ReqOperator::EqualTo, evr))};
-                        group_provides.push(Ok(wrap_requirement(req)));
-                    },
-                    Err(e)  => group_provides.push(Err(e))
-                }
-            }
-
-            // Collect the Vec<Result<Expression, String>>s into a Result<Vec<Expression>, String>
-            let group_provides_result: Result<Vec<Rc<DepCell<DepExpression>>>, String> = group_provides.into_iter().collect();
-            let group_obsoletes_result: Result<Vec<Rc<DepCell<DepExpression>>>, String> = group_obsoletes.into_iter().collect();
-            let group_conflicts_result: Result<Vec<Rc<DepCell<DepExpression>>>, String> = group_conflicts.into_iter().collect();
-
-            // unwrap the result or return the error
-            (try!(group_provides_result), try!(group_obsoletes_result), try!(group_conflicts_result))
         },
         Err(e) => return Err(e.to_string())
     };
 
+    // look for packages that provide the conflict expressions
+    for c in &conflicts {
+        let group_ids = try!(req_provider_ids(conn, arches, c));
+        group_requirements.extend(group_ids.into_iter().map(DepExpression::Not));
+    }
+
+    // look for packages with names matching the obsolete expressions
+    for o in &obsoletes {
+        let group_ids = try!(req_obsolete_ids(conn, arches, o));
+        group_requirements.extend(group_ids.into_iter().map(DepExpression::Not));
+    }
+
     // Collect the requirements
-    let group_requirements = match get_requirements_group_id(conn, group_id) {
+    match get_requirements_group_id(conn, group_id) {
         Ok(requirements) => {
             // Map the data from the Requirements table into a rpm Requirement
-            let gr_reqs: Vec<Requirement> = requirements.iter().map(|r| match Requirement::from_str(r.req_expr.as_str()) {
-                                                                            Ok(req) => req,
-                                                                            Err(_)  => Requirement{name: r.req_expr.clone(), expr: None}
-                                                                        }).collect();
+            let gr_reqs: Vec<Requirement> = requirements.iter().map(|r| Requirement::from(r.req_expr.as_str())).collect();
 
-            // for each requirement, create an expression of (requirement AND requirement_providers)
-            let mut group_requirements: Vec<Rc<DepCell<DepExpression>>> = Vec::new();
-            for r in &gr_reqs {
+            for r in gr_reqs {
+                // Find the providers that satisfy the requirement
+                let provider_ids = try!(req_provider_ids(conn, arches, &r));
+
+                // If there are no providers, that's an error
+                if provider_ids.is_empty() {
+                    return Err(format!("Unable to satisfy requirement {}", r));
+                }
+
+                // If any of the provider ids have already been closed over, we're done with this
+                // requirement (there is already a mandatory provider, so the requirement is satisfied)
+                if provider_ids.iter().any(|id| parent_groups_copy.contains(id)) {
+                    continue;
+                }
+
+                // if the providers are new, recurse over their requirements
+                let mut req_providers: Vec<DepExpression> = Vec::new();
+                for p in &provider_ids {
+                    req_providers.push(try!(depclose_package(conn, arches, p.clone(), &parent_groups_copy, cache)));
+                }
+
                 // If only one group comes back as the requirement (i.e., there is only one
                 // provider for the requirement), that group can be skipped in additional
                 // requirements.
-                // For instance, if our expression so far is something like:
-                //    (req_1 AND (groupid=47 AND group_47_reqs)) AND (req_2 ...)
+                // For instance, if we have:
+                //    Group1 Requires B
+                //    Group1 Requires C
                 //
-                // and req_2 is also satisified by groupid=47, we don't need another copy of
-                // groupid=47 and its requirements.
+                //    Group2 Provides B
+                //    Group2 Provides C
+                //    Group3 Provides C
                 //
+                // When processing the B requirement, we get just Group2 and its requirements. When
+                // processing the C requirement, the requirement is satisfied by (Group2 OR
+                // Group3). We can just skip that second requirement, since it's already satisfied
+                // by Group2, which is already mandatory for this expression.  This is essentially
+                // an early, crappy form of unit propagation.
+                // 
                 // This isn't perfect, since there can still be extra copies depending on the order
                 // things are processed in, but it should cut way down on extra copies of
                 // everything.
-                let providers = try!(req_providers(conn, arches, r, &parent_groups_copy, cache, group_id));
-                let req_expr  = wrap_requirement(r.clone());
-                if let Some(provider_exp) = providers {
-                    {   // extra block to end this borrow
-                        if let DepExpression::Atom(DepAtom::GroupId(provider_group_id)) = *(provider_exp.borrow()) {
-                            if group_id == provider_group_id {
-                                parent_groups_copy.insert(group_id);
-                            }
-                        }
-                    }
+                if provider_ids.len() == 1 {
+                    parent_groups_copy.insert(provider_ids[0]);
+                }
 
-                    group_requirements.push(wrap_depexpression(DepExpression::And(vec![req_expr, provider_exp])));
+                // the expression for this requirement is an OR of the possible providers
+                if req_providers.len() == 1 {
+                    group_requirements.push(req_providers.remove(0));
+                } else {
+                    group_requirements.push(DepExpression::Or(req_providers));
                 }
             }
-            group_requirements
         },
         Err(e) => return Err(e.to_string())
     };
 
-    let mut and_list = Vec::new();
-    and_list.push(wrap_atom(DepAtom::GroupId(group_id)));
-    if !group_provides.is_empty() {
-        and_list.push(wrap_depexpression(DepExpression::And(group_provides)));
-    }
+    // Add the package itself to the requirements
+    group_requirements.push(DepExpression::Atom(group_id));
 
-    if !group_requirements.is_empty() {
-        and_list.push(wrap_depexpression(DepExpression::And(group_requirements)));
-    }
+    // Cache the expression and return
+    let expr = if group_requirements.len() == 1 {
+        group_requirements.remove(0)
+    } else {
+        DepExpression::And(group_requirements)
+    };
+    cache.insert(group_id, expr.clone());
 
-    if !group_obsoletes.is_empty() {
-        and_list.push(wrap_depexpression(DepExpression::And(group_obsoletes)));
-    }
-
-    if !group_conflicts.is_empty() {
-        and_list.push(wrap_depexpression(DepExpression::And(group_conflicts)));
-    }
-
-    Ok(wrap_depexpression(DepExpression::And(and_list)))
+    Ok(expr)
 }
 
+/// Gathers all possible dependencies for a package.
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `arches` - The package architectures to select. e.g., x86_64, i686
+/// * `package` - The package names to select
+///
+/// # Returns
+///
+/// * On success an unsolved DepExpression, describing the selected packages and the packages they
+///   require and conflict with.
+///
+/// * On error, a string describing the error. This could be because a package does not exist or
+///   its dependencies cannot be found.
+///
 pub fn close_dependencies(conn: &Connection, arches: &[String], packages: &[String]) -> Result<DepExpression, String> {
-    let mut req_list = Vec::new();
-    let mut cache = HashMap::new();
+    let mut req_list: Vec<DepExpression> = Vec::new();
+    let mut cache: HashMap<GroupId, DepExpression> = HashMap::new();
 
-    for p in packages.iter() {
+    for p in packages {
         // Get all the groups with the given name, and then filter out all those with an invalid
         // architecture.  This will really only matter when we are called with a library package,
         // which could have been built for several arches.  Binary packages are typically single
@@ -434,11 +363,85 @@ pub fn close_dependencies(conn: &Connection, arches: &[String], packages: &[Stri
                                     group_list.push(try!(depclose_package(conn, arches, grp.id, &HashSet::new(), &mut cache)));
                                 }
                             }
-                          },
+                           },
             Err(e)     => return Err(e.to_string())
         }
-        req_list.push(wrap_depexpression(DepExpression::Or(group_list)));
+
+        // if it's just one thing, don't wrap it
+        if group_list.len() == 1 {
+            req_list.push(group_list.remove(0));
+        } else {
+            req_list.push(DepExpression::Or(group_list));
+        }
     }
 
-    Ok(DepExpression::And(req_list))
+    // Like above: don't wrap the result if it's only one thing
+    if req_list.len() == 1 {
+        Ok(req_list.remove(0))
+    } else {
+        Ok(DepExpression::And(req_list))
+    }
+}
+
+// Test functions
+// provider_to_requirement: takes a group and key/val and returns a (GroupId, Requirement)
+#[test]
+fn test_provider_to_requirement_err() {
+    assert!(provider_to_requirement(&Groups{id: 1, name: "whatever".to_string(), group_type: "test".to_string()},
+                                    &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: "something".to_string(), ext_value: None}
+                                   ).is_err());
+}
+
+#[test]
+fn test_provider_to_requirement_ok() -> () {
+    assert_eq!(provider_to_requirement(&Groups{id: 47, name: "whatever".to_string(), group_type: "test".to_string()},
+                                       &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: "something".to_string(), ext_value: Some("something >= 1.0".to_string())}),
+               Ok((47, Requirement::from("something >= 1.0"))));
+}
+
+// req_providers_ids: return a list of GroupIds that provide a given requirement
+// clippy isn't very good at figuring out what is used in tests for some reason
+#[cfg_attr(feature="cargo-clippy", allow(unused_imports))]
+#[cfg_attr(feature="cargo-clippy", allow(dead_code))]
+#[cfg(test)]
+mod test_req_provider_ids {
+    use test_helper::*;
+    use rusqlite::{self, Connection};
+    use depclose::*;
+    use std::collections::HashSet;
+
+    // TODO share this between here and tests/db.rs
+    macro_rules! assert_eq_no_order {
+        ($a:expr, $b:expr) => {
+            {
+                let v1: Vec<_> = $a;
+                let v2: Vec<_> = $b;
+                assert_eq!(v1.iter().collect::<HashSet<_>>(),
+                           v2.iter().collect::<HashSet<_>>());
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn test_data() -> rusqlite::Result<Connection> {
+        create_test_packages(&[
+                             // provides itself, doesn't require anything
+                             testpkg("singleton", None, "1.0", "1", "x86_64",
+                                     &["singleton = 1.0-1"],
+                                     &[],
+                                     &[],
+                                     &[])
+        ])
+    }
+
+    #[test]
+    fn test_1() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let requirement = Requirement::from("singleton");
+        let test_result = vec![get_nevra_group_id(&conn, "singleton", None, "1.0", "1", "x86_64")];
+        let test_data = req_provider_ids(&conn, &arches, &requirement).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
 }

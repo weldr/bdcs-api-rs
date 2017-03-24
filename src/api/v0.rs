@@ -93,8 +93,6 @@
 // disagrees with. Ignore these warnings.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
-use std::rc::Rc;
-
 use rocket::State;
 use rocket_contrib::JSON;
 use rusqlite::Connection;
@@ -576,7 +574,7 @@ fn depsolve_helper(conn: &Connection, projects: &[String]) -> Vec<PackageNEVRA> 
     };
 
     // Wrap the returned depexpression in the crud it needs
-    let mut exprs = vec![Rc::new(DepCell::new(depexpr))];
+    let mut exprs = vec![depexpr];
 
     match solve_dependencies(conn, &mut exprs) {
         Ok(ids) => {
