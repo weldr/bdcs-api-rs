@@ -384,6 +384,18 @@ pub fn close_dependencies(conn: &Connection, arches: &[String], packages: &[Stri
 }
 
 // Test functions
+// TODO share this between here and tests/db.rs
+macro_rules! assert_eq_no_order {
+    ($a:expr, $b:expr) => {
+        {
+            let v1: Vec<_> = $a;
+            let v2: Vec<_> = $b;
+            assert_eq!(v1.iter().collect::<HashSet<_>>(),
+                       v2.iter().collect::<HashSet<_>>());
+        }
+    }
+}
+
 // provider_to_requirement: takes a group and key/val and returns a (GroupId, Requirement)
 #[test]
 fn test_provider_to_requirement_err() {
@@ -399,35 +411,91 @@ fn test_provider_to_requirement_ok() -> () {
                Ok((47, Requirement::from("something >= 1.0"))));
 }
 
-// req_providers_ids: return a list of GroupIds that provide a given requirement
+// group_matches_arch: bool for whether a given group matches a list of arches
+#[cfg(test)]
 // clippy isn't very good at figuring out what is used in tests for some reason
 #[cfg_attr(feature="cargo-clippy", allow(unused_imports))]
 #[cfg_attr(feature="cargo-clippy", allow(dead_code))]
-#[cfg(test)]
-mod test_req_provider_ids {
+mod test_group_matches_arch {
+    use depclose::*;
     use test_helper::*;
     use rusqlite::{self, Connection};
-    use depclose::*;
-    use std::collections::HashSet;
 
-    // TODO share this between here and tests/db.rs
-    macro_rules! assert_eq_no_order {
-        ($a:expr, $b:expr) => {
-            {
-                let v1: Vec<_> = $a;
-                let v2: Vec<_> = $b;
-                assert_eq!(v1.iter().collect::<HashSet<_>>(),
-                           v2.iter().collect::<HashSet<_>>());
-            }
-        }
-    }
-
-    #[cfg(test)]
     fn test_data() -> rusqlite::Result<Connection> {
         create_test_packages(&[
-                             // provides itself, doesn't require anything
-                             testpkg("singleton", None, "1.0", "1", "x86_64",
-                                     &["singleton = 1.0-1"],
+                             testpkg("testy", None, "1.0", "1", "x86_64", &[], &[], &[], &[]),
+                             testpkg("testy", None, "1.0", "1", "i686", &[], &[], &[], &[]),
+                             testpkg("testy", None, "1.0", "1", "s390x", &[], &[], &[], &[]),
+                             testpkg("testy", None, "1.0", "1", "noarch", &[], &[], &[], &[])
+        ])
+    }
+
+    #[test]
+    fn test_no_arch() -> () {
+        let conn = test_data().unwrap();
+        let x86_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "x86_64");
+        let i686_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "i686");
+        let noarch_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "noarch");
+
+        assert_eq!(group_matches_arch(&conn, x86_id, &vec![]), false);
+        assert_eq!(group_matches_arch(&conn, i686_id, &vec![]), false);
+        assert_eq!(group_matches_arch(&conn, noarch_id, &vec![]), true);
+    }
+
+    #[test]
+    fn test_single_arch() -> () {
+        let conn = test_data().unwrap();
+        let x86_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "x86_64");
+        let i686_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "i686");
+        let noarch_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "noarch");
+
+        let x86_arches = vec!["x86_64".to_string()];
+        let i686_arches = vec!["i686".to_string()];
+
+        assert_eq!(group_matches_arch(&conn, x86_id, &x86_arches), true);
+        assert_eq!(group_matches_arch(&conn, i686_id, &x86_arches), false);
+        assert_eq!(group_matches_arch(&conn, noarch_id, &x86_arches), true);
+
+        assert_eq!(group_matches_arch(&conn, x86_id, &i686_arches), false);
+        assert_eq!(group_matches_arch(&conn, i686_id, &i686_arches), true);
+        assert_eq!(group_matches_arch(&conn, noarch_id, &i686_arches), true);
+    }
+
+    #[test]
+    fn test_multi_arch() -> () {
+        let conn = test_data().unwrap();
+        let x86_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "x86_64");
+        let i686_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "i686");
+        let s390x_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "s390x");
+        let noarch_id = get_nevra_group_id(&conn, "testy", None, "1.0", "1", "noarch");
+
+        let multi_arches = vec!["x86_64".to_string(), "i686".to_string()];
+
+        assert_eq!(group_matches_arch(&conn, x86_id, &multi_arches), true);
+        assert_eq!(group_matches_arch(&conn, i686_id, &multi_arches), true);
+        assert_eq!(group_matches_arch(&conn, s390x_id, &multi_arches), false);
+        assert_eq!(group_matches_arch(&conn, noarch_id, &multi_arches), true);
+    }
+}
+
+// group_id_to_requirement: convert a GroupId to a name-based requirement, for Obsoletes
+#[cfg(test)]
+#[cfg_attr(feature="cargo-clippy", allow(unused_imports))]
+#[cfg_attr(feature="cargo-clippy", allow(dead_code))]
+mod test_group_id_to_requirement {
+    use depclose::*;
+    use test_helper::*;
+    use rusqlite::{self, Connection};
+
+    fn test_data() -> rusqlite::Result<Connection> {
+        create_test_packages(&[
+                             testpkg("test-package-1", None, "1.0", "1", "x86_64",
+                                     &["test-package-1 = 1.0-1"],
+                                     &[],
+                                     &[],
+                                     &[]),
+                             testpkg("test-package-2", Some(47), "9.5.2", "3", "x86_64",
+                                     &["test-package-2 = 47:9.5.2-3"],
                                      &[],
                                      &[],
                                      &[])
@@ -437,11 +505,354 @@ mod test_req_provider_ids {
     #[test]
     fn test_1() {
         let conn = test_data().unwrap();
+        let group_id = get_nevra_group_id(&conn, "test-package-1", None, "1.0", "1", "x86_64");
+        assert_eq!(group_id_to_requirement(&conn, group_id),
+                   Ok((group_id, Requirement::from("test-package-1 = 1.0-1"))));
+    }
+
+    #[test]
+    fn test_2() {
+        let conn = test_data().unwrap();
+        let group_id = get_nevra_group_id(&conn, "test-package-2", Some(47), "9.5.2", "3", "x86_64");
+        assert_eq!(group_id_to_requirement(&conn, group_id),
+                   Ok((group_id, Requirement::from("test-package-2 = 47:9.5.2-3"))));
+    }
+}
+
+// req_obsolete_ids: return a list of group ids that match an obsolete requirement
+#[cfg(test)]
+#[cfg_attr(feature="cargo-clippy", allow(unused_imports))]
+#[cfg_attr(feature="cargo-clippy", allow(dead_code))]
+mod test_req_obsolete_ids {
+    use depclose::*;
+    use test_helper::*;
+    use rusqlite::{self, Connection};
+
+    fn test_data() -> rusqlite::Result<Connection> {
+        create_test_packages(&[
+                             // Normal looking package, provides itself
+                             testpkg("test-package-1", None, "1.0", "1", "x86_64",
+                                     &["test-package-1 = 1.0-1"],
+                                     &[],
+                                     &[],
+                                     &[]),
+                             
+                             // Provides does not match name, to ensure match is against name
+                             testpkg("test-package-2", None, "1.0", "1", "x86_64",
+                                     &["other-provides = 1.0"],
+                                     &[],
+                                     &[],
+                                     &[])
+         ])
+    }
+
+
+    #[test]
+    fn test_empty() {
+        let conn = test_data().unwrap();
         let arches = vec!["x86_64".to_string()];
-        let requirement = Requirement::from("singleton");
-        let test_result = vec![get_nevra_group_id(&conn, "singleton", None, "1.0", "1", "x86_64")];
-        let test_data = req_provider_ids(&conn, &arches, &requirement).unwrap();
+        let test_req = Requirement::from("does-not-exist = 1.0-1");
+        let test_result = vec![];
+        let test_data = req_obsolete_ids(&conn, &arches, &test_req).unwrap();
 
         assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_normal() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-1 = 1.0-1");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-1", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_obsolete_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_normal_version_match() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-1 >= 0.9");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-1", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_obsolete_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_normal_no_version_match() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-1 >= 1.1");
+
+        let test_result = vec![];
+        let test_data = req_obsolete_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_name_only() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-2 = 1.0-1");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-2", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_obsolete_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_provide_only() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("other-provides = 1.0");
+
+        let test_result = vec![];
+        let test_data = req_obsolete_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+}
+
+// req_providers_ids: return a list of GroupIds that provide a given requirement
+// Like the obsoletes test, except:
+//   - matches are against Provides data, not package name
+//   - can also match filenames.
+#[cfg_attr(feature="cargo-clippy", allow(unused_imports))]
+#[cfg_attr(feature="cargo-clippy", allow(dead_code))]
+#[cfg(test)]
+mod test_req_provider_ids {
+    use test_helper::*;
+    use rusqlite::{self, Connection};
+    use depclose::*;
+    use std::collections::HashSet;
+
+    #[cfg(test)]
+    fn test_data() -> rusqlite::Result<Connection> {
+        let test_data = try!(create_test_packages(&[
+                             // Normal looking package, provides itself
+                             testpkg("test-package-1", None, "1.0", "1", "x86_64",
+                                     &["test-package-1 = 1.0-1"],
+                                     &[],
+                                     &[],
+                                     &[]),
+                             
+                             // Provides does not match name, to ensure match is against name
+                             testpkg("test-package-2", None, "1.0", "1", "x86_64",
+                                     &["other-provides = 1.0"],
+                                     &[],
+                                     &[],
+                                     &[]),
+
+                             // Package with filename provides
+                             testpkg("test-package-3", None, "1.0", "1", "x86_64",
+                                     &["test-package-3 = 1.0-1",
+                                       "/provided/file"],
+                                     &[],
+                                     &[],
+                                     &[])
+        ]));
+
+        // Add another file to test-package-3
+        let package_3_id = get_nevra_group_id(&test_data, "test-package-3", None, "1.0", "1", "x86_64");
+        let file_type_id: i64 = try!(test_data.query_row("select id from file_types where file_type = 'regular file'",
+                                                         &[],
+                                                         |row| row.get(0)));
+
+        try!(test_data.execute_named("
+            insert into files (path, digest, file_type_id, file_mode, file_user, file_group, file_size, mtime, symlink_target)
+            values (:path, :digest, :file_type_id, :file_mode, :file_user, :file_group, :file_size, :mtime, :symlink_target)",
+            &[(":path", &"/actual/file".to_string()),
+              (":digest", &"".to_string()),
+              (":file_type_id", &file_type_id),
+              (":file_mode", &0o0644),
+              (":file_user", &"root".to_string()),
+              (":file_group", &"root".to_string()),
+              (":file_size", &0),
+              (":mtime", &0),
+              (":symlink_target", &"".to_string())]));
+        let file_id = test_data.last_insert_rowid();
+
+        try!(test_data.execute_named("insert into group_files (group_id, file_id) values (:group_id, :file_id)",
+            &[(":group_id", &package_3_id),
+              (":file_id", &file_id)]));
+
+        Ok(test_data)
+    }
+
+    #[test]
+    fn test_empty() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("does-not-exist = 1.0-1");
+        let test_result = vec![];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_normal() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-1 = 1.0-1");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-1", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_normal_version_match() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-1 >= 0.9");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-1", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_normal_no_version_match() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-1 >= 1.1");
+
+        let test_result = vec![];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_name_only() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("test-package-2 = 1.0-1");
+
+        let test_result = vec![];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_provide_only() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("other-provides = 1.0");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-2", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_path_normal() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("/actual/file");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-3", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_path_provided() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("/provided/file");
+
+        let test_group_id = get_nevra_group_id(&conn, "test-package-3", None, "1.0", "1", "x86_64");
+        let test_result = vec![test_group_id];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+
+    #[test]
+    fn test_path_empty() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        let test_req = Requirement::from("/nosuch/file");
+
+        let test_result = vec![];
+        let test_data = req_provider_ids(&conn, &arches, &test_req).unwrap();
+
+        assert_eq_no_order!(test_data, test_result);
+    }
+}
+
+#[cfg(test)]
+#[cfg_attr(feature="cargo-clippy", allow(unused_imports))]
+#[cfg_attr(feature="cargo-clippy", allow(dead_code))]
+mod test_depclose_package {
+    use depclose::*;
+    use test_helper::*;
+    use rusqlite::{self, Connection};
+
+    fn test_data() -> rusqlite::Result<Connection> {
+        create_test_packages(&[
+            // A requires B
+            testpkg("test-package-A", None, "1.0", "1", "x86_64",
+                    &["test-package-A = 1.0-1"],
+                    &["test-package-B"],
+                    &[],
+                    &[]),
+
+            testpkg("test-package-B", None, "1.0", "1", "x86_64",
+                    &["test-package-B = 1.0-1"],
+                    &[],
+                    &[],
+                    &[])
+        ])
+    }
+
+    // no-order depexpression compare
+    pub fn exprcmp(e1: &DepExpression, e2: &DepExpression) -> bool {
+        match (e1, e2) {
+            (&DepExpression::Atom(id1), &DepExpression::Atom(id2)) |
+            (&DepExpression::Not(id1),  &DepExpression::Not(id2)) => id1 == id2,
+            (&DepExpression::And(ref v1), &DepExpression::And(ref v2))   =>
+                v1.iter().all(|item1| v2.iter().any(|item2| exprcmp(item1, item2))),
+            (&DepExpression::Or(ref v1),  &DepExpression::Or(ref v2))    =>
+                v1.iter().all(|item1| v2.iter().any(|item2| exprcmp(item1, item2))),
+            _ => false
+        }
+    }
+
+
+    #[test]
+    fn test_1() {
+        let conn = test_data().unwrap();
+        let arches = vec!["x86_64".to_string()];
+        
+        let group_id_a = get_nevra_group_id(&conn, "test-package-A", None, "1.0", "1", "x86_64");
+        let group_id_b = get_nevra_group_id(&conn, "test-package-B", None, "1.0", "1", "x86_64");
+
+        let test_result = DepExpression::And(vec![DepExpression::Atom(group_id_a), DepExpression::Atom(group_id_b)]);
+        let test_data = depclose_package(&conn, &arches, group_id_a, &HashSet::new(), &mut HashMap::new()).unwrap();
+
+        println!("expected: {:?}", test_result);
+        println!("got: {:?}", test_data);
+        assert!(exprcmp(&test_result, &test_data))
     }
 }
