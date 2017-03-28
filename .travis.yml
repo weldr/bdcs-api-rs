@@ -6,7 +6,7 @@ rust:
 before_install:
     - sudo apt-get install libssh2-1-dev
 script:
-  - RUST_BACKTRACE=1 cargo test
+  - RUST_BACKTRACE=1 cargo test --features "strict"
 notifications:
   email:
     on_failure: change

@@ -22,6 +22,7 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
+#![cfg_attr(feature = "strict", deny(warnings))]
 #![feature(plugin)]
 #![feature(custom_derive)]
 #![plugin(rocket_codegen)]

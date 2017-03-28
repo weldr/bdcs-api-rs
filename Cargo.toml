@@ -42,3 +42,7 @@ unicase = "1.*"
 
 [dev-dependencies]
 rocket = { version = "0.2.*", features = ["testing"] }
+
+[features]
+# Treat warnings as build errors. Use for testing and CI!
+strict = []
