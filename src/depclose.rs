@@ -328,16 +328,15 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                 }
             }
 
-            match (name, version) {
-                (Some(name), Some(version)) => match EVR::from_str(version.as_str()) {
+            if let (Some(name), Some(version)) = (name, version) {
+                match EVR::from_str(version.as_str()) {
                     Ok(evr) => {
                         let req = Requirement{name: "PKG: ".to_string() + name.as_str(),
                                               expr: Some((ReqOperator::EqualTo, evr))};
                         group_provides.push(Ok(wrap_requirement(req)));
                     },
                     Err(e)  => group_provides.push(Err(e))
-                },
-                _ => ()
+                }
             }
 
             // Collect the Vec<Result<Expression, String>>s into a Result<Vec<Expression>, String>
@@ -377,23 +376,17 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                 // everything.
                 let providers = try!(req_providers(conn, arches, r, &parent_groups_copy, cache, group_id));
                 let req_expr  = wrap_requirement(r.clone());
-                match providers {
-                    Some(provider_exp) => {
-                        {   // extra block to end this borrow
-                            match *(provider_exp.borrow()) {
-                                DepExpression::Atom(DepAtom::GroupId(provider_group_id)) => {
-                                    if group_id == provider_group_id {
-                                        parent_groups_copy.insert(group_id);
-                                    }
-                                },
-                                _ => ()
+                if let Some(provider_exp) = providers {
+                    {   // extra block to end this borrow
+                        if let DepExpression::Atom(DepAtom::GroupId(provider_group_id)) = *(provider_exp.borrow()) {
+                            if group_id == provider_group_id {
+                                parent_groups_copy.insert(group_id);
                             }
                         }
+                    }
 
-                        group_requirements.push(wrap_depexpression(DepExpression::And(vec![req_expr, provider_exp])));
-                    },
-                    None => ()
-                };
+                    group_requirements.push(wrap_depexpression(DepExpression::And(vec![req_expr, provider_exp])));
+                }
             }
             group_requirements
         },

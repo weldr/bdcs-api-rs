@@ -235,8 +235,7 @@ impl Requirement {
         // If either half is missing the expression, it's a match
         let (provides_operator, provides_evr, requires_operator, requires_evr) =
             match (&self.expr, &requires.expr) {
-                (&None, _) => return true,
-                (_, &None) => return true,
+                (&None, _) | (_, &None) => return true,
                 (&Some((ref provides_operator, ref provides_evr)), &Some((ref requires_operator, ref requires_evr))) =>
                     (provides_operator, provides_evr, requires_operator, requires_evr)
         };

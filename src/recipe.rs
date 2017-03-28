@@ -335,11 +335,8 @@ pub fn add_file(repo: &Repository, file: &str, branch: &str, replace: bool) -> R
     let recipe = try!(toml::from_str::<Recipe>(&input).or(Err(RecipeError::ParseTOML)));
 
     // Skip existing recipes (using the same recipe.name)
-    if replace == false {
-        match read(repo, &recipe.name, branch, None) {
-            Ok(_) => return Ok(false),
-            Err(_) => {}
-        }
+    if !replace && read(repo, &recipe.name, branch, None).is_ok() {
+        return Ok(false);
     }
 
     write(repo, &recipe, branch, None)
@@ -389,18 +386,11 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&
 
     // Read the previous version of this recipe, compare its .version to the new one.
     // If they are the same bump the patch level before saving the new one.
-    match read(repo, &recipe.name, branch, None) {
-        Ok(last_recipe) => {
-            match last_recipe.version() {
-                Ok(last_version) => {
-                    if last_version == new_version {
-                        try!(recipe.increment_patch())
-                    }
-                }
-                Err(_) => {}
-            }
+    if let Ok(last_version) = read(repo, &recipe.name, branch, None)
+                                .and_then(|last_recipe| last_recipe.version()) {
+        if last_version == new_version {
+            try!(recipe.increment_patch())
         }
-        Err(_) => {}
     }
 
     let parent_commit = try!(repo.find_commit(branch_id));

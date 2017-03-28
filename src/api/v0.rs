@@ -677,7 +677,7 @@ pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoRe
                     dependencies: deps
                 });
             }
-            Ok((0,_)) => {}
+            //Ok((0,_)) => {}
             Ok((_,_)) => {}
             Err(e) => {
                 error!("Error looking up module info"; "module" => m, "error" => format!("{:?}", e));

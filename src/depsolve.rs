@@ -83,26 +83,23 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                 },
 
                 DepExpression::Not(ref rc) => {
-                    match *(rc.borrow()) {
-                        DepExpression::Atom(ref a) => {
-                            if !assignments.contains_key(a) {
-                                if assign {
-                                    assignments.insert(a.clone(), false);
-                                    changed = true;
-                                    *change_count += 1;
-                                    indices_to_remove.push(i);
-                                }
-                            } else if assignments.get(a) == Some(&false) {
+                    if let DepExpression::Atom(ref a) = *(rc.borrow()) {
+                        if !assignments.contains_key(a) {
+                            if assign {
+                                assignments.insert(a.clone(), false);
                                 changed = true;
                                 *change_count += 1;
                                 indices_to_remove.push(i);
-                            } else {
-                                panic!("conflict resolving {}", a);
                             }
-                        },
-                        // TODO?
-                        _ => ()
+                        } else if assignments.get(a) == Some(&false) {
+                            changed = true;
+                            *change_count += 1;
+                            indices_to_remove.push(i);
+                        } else {
+                            panic!("conflict resolving {}", a);
+                        }
                     }
+                    // TODO else?
                 },
 
                 DepExpression::And(ref mut and_list) => {

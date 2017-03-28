@@ -850,14 +850,10 @@ pub fn get_groups_id(conn: &Connection, id: &i64) -> rusqlite::Result<Option<Gro
 /// * A Vector of [Groups](struct.Groups.html) for the matching group names
 ///
 pub fn get_groups_vec(conn: &Connection, groups: &[&str]) -> rusqlite::Result<Vec<Groups>> {
-    let mut results = Vec::new();
-    for group_name in groups {
-        match get_groups_name(conn, group_name, 0, i64::max_value()) {
-            Ok(r) => results.extend(r),
-            Err(_) => {}
-        }
-    }
-    Ok(results)
+    let max = i64::max_value();
+    Ok(groups.into_iter()
+             .flat_map(|group_name| get_groups_name(conn, group_name, 0, max).unwrap_or_default())
+             .collect())
 }
 
 
@@ -1057,14 +1053,7 @@ pub fn pkg_nevra_group_id(conn: &Connection, group_id: i64) -> Option<PackageNEV
 ///
 /// * A Vec of PackageNEVRA structs.
 pub fn pkg_nevra_groups_vec(conn: &Connection, groups: &Vec<i64>) -> Vec<PackageNEVRA> {
-    let mut results = Vec::new();
-    for group_id in groups {
-        match pkg_nevra_group_id(conn, *group_id) {
-            Some(r) => results.push(r),
-            None => {}
-        }
-    }
-    results
+    groups.iter().filter_map(|group_id| pkg_nevra_group_id(conn, *group_id)).collect()
 }
 
 
