@@ -1031,7 +1031,7 @@ impl fmt::Display for PackageNEVRA {
 ///
 /// * A PackageNEVRA struct or None
 pub fn pkg_nevra_group_id(conn: &Connection, group_id: i64) -> Option<PackageNEVRA> {
-    let kvs = match get_groups_kv_group_id(&conn, group_id) {
+    let kvs = match get_groups_kv_group_id(conn, group_id) {
         Ok(k) => k,
         Err(_) => { return None; }
     };
@@ -1059,7 +1059,7 @@ pub fn pkg_nevra_group_id(conn: &Connection, group_id: i64) -> Option<PackageNEV
 pub fn pkg_nevra_groups_vec(conn: &Connection, groups: &Vec<i64>) -> Vec<PackageNEVRA> {
     let mut results = Vec::new();
     for group_id in groups {
-        match pkg_nevra_group_id(&conn, *group_id) {
+        match pkg_nevra_group_id(conn, *group_id) {
             Some(r) => results.push(r),
             None => {}
         }
@@ -1133,7 +1133,7 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
                 Err(_) => vec![]
             };
             for build in builds {
-                let kvs = match get_source_kv_source_id(&conn, build.source_id) {
+                let kvs = match get_source_kv_source_id(conn, build.source_id) {
                     Ok(k) => k,
                     Err(_) => vec![]
                 };

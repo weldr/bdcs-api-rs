@@ -66,16 +66,16 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
 
             match *(val.borrow_mut()) {
                 DepExpression::Atom(ref a) => {
-                    if !assignments.contains_key(&a) {
+                    if !assignments.contains_key(a) {
                         if assign {
                             assignments.insert(a.clone(), true);
-                            *change_count = *change_count + 1;
+                            *change_count += 1;
                             changed = true;
                             indices_to_remove.push(i);
                         }
-                    } else if assignments.get(&a) == Some(&true) {
+                    } else if assignments.get(a) == Some(&true) {
                         changed = true;
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                         indices_to_remove.push(i);
                     } else {
                         panic!("conflict resolving {}", a);
@@ -85,16 +85,16 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                 DepExpression::Not(ref rc) => {
                     match *(rc.borrow()) {
                         DepExpression::Atom(ref a) => {
-                            if !assignments.contains_key(&a) {
+                            if !assignments.contains_key(a) {
                                 if assign {
                                     assignments.insert(a.clone(), false);
                                     changed = true;
-                                    *change_count = *change_count + 1;
+                                    *change_count += 1;
                                     indices_to_remove.push(i);
                                 }
-                            } else if assignments.get(&a) == Some(&false) {
+                            } else if assignments.get(a) == Some(&false) {
                                 changed = true;
-                                *change_count = *change_count + 1;
+                                *change_count += 1;
                                 indices_to_remove.push(i);
                             } else {
                                 panic!("conflict resolving {}", a);
@@ -109,7 +109,7 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                     // recurse on this list of expressions
                     if unit_propagation_helper(and_list, assignments, assign, change_count) {
                         changed = true;
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                     }
 
                     // if there's only one thing left in the list, the And is actually just that
@@ -117,11 +117,11 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                     if and_list.len() == 1 {
                         indices_to_replace.push(i);
                         changed = true;
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                     } else if and_list.is_empty() {
                         indices_to_remove.push(i);
                         changed = true;
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                     }
                 },
 
@@ -131,15 +131,15 @@ fn unit_propagation_helper(exprs: &mut Vec<Rc<DepCell<DepExpression>>>, assignme
                     // assign=true
                     if or_list.len() == 1 {
                         indices_to_replace.push(i);
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                         changed = true;
                     } else if or_list.is_empty() {
                         indices_to_remove.push(i);
                         changed = true;
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                     } else if unit_propagation_helper(or_list, assignments, false, change_count) {
                         changed = true;
-                        *change_count = *change_count + 1;
+                        *change_count += 1;
                     }
                 }
             }

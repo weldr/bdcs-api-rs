@@ -173,12 +173,12 @@ impl FromStr for ReqOperator {
 // Match a ReqOperator with an Operator, so, e.g., >= matches > and =
 impl PartialEq<Ordering> for ReqOperator {
     fn eq(&self, o: &Ordering) -> bool {
-        match self {
-            &ReqOperator::GreaterThanEqual => o == &Ordering::Greater || o == &Ordering::Equal,
-            &ReqOperator::GreaterThan      => o == &Ordering::Greater,
-            &ReqOperator::EqualTo          => o == &Ordering::Equal,
-            &ReqOperator::LessThanEqual    => o == &Ordering::Less || o == &Ordering::Equal,
-            &ReqOperator::LessThan         => o == &Ordering::Less
+        match *self {
+            ReqOperator::GreaterThanEqual => o == &Ordering::Greater || o == &Ordering::Equal,
+            ReqOperator::GreaterThan      => o == &Ordering::Greater,
+            ReqOperator::EqualTo          => o == &Ordering::Equal,
+            ReqOperator::LessThanEqual    => o == &Ordering::Less || o == &Ordering::Equal,
+            ReqOperator::LessThan         => o == &Ordering::Less
         }
     }
 }
@@ -246,11 +246,11 @@ impl Requirement {
         // e.g. Provides: whatever <= 1.0, Requires: whatever >= 1.0-9
         if provides_evr.epoch.unwrap_or(0) == requires_evr.epoch.unwrap_or(0) &&
                 provides_evr.version == requires_evr.version {
-            if provides_operator == &Ordering::Equal && provides_evr.release == String::from("") {
+            if provides_operator == &Ordering::Equal && provides_evr.release == "" {
                 return true;
             }
 
-            if requires_operator == &Ordering::Equal && requires_evr.release == String::from("") {
+            if requires_operator == &Ordering::Equal && requires_evr.release == "" {
                 return true;
             }
         }
@@ -298,7 +298,7 @@ pub fn vercmp(v1: &str, v2: &str) -> Ordering {
     }
 
     // Kind of like take_while but you can get to the rest of the string, too
-    fn split_at_predicate<'a, P>(s: &'a String, p: P) -> (&'a str, &'a str)  where
+    fn split_at_predicate<P>(s: &String, p: P) -> (&str, &str)  where
             P: Fn(char) -> bool {
         let s_index = s.find(p);
         match s_index {

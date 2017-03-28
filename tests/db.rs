@@ -277,9 +277,9 @@ pub fn create_test_db(data: Vec<TestData>) -> rusqlite::Result<Connection> {
             Ok(group_id)
         }
 
-        match data {
-            &TestData::Projects(ref project) => try!(insert_project(conn, project)),
-            &TestData::Groups(ref group) => try!(insert_group(conn, group))
+        match *data {
+            TestData::Projects(ref project) => try!(insert_project(conn, project)),
+            TestData::Groups(ref group) => try!(insert_group(conn, group))
         };
 
         Ok(())

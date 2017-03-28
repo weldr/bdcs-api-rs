@@ -36,9 +36,9 @@ pub enum DepAtom {
 
 impl fmt::Display for DepAtom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &DepAtom::GroupId(i)            => write!(f, "groupid={}", i),
-            &DepAtom::Requirement(ref r)    => write!(f, "({})", r)
+        match *self {
+            DepAtom::GroupId(i)            => write!(f, "groupid={}", i),
+            DepAtom::Requirement(ref r)    => write!(f, "({})", r)
         }
     }
 }
@@ -53,15 +53,15 @@ pub enum DepExpression {
 
 impl fmt::Display for DepExpression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &DepExpression::Atom(ref req)    => write!(f, "{}", req),
-            &DepExpression::And(ref lst)     => { let strs: String = lst.iter().map(|x| x.borrow().to_string()).intersperse(String::from(" AND ")).collect();
-                                                  write!(f, "{}", strs)
-                                                },
-            &DepExpression::Or(ref lst)      => { let strs: String = lst.iter().map(|x| x.borrow().to_string()).intersperse(String::from(" OR ")).collect();
-                                                  write!(f, "{}", strs)
-                                                },
-            &DepExpression::Not(ref expr)    => write!(f, "NOT {}", *(expr.borrow()))
+        match *self {
+            DepExpression::Atom(ref req)    => write!(f, "{}", req),
+            DepExpression::And(ref lst)     => { let strs: String = lst.iter().map(|x| x.borrow().to_string()).intersperse(String::from(" AND ")).collect();
+                                                 write!(f, "{}", strs)
+                                               },
+            DepExpression::Or(ref lst)      => { let strs: String = lst.iter().map(|x| x.borrow().to_string()).intersperse(String::from(" OR ")).collect();
+                                                 write!(f, "{}", strs)
+                                               },
+            DepExpression::Not(ref expr)    => write!(f, "NOT {}", *(expr.borrow()))
         }
     }
 }
@@ -101,11 +101,7 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) ->
     match get_groups_kv_group_id(conn, group_id) {
         Ok(kvs) => { for kv in kvs {
                          if kv.key_value == "arch" {
-                             if kv.val_value == "noarch" || arches.contains(&kv.val_value) {
-                                 return true
-                             } else {
-                                 return false
-                             }
+                             return kv.val_value == "noarch" || arches.contains(&kv.val_value);
                          }
                      }
 
@@ -119,9 +115,9 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) ->
 fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>, self_id: i64) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
     // helper function for converting a (Group, KeyVal) to Option<(group_id, Requirement)>
     fn provider_to_requirement(group: &Groups, kv: &KeyVal) -> Option<(i64, Requirement)> {
-        let ext_val = match &kv.ext_value {
-            &Some(ref ext_val) => ext_val,
-            &None => return None
+        let ext_val = match kv.ext_value {
+            Some(ref ext_val) => ext_val,
+            None => return None
         };
 
         let requirement = match Requirement::from_str(ext_val.as_str()) {
@@ -157,7 +153,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
                                                // convert the provides expression to a Requirement and return a (group_id, Requirement) tuple
                                                .filter_map(|&(ref group, ref kv)| provider_to_requirement(group, kv))
                                                // filter out any that don't match version-wise
-                                               .filter(|&(_, ref provider_req)| provider_req.satisfies(&req))
+                                               .filter(|&(_, ref provider_req)| provider_req.satisfies(req))
                                                // filter out any that don't match arch-wise
                                                .filter(|&(ref group_id, _)| group_matches_arch(conn, *group_id, arches));
 
@@ -205,7 +201,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
         let mut file_providers = match get_groups_filename(conn, req.name.as_str()) {
             Ok(groups) => {
                 // Unlike group_providers, there are no versions to care about here
-                groups.iter().filter_map(|ref group| match depclose_provider(conn, arches, group.id, parents, cache) {
+                groups.iter().filter_map(|group| match depclose_provider(conn, arches, group.id, parents, cache) {
                     Ok(Some(provider)) => {
                         satisfied = true;
                         Some((group.name.clone(), provider))
@@ -290,13 +286,13 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
         Ok(group_key_vals) => {
             // map a key/value pair into a Requirement
             fn kv_to_expr(kv: &KeyVal) -> Result<Rc<DepCell<DepExpression>>, String> {
-                match &kv.ext_value {
-                    &Some(ref ext_value) => { match Requirement::from_str(ext_value.as_str()) {
-                                                  Ok(s)  => Ok(wrap_requirement(s)),
-                                                  Err(_) => Ok(wrap_requirement(Requirement{name: ext_value.clone(), expr: None}))
-                                              }
-                                            }
-                    &None                => Err(String::from("ext_value is not set"))
+                match kv.ext_value {
+                    Some(ref ext_value) => { match Requirement::from_str(ext_value.as_str()) {
+                                                Ok(s)  => Ok(wrap_requirement(s)),
+                                                Err(_) => Ok(wrap_requirement(Requirement{name: ext_value.clone(), expr: None}))
+                                             }
+                                           }
+                    None                => Err(String::from("ext_value is not set"))
                 }
             }
 
@@ -315,8 +311,8 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                     "rpm-provide" => group_provides.push(kv_to_expr(kv)),
                     "rpm-conflict" => group_conflicts.push(kv_to_not_expr(kv)),
                     // obsolete matches the package name, not a provides, so handle it differently
-                    "rpm-obsolete" => match &kv.ext_value {
-                        &Some(ref ext_value) => match Requirement::from_str(ext_value.as_str()) {
+                    "rpm-obsolete" => match kv.ext_value {
+                        Some(ref ext_value) => match Requirement::from_str(ext_value.as_str()) {
                             Ok(base_req) => {
                                 let new_req = Requirement{name: "PKG: ".to_string() + base_req.name.as_str(),
                                                           expr: base_req.expr};
@@ -324,7 +320,7 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
                             },
                             Err(e) => group_obsoletes.push(Err(e))
                         },
-                        &None => group_obsoletes.push(Err("ext_value is not set".to_string()))
+                        None => group_obsoletes.push(Err("ext_value is not set".to_string()))
                     },
                     "name"         => name = Some(&kv.val_value),
                     "version"      => version = Some(&kv.val_value),

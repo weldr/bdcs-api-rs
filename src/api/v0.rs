@@ -497,7 +497,7 @@ pub struct ProjectsInfoResponse {
 #[get("/projects/info/<projects>")]
 pub fn projects_info(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInfoResponse>> {
     info!("/projects/info/"; "projects" => projects);
-    let projects: Vec<&str> = projects.split(",").collect();
+    let projects: Vec<&str> = projects.split(',').collect();
     let result = get_projects_details(&db.conn(), &projects);
     CORS(JSON(ProjectsInfoResponse {
             projects: result.unwrap_or_default(),
@@ -551,7 +551,7 @@ pub struct ProjectsDepsolveResponse {
 #[get("/projects/depsolve/<projects>")]
 pub fn projects_depsolve(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsDepsolveResponse>> {
     info!("/projects/depsolve/"; "projects" => projects);
-    let projects: Vec<String> = projects.split(",").map(|s| String::from(s)).collect();
+    let projects: Vec<String> = projects.split(',').map(String::from).collect();
 
     let pkg_nevras = depsolve_helper(&db.conn(), &projects);
 
@@ -661,7 +661,7 @@ pub struct ModulesInfoResponse {
 #[get("/modules/info/<modules>")]
 pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoResponse>> {
     info!("/modules/info/"; "modules" => modules);
-    let modules: Vec<String> = modules.split(",").map(|s| String::from(s)).collect();
+    let modules: Vec<String> = modules.split(',').map(String::from).collect();
 
     let mut result = Vec::new();
     for m in modules {
@@ -782,7 +782,7 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
         modules = "*";
     }
     info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
-    let modules: Vec<&str> = modules.split(",").collect();
+    let modules: Vec<&str> = modules.split(',').collect();
     let mut result = get_groups_vec(&db.conn(), &modules)
                      .unwrap_or_default();
     result.sort();
@@ -968,8 +968,8 @@ pub fn recipes_info(recipe_names: &str, repo: State<RecipeRepo>) -> CORS<JSON<Re
     // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
-    for name in recipe_names.split(",") {
-        let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
+    for name in recipe_names.split(',') {
+        let _ = recipe::read(&repo.repo(), name, "master", None).map(|recipe| {
             result.push(recipe);
         });
     }
@@ -997,7 +997,7 @@ pub fn recipes_info_toml(recipe_name: &str, format: Format, repo: State<RecipeRe
 
     // TODO Error handling for format requests other than toml
     CORS(TOML(
-        recipe::read(&repo.repo(), &recipe_name, "master", None).unwrap()
+        recipe::read(&repo.repo(), recipe_name, "master", None).unwrap()
     ))
 }
 
@@ -1097,8 +1097,8 @@ pub fn recipes_changes(recipe_names: &str, offset: i64, limit: i64, repo: State<
     // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
-    for name in recipe_names.split(",") {
-        match recipe::commits(&repo.repo(), &name, "master") {
+    for name in recipe_names.split(',') {
+        match recipe::commits(&repo.repo(), name, "master") {
             Ok(mut commits) => {
                 let total = commits.len() as i64;
                 commits = commits.into_iter().skip(offset as usize).take(limit as usize).collect();
@@ -1541,8 +1541,8 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
     // TODO Get the user's branch name. Use master for now.
 
     let mut result = Vec::new();
-    for name in recipe_names.split(",") {
-        let _ = recipe::read(&repo.repo(), &name, "master", None).map(|recipe| {
+    for name in recipe_names.split(',') {
+        let _ = recipe::read(&repo.repo(), name, "master", None).map(|recipe| {
             let mut projects = Vec::new();
             projects.extend(recipe.clone().modules.iter().map(|m| m.name.clone()));
             projects.extend(recipe.clone().packages.iter().map(|p| p.name.clone()));
@@ -1557,7 +1557,7 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
             let mut recipe_nevras = Vec::new();
             for proj in projects {
                 recipe_nevras.push(
-                    match pkg_nevras.binary_search_by_key(&proj, |ref s| s.name.clone()) {
+                    match pkg_nevras.binary_search_by_key(&proj, |s| s.name.clone()) {
                         Ok(idx) => pkg_nevras[idx].clone(),
                         Err(_) => PackageNEVRA {
                             name:    proj,

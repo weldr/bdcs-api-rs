@@ -61,7 +61,7 @@ impl<T: Deserialize> FromData for TOML<T> {
 
         let mut input = String::new();
         let _ = data.open().read_to_string(&mut input);
-        match toml::from_str(&input).map(|val| TOML(val)) {
+        match toml::from_str(&input).map(TOML) {
             Ok(value) => Outcome::Success(value),
             Err(e) => {
                 error!("Couldn't parse TOML body: {:?}", e);
@@ -90,13 +90,13 @@ impl<T: Serialize> Responder<'static> for TOML<T> {
 impl<T> Deref for TOML<T> {
     type Target = T;
 
-    fn deref<'a>(&'a self) -> &'a T {
+    fn deref(&self) -> &T {
         &self.0
     }
 }
 
 impl<T> DerefMut for TOML<T> {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut T {
+    fn deref_mut(&mut self) -> &mut T {
         &mut self.0
     }
 }

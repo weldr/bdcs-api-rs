@@ -136,10 +136,10 @@ fn setup_repo() {
 #[test]
 fn test_v0_test() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     let mut req = MockRequest::new(Method::Get, "/test");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -149,11 +149,11 @@ fn test_v0_test() {
 #[test]
 fn test_v0_isos() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_isos()
     let mut req = MockRequest::new(Method::Get, "/isos");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -163,13 +163,13 @@ fn test_v0_isos() {
 #[test]
 fn test_v0_compose_types() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_compose_types()
     let expected = include_str!("results/v0/compose-types.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/compose/types");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -179,21 +179,21 @@ fn test_v0_compose_types() {
 #[test]
 fn test_v0_projects_list() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_projects_list()
     let expected_default = include_str!("results/v0/projects-list.json").trim_right();
     let expected_filter = include_str!("results/v0/projects-list-filter.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/projects/list");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
     let mut req = MockRequest::new(Method::Get, "/projects/list?offset=2&limit=2");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -204,13 +204,13 @@ fn test_v0_projects_list() {
 #[test]
 fn test_projects_depsolve() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_projects_depsolve()
     let expected = include_str!("results/v0/projects-depsolve.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/projects/depsolve/bash");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -220,13 +220,13 @@ fn test_projects_depsolve() {
 #[test]
 fn test_v0_projects_info() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_projects_info()
     let expected_default = include_str!("results/v0/projects-info.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/projects/info/bash");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -237,13 +237,13 @@ fn test_v0_projects_info() {
 #[test]
 fn test_v0_modules_info() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_modules_info()
     let expected_default = include_str!("results/v0/modules-info.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/modules/info/basesystem");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -253,21 +253,21 @@ fn test_v0_modules_info() {
 #[test]
 fn test_v0_modules_list_noargs() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_modules_list_noargs()
     let expected_default = include_str!("results/v0/modules-list.json").trim_right();
     let expected_filter = include_str!("results/v0/modules-list-filter.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/modules/list");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
     let mut req = MockRequest::new(Method::Get, "/modules/list?offset=2&limit=2");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -277,13 +277,13 @@ fn test_v0_modules_list_noargs() {
 #[test]
 fn test_v0_recipes_info() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_recipes_info()
     let expected_default = include_str!("results/v0/recipes-info.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/recipes/info/jboss,kubernetes");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -293,11 +293,11 @@ fn test_v0_recipes_info() {
 #[test]
 fn test_v0_recipes_changes() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_recipes_changes()
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave,kubernetes");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
@@ -310,7 +310,7 @@ fn test_v0_recipes_changes() {
     assert_eq!(j["recipes"][1]["total"], Value::from(1));
 
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?limit=1");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
@@ -319,7 +319,7 @@ fn test_v0_recipes_changes() {
     assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
 
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?offset=1&limit=1");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
@@ -332,13 +332,13 @@ fn test_v0_recipes_changes() {
 #[test]
 fn test_recipes_depsolve() {
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_recipes_depsolve()
     let expected = include_str!("results/v0/recipes-depsolve.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/kubernetes");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -350,7 +350,7 @@ fn test_v0_recipes() {
     // NOTE All the recipe tests need to be in the same thread, otherwise they will
     // interfere with each other
     assert_eq!(FRAMEWORK.initialized, true);
-    let ref rocket = FRAMEWORK.rocket;
+    let rocket = &FRAMEWORK.rocket;
 
     // v0_recipes_list()
     // TODO Copy ./examples/recipes/ to a temporary directory
@@ -359,14 +359,14 @@ fn test_v0_recipes() {
     let expected_filter = include_str!("results/v0/recipes-list-filter.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/recipes/list/");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some(expected_default.to_string()));
 
     let mut req = MockRequest::new(Method::Get, "/recipes/list?limit=2");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -378,7 +378,7 @@ fn test_v0_recipes() {
     let mut req = MockRequest::new(Method::Post, "/recipes/new")
                     .header(ContentType::JSON)
                     .body(recipe_json);
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -387,7 +387,7 @@ fn test_v0_recipes() {
     // v0_recipes_delete
     // Delete the test recipe created above
     let mut req = MockRequest::new(Method::Delete, "/recipes/delete/recipe-test");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -400,7 +400,7 @@ fn test_v0_recipes() {
     let mut req = MockRequest::new(Method::Post, "/recipes/new")
                     .header(ContentType::new("text", "x-toml"))
                     .body(recipe_toml);
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -409,7 +409,7 @@ fn test_v0_recipes() {
     // v0_recipes_diff()
     // Need the commit id from the change to http-server for the next test
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/http-server");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
@@ -424,7 +424,7 @@ fn test_v0_recipes() {
     };
 
     let mut req = MockRequest::new(Method::Get, format!("/recipes/diff/http-server/{}/NEWEST", commit_id));
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
@@ -444,7 +444,7 @@ fn test_v0_recipes() {
     let mut req = MockRequest::new(Method::Post, "/recipes/new")
                     .header(ContentType::JSON)
                     .body(recipe_json);
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
@@ -452,7 +452,7 @@ fn test_v0_recipes() {
 
     // Get the original commit
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/recipe-test");
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
@@ -467,7 +467,7 @@ fn test_v0_recipes() {
 
     // Undo the change
     let mut req = MockRequest::new(Method::Post, format!("/recipes/undo/recipe-test/{}", commit_id));
-    let mut response = req.dispatch_with(&rocket);
+    let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());

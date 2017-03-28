@@ -222,7 +222,7 @@ fn find_last_commit(repo: &Repository) -> Result<Commit, git2::Error> {
 /// This appends '.toml' to the recipe name after replacing spaces with '-'
 ///
 fn recipe_filename(name: &str) -> Result<String, RecipeError> {
-    if name.len() > 0 {
+    if !name.is_empty() {
         Ok(format!("{}.toml", name.clone().replace(" ", "-")))
     } else {
         Err(RecipeError::RecipeName)
@@ -487,7 +487,7 @@ pub fn list(repo: &Repository, branch: &str, _commit: Option<&str>) -> Result<Ve
     for entry in tree.iter() {
         // filenames end with .toml, strip that off and return the base.
         if let Some(name) = entry.name() {
-            let recipe_name = name.rsplitn(2, ".").last().unwrap_or("");
+            let recipe_name = name.rsplitn(2, '.').last().unwrap_or("");
             recipes.push(recipe_name.to_string());
         }
     }
@@ -649,9 +649,9 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
             });
             if m {
                 commits.push(RecipeCommit {
-                                commit: format!("{}", commit.id()),
+                                commit: commit.id().to_string(),
                                 time: time_rfc2822(commit.time()),
-                                message: format!("{}", commit.message().unwrap_or("Missing"))
+                                message: commit.message().unwrap_or("Missing").to_string()
 
                 });
             }
@@ -740,7 +740,7 @@ pub fn diff(repo: &Repository,
             '+' | '-' | ' ' => diff_lines.push(format!("{}{}", line.origin(), str::from_utf8(line.content()).unwrap().trim_right())),
             _ => {
                 for l in str::from_utf8(line.content()).unwrap().lines() {
-                    diff_lines.push(format!("{}", l));
+                    diff_lines.push(l.to_string());
                 }
             }
         }
