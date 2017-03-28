@@ -306,7 +306,7 @@ fn depclose_package(conn: &Connection, arches: &[String], group_id: i64, parent_
             let mut name = None;
             let mut version = None;
 
-            for kv in group_key_vals.iter() {
+            for kv in &group_key_vals {
                 match kv.key_value.as_str() {
                     "rpm-provide" => group_provides.push(kv_to_expr(kv)),
                     "rpm-conflict" => group_conflicts.push(kv_to_not_expr(kv)),
@@ -361,7 +361,7 @@ fn depclose_package(conn: &Connection, arches: &[String], group_id: i64, parent_
 
             // for each requirement, create an expression of (requirement AND requirement_providers)
             let mut group_requirements: Vec<Rc<DepCell<DepExpression>>> = Vec::new();
-            for r in gr_reqs.iter() {
+            for r in &gr_reqs {
                 // If only one group comes back as the requirement (i.e., there is only one
                 // provider for the requirement), that group can be skipped in additional
                 // requirements.

@@ -69,15 +69,15 @@ pub fn create_test_packages(data: &[TestPkg]) -> rusqlite::Result<Connection> {
             key_vals.push(TestKeyValues{key_value: "epoch".to_string(), val_value: epoch.to_string(), ext_value: None});
         }
 
-        for p in pkg.provides.iter() {
+        for p in &pkg.provides {
             key_vals.push(TestKeyValues{key_value: "rpm-provide".to_string(), val_value: p.name.clone(), ext_value: Some(p.to_string())});
         }
 
-        for o in pkg.obsoletes.iter() {
+        for o in &pkg.obsoletes {
             key_vals.push(TestKeyValues{key_value: "rpm-obsolete".to_string(), val_value: o.name.clone(), ext_value: Some(o.to_string())});
         }
 
-        for c in pkg.conflicts.iter() {
+        for c in &pkg.conflicts {
             key_vals.push(TestKeyValues{key_value: "rpm-conflict".to_string(), val_value: c.name.clone(), ext_value: Some(c.to_string())});
         }
 

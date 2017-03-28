@@ -134,7 +134,7 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
                   (":symlink_target", &file.symlink_target)]));
             let file_id = conn.last_insert_rowid();
 
-            for kv in file.key_vals.iter() {
+            for kv in &file.key_vals {
                 let key_val_id = try!(insert_key_val(conn, kv));
                 try!(conn.execute_named("
                     insert into file_key_values (file_id, key_val_id) values (:file_id, :key_val_id)",
@@ -167,17 +167,17 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
                 (":build_env_ref", &build.build_env_ref)]));
             let build_id = conn.last_insert_rowid();
 
-            for signature in build.signatures.iter() {
+            for signature in &build.signatures {
                 try!(insert_build_signature(conn, signature, build_id));
             }
 
-            for file in build.files.iter() {
+            for file in &build.files {
                 let file_id = try!(insert_file(conn, file));
                 try!(conn.execute_named("insert into build_files (build_id, file_id) values (:build_id, :file_id)",
                                                 &[(":build_id", &build_id), (":file_id", &file_id)]));
             }
 
-            for kv in build.key_vals.iter() {
+            for kv in &build.key_vals {
                 let key_val_id = try!(insert_key_val(conn, kv));
                 try!(conn.execute_named("insert into build_values (build_id, key_val_id) values (:build_id, :key_val_id)",
                                                 &[(":build_id", &build_id), (":key_val_id", &key_val_id)]));
@@ -196,11 +196,11 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
                   (":source_ref", &source.source_ref)]));
             let source_id = conn.last_insert_rowid();
 
-            for build in source.builds.iter() {
+            for build in &source.builds {
                 try!(insert_build(conn, build, source_id));
             }
 
-            for kv in source.key_vals.iter() {
+            for kv in &source.key_vals {
                 let key_val_id = try!(insert_key_val(conn, kv));
                 try!(conn.execute_named("insert into source_key_values (source_id, key_val_id) values (:source_id, :key_val_id)",
                                                 &[(":source_id", &source_id), (":key_val_id", &key_val_id)]));
@@ -220,11 +220,11 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
                   (":upstream_vcs", &project.upstream_vcs)]));
             let project_id = conn.last_insert_rowid();
 
-            for source in project.sources.iter() {
+            for source in &project.sources {
                 try!(insert_source(conn, source, project_id));
             }
 
-            for kv in project.key_vals.iter() {
+            for kv in &project.key_vals {
                 let key_val_id = try!(insert_key_val(conn, kv));
                 try!(conn.execute_named("insert into project_values (project_id, key_val_id) values (:project_id, :key_val_id)",
                                                 &[(":project_id", &project_id), (":key_val_id", &key_val_id)]));
@@ -250,25 +250,25 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
                 &[(":name", &group.name), (":group_type", &group.group_type)]));
             let group_id = conn.last_insert_rowid();
 
-            for file in group.files.iter() {
+            for file in &group.files {
                 let file_id = try!(insert_file(conn, file));
                 try!(conn.execute_named("insert into group_files (group_id, file_id) values (:group_id, :file_id)",
                                                 &[(":group_id", &group_id), (":file_id", &file_id)]));
             }
 
-            for child in group.children.iter() {
+            for child in &group.children {
                 let child_id = try!(insert_group(conn, child));
                 try!(conn.execute_named("insert into group_groups (parent_group_id, child_group_id) values (:parent_group_id, :child_group_id)",
                                                 &[(":parent_group_id", &group_id), (":child_group_id", &child_id)]));
             }
 
-            for kv in group.key_vals.iter() {
+            for kv in &group.key_vals {
                 let key_val_id = try!(insert_key_val(conn, kv));
                 try!(conn.execute_named("insert into group_key_values (group_id, key_val_id) values (:group_id, :key_val_id)",
                                                 &[(":group_id", &group_id), (":key_val_id", &key_val_id)]));
             }
 
-            for requirement in group.requirements.iter() {
+            for requirement in &group.requirements {
                 let req_id = try!(insert_requirement(conn, requirement));
                 try!(conn.execute_named("insert into group_requirements (group_id, req_id) values (:group_id, :req_id)",
                                                 &[(":group_id", &group_id), (":req_id", &req_id)]));
