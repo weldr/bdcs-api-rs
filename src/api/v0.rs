@@ -560,9 +560,9 @@ pub fn projects_depsolve(projects: &str, db: State<DBPool>) -> CORS<JSON<Project
     }))
  }
 
-fn depsolve_helper(conn: &Connection, projects: &Vec<String>) -> Vec<PackageNEVRA> {
+fn depsolve_helper(conn: &Connection, projects: &[String]) -> Vec<PackageNEVRA> {
     // depclose the given projects into a big ol' depexpr
-    let depexpr = match close_dependencies(conn, &vec!(String::from("x86_64")), projects) {
+    let depexpr = match close_dependencies(conn, &[String::from("x86_64")], projects) {
         Ok(d) => d,
         Err(e) => {
             error!("close_dependencies"; "projects" => format!("{:?}", projects), "error" => e);
@@ -667,7 +667,7 @@ pub fn modules_info(modules: &str, db: State<DBPool>) -> CORS<JSON<ModulesInfoRe
     for m in modules {
         match get_projects_name(&db.conn(), &m, 0, i64::max_value()) {
             Ok((1, p)) => {
-                let deps = depsolve_helper(&db.conn(), &vec![m]);
+                let deps = depsolve_helper(&db.conn(), &[m]);
                 result.push(ModuleInfoDeps {
                     name:         p[0].name.clone(),
                     summary:      p[0].summary.clone(),

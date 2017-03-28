@@ -297,12 +297,12 @@ pub fn vercmp(v1: &str, v2: &str) -> Ordering {
     }
 
     // Kind of like take_while but you can get to the rest of the string, too
-    fn split_at_predicate<P>(s: &String, p: P) -> (&str, &str)  where
+    fn split_at_predicate<P>(s: &str, p: P) -> (&str, &str)  where
             P: Fn(char) -> bool {
         let s_index = s.find(p);
         match s_index {
             Some(i) => s.split_at(i),
-            None    => (s.as_str(), "")
+            None    => (s, "")
         }
     }
 

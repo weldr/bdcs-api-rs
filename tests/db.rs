@@ -101,7 +101,7 @@ pub enum TestData {
     Groups(TestGroups)
 }
 
-pub fn create_test_db(data: Vec<TestData>) -> rusqlite::Result<Connection> {
+pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
     fn insert_record(conn: &Connection, data: &TestData) -> rusqlite::Result<()> {
         fn insert_key_val(conn: &Connection, keyval: &TestKeyValues) -> rusqlite::Result<i64> {
             try!(conn.execute_named("
@@ -114,9 +114,9 @@ pub fn create_test_db(data: Vec<TestData>) -> rusqlite::Result<Connection> {
         }
 
         fn insert_file(conn: &Connection, file: &TestFiles) -> rusqlite::Result<i64> {
-            fn get_file_type_id(conn: &Connection, file_type: &String) -> rusqlite::Result<i64> {
+            fn get_file_type_id(conn: &Connection, file_type: &str) -> rusqlite::Result<i64> {
                 conn.query_row_named("select id from file_types where file_type == :file_type",
-                                     &[(":file_type", file_type)],
+                                     &[(":file_type", &file_type)],
                                      |row| row.get(0) )
             }
 
@@ -479,7 +479,7 @@ use bdcs::db::*;
 use std::path::PathBuf;
 
 fn test_db_1() -> rusqlite::Result<Connection> {
-    create_test_db(vec![
+    create_test_db(&[
                    TestData::Groups(TestGroups{name: "group-one".to_string(),
                                                group_type: "rpm".to_string(),
                                                files: vec![TestFiles{path: "/one/1".to_string(), digest: "".to_string(), file_type: "regular file".to_string(),
@@ -511,7 +511,7 @@ fn test_db_1() -> rusqlite::Result<Connection> {
 
 #[test]
 fn test_get_pkg_empty() -> () {
-    let conn = create_test_db(vec![]).unwrap();
+    let conn = create_test_db(&[]).unwrap();
     let test_data: Vec<PathBuf> = vec![];
     assert_eq!(get_pkg_files_name(&conn, "whatever").unwrap(), test_data);
 }
@@ -536,7 +536,7 @@ fn test_data_2() -> () {
 
 // get_pkg_files_nevra: return a list of files associated with a given build, selected by the NEVRA of the build
 fn test_db_2() -> rusqlite::Result<Connection> {
-    create_test_db(vec![
+    create_test_db(&[
                    TestData::Projects(TestProjects{name: "project-one".to_string(), summary: "".to_string(), description: "".to_string(),
                                                    homepage: None, upstream_vcs: "".to_string(), key_vals: vec![],
                                                    sources: vec![
@@ -559,7 +559,7 @@ fn test_db_2() -> rusqlite::Result<Connection> {
 
 #[test]
 fn test_empty() -> () {
-    let conn = create_test_db(vec![]).unwrap();
+    let conn = create_test_db(&[]).unwrap();
     let test_data: Vec<PathBuf> = vec![];
     assert_eq_no_order!(get_pkg_files_nevra(&conn, "whatever", 0, "0", "0", "x86_64").unwrap(), test_data);
 }

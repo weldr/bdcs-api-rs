@@ -97,7 +97,7 @@ fn wrap_requirement(req: Requirement) -> Rc<DepCell<DepExpression>> {
     wrap_atom(DepAtom::Requirement(req))
 }
 
-fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) -> bool {
+fn group_matches_arch(conn: &Connection, group_id: i64, arches: &[String]) -> bool {
     match get_groups_kv_group_id(conn, group_id) {
         Ok(kvs) => { for kv in kvs {
                          if kv.key_value == "arch" {
@@ -112,7 +112,7 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &Vec<String>) ->
 }
 
 // Given a requirement, find a list of groups providing it and return all of that as an expression
-fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>, self_id: i64) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
+fn req_providers(conn: &Connection, arches: &[String], req: &Requirement, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>, self_id: i64) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
     // helper function for converting a (Group, KeyVal) to Option<(group_id, Requirement)>
     fn provider_to_requirement(group: &Groups, kv: &KeyVal) -> Option<(i64, Requirement)> {
         let ext_val = match kv.ext_value {
@@ -129,7 +129,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
     }
 
     // gather child requirements if necessary
-    fn depclose_provider(conn: &Connection, arches: &Vec<String>, group_id: i64, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
+    fn depclose_provider(conn: &Connection, arches: &[String], group_id: i64, parents: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Option<Rc<DepCell<DepExpression>>>, String> {
         if parents.contains(&group_id) {
             // This requirement is already satisfied, return
             Ok(None)
@@ -268,7 +268,7 @@ fn req_providers(conn: &Connection, arches: &Vec<String>, req: &Requirement, par
 // if everything it needs can be removed from the expression, so that a group id is effectively the
 // thing that can be turned on or off during solving.
 
-fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, parent_groups: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Rc<DepCell<DepExpression>>, String> {
+fn depclose_package(conn: &Connection, arches: &[String], group_id: i64, parent_groups: &HashSet<i64>, cache: &mut HashMap<i64, Rc<DepCell<DepExpression>>>) -> Result<Rc<DepCell<DepExpression>>, String> {
     // If this value is cached, return it
     if let Some(expr) = cache.get(&group_id) {
         return Ok(expr.clone());
@@ -414,7 +414,7 @@ fn depclose_package(conn: &Connection, arches: &Vec<String>, group_id: i64, pare
     Ok(wrap_depexpression(DepExpression::And(and_list)))
 }
 
-pub fn close_dependencies(conn: &Connection, arches: &Vec<String>, packages: &Vec<String>) -> Result<DepExpression, String> {
+pub fn close_dependencies(conn: &Connection, arches: &[String], packages: &[String]) -> Result<DepExpression, String> {
     let mut req_list = Vec::new();
     let mut cache = HashMap::new();
 

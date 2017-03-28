@@ -33,7 +33,7 @@ fn main() {
         .unwrap_or_else(|e| exit_error!(3, e));
 
     // depclose the given args into a big ol' depexpr
-    let depexpr = close_dependencies(&conn, &vec!(String::from("x86_64")), &argv)
+    let depexpr = close_dependencies(&conn, &[String::from("x86_64")], &argv)
         .unwrap_or_else(|e| exit_error!(1, e));
 
     // Wrap the returned depexpression in the crud it needs

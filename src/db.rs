@@ -190,7 +190,7 @@ impl KeyVal {
 /// * HashMap of Key, (Value, Ext Value)
 ///
 ///
-fn keyval_hash(kvs: &Vec<KeyVal>) -> HashMap<String, (String, Option<String>)> {
+fn keyval_hash(kvs: &[KeyVal]) -> HashMap<String, (String, Option<String>)> {
     let mut hash: HashMap<String, (String, Option<String>)> = HashMap::new();
     for kv in kvs {
         hash.entry(kv.key_value.clone()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
@@ -1052,7 +1052,7 @@ pub fn pkg_nevra_group_id(conn: &Connection, group_id: i64) -> Option<PackageNEV
 /// # Returns
 ///
 /// * A Vec of PackageNEVRA structs.
-pub fn pkg_nevra_groups_vec(conn: &Connection, groups: &Vec<i64>) -> Vec<PackageNEVRA> {
+pub fn pkg_nevra_groups_vec(conn: &Connection, groups: &[i64]) -> Vec<PackageNEVRA> {
     groups.iter().filter_map(|group_id| pkg_nevra_group_id(conn, *group_id)).collect()
 }
 

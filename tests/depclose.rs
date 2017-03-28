@@ -48,7 +48,7 @@ pub fn req(input: &str) -> Requirement {
 
 // make generating a TestPkg easier
 pub fn testpkg(name: &str, epoch: Option<u32>, version: &str, release: &str, arch: &str,
-               provides: Vec<&str>, requires: Vec<&str>, obsoletes: Vec<&str>, conflicts: Vec<&str>) -> TestPkg {
+               provides: &[&str], requires: &[&str], obsoletes: &[&str], conflicts: &[&str]) -> TestPkg {
     fn req_ref(input: &&str) -> Requirement { req(input) }
     TestPkg{name: name.to_string(), evr: EVR{epoch: epoch, version: version.to_string(), release: release.to_string()}, arch: arch.to_string(),
             provides: provides.iter().map(req_ref).collect(),
@@ -57,7 +57,7 @@ pub fn testpkg(name: &str, epoch: Option<u32>, version: &str, release: &str, arc
             conflicts: conflicts.iter().map(req_ref).collect()}
 }
 
-pub fn create_test_packages(data: Vec<TestPkg>) -> rusqlite::Result<Connection> {
+pub fn create_test_packages(data: &[TestPkg]) -> rusqlite::Result<Connection> {
     fn pkg_to_group(pkg: &TestPkg) -> TestData {
         let mut key_vals: Vec<TestKeyValues> = vec![
             TestKeyValues{key_value: "name".to_string(), val_value: pkg.name.clone(), ext_value: None},
@@ -91,7 +91,7 @@ pub fn create_test_packages(data: Vec<TestPkg>) -> rusqlite::Result<Connection> 
                                     requirements: requirements})
     }
 
-    create_test_db(data.iter().map(pkg_to_group).collect())
+    create_test_db(&data.iter().map(pkg_to_group).collect::<Vec<TestData>>())
 }
 
 // O(n^2) cmp function because RefCell makes everything terrible
@@ -155,13 +155,13 @@ fn rc(expr: DepExpression) -> Rc<DepCell<DepExpression>> {
 }
 
 fn test_data() -> rusqlite::Result<Connection> {
-    create_test_packages(vec![
+    create_test_packages(&[
         // provides itself, doesn't require anything
         testpkg("singleton", None, "1.0", "1", "x86_64",
-                vec!["singleton = 1.0-1"],
-                vec![],
-                vec![],
-                vec![])
+                &["singleton = 1.0-1"],
+                &[],
+                &[],
+                &[])
     ])
 }
 
@@ -185,5 +185,5 @@ fn test_singleton() -> () {
             ]))
         ]);
 
-    assert!(cmp_expression(&test_result, &close_dependencies(&conn, &vec!["x86_64".to_string()], &vec!["singleton".to_string()]).unwrap()));
+    assert!(cmp_expression(&test_result, &close_dependencies(&conn, &["x86_64".to_string()], &["singleton".to_string()]).unwrap()));
 }
