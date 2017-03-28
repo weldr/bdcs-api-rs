@@ -500,7 +500,7 @@ pub fn projects_info(projects: &str, db: State<DBPool>) -> CORS<JSON<ProjectsInf
     let projects: Vec<&str> = projects.split(",").collect();
     let result = get_projects_details(&db.conn(), &projects);
     CORS(JSON(ProjectsInfoResponse {
-            projects: result.unwrap_or(vec![]),
+            projects: result.unwrap_or_default(),
     }))
 }
 
@@ -784,7 +784,7 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
     info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
     let modules: Vec<&str> = modules.split(",").collect();
     let mut result = get_groups_vec(&db.conn(), &modules)
-                     .unwrap_or(vec![]);
+                     .unwrap_or_default();
     result.sort();
     // Groups includes the unique id, so dedupe using the name.
     result.dedup_by(|a, b| a.name.eq(&b.name));
@@ -873,7 +873,7 @@ pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JS
     info!("/recipes/list"; "offset" => offset, "limit" => limit);
     // TODO Get the user's branch name. Use master for now.
 
-    let mut result = recipe::list(&repo.repo(), "master", None).unwrap_or(vec![]);
+    let mut result = recipe::list(&repo.repo(), "master", None).unwrap_or_default();
     result.sort();
     result.dedup();
     let total = result.len() as i64;

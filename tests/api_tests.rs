@@ -300,7 +300,7 @@ fn test_v0_recipes_changes() {
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "kubernetes".to_string());
     assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe kubernetes, version 0.0.1 saved".to_string());
@@ -313,7 +313,7 @@ fn test_v0_recipes_changes() {
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "octave".to_string());
     assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
@@ -322,7 +322,7 @@ fn test_v0_recipes_changes() {
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "octave".to_string());
     assert_eq!(j["recipes"][0]["changes"], Value::Array(vec![]));
@@ -412,7 +412,7 @@ fn test_v0_recipes() {
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
     assert_eq!(j["recipes"][0]["changes"][1]["message"], "Recipe http-server, version 0.0.1 saved".to_string());
@@ -427,7 +427,7 @@ fn test_v0_recipes() {
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
     assert_eq!(j["recipes"][0]["from"], commit_id);
@@ -455,7 +455,7 @@ fn test_v0_recipes() {
     let mut response = req.dispatch_with(&rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or("".to_string());
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "recipe-test".to_string());
 

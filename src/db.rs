@@ -1161,7 +1161,7 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
                                     release:          build.release,
                                     arch:             build.arch,
                                     build_time:       build.build_time,
-                                    changelog:        String::from_utf8(build.changelog).unwrap_or("".to_string()),
+                                    changelog:        String::from_utf8(build.changelog).unwrap_or_default(),
                                     build_config_ref: build.build_config_ref,
                                     build_env_ref:    build.build_env_ref,
                                     metadata:         Some(build_metadata),
