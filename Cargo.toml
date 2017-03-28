@@ -6,7 +6,7 @@ license = "GPL-3.0"
 
 [[bin]]
 name = "bdcs-api-server"
-path = "src/main.rs"
+path = "src/bin/bdcs-api-server.rs"
 
 [[bin]]
 name = "depclose"
