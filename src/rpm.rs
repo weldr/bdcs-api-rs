@@ -25,10 +25,13 @@
 use std::ascii::AsciiExt;
 use std::cmp::Ordering;
 use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::iter::Peekable;
+use std::str::Chars;
 use std::str::FromStr;
 
 /// Representation of epoch-version-release data
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct EVR {
     pub epoch: Option<u32>,
     pub version: String,
@@ -63,6 +66,20 @@ impl PartialEq for EVR {
     }
 }
 impl Eq for EVR {}
+
+// Since Eq is manually implements, the same needs to happen for Hash.
+// It's possible for two versions that are not bitwise-equivalent to
+// be equivalent in the eyes of ==, and if those two versions hashed to
+// different values then bad things could happen.
+impl Hash for EVR {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.epoch.hash(state);
+
+        // use RPMSplit to normalize the version and release before hashing
+        RPMSplit::new(self.version.as_str()).collect::<Vec<String>>().hash(state);
+        RPMSplit::new(self.release.as_str()).collect::<Vec<String>>().hash(state);
+    }
+}
 
 impl fmt::Display for EVR {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -270,107 +287,149 @@ impl Requirement {
     }
 }
 
-pub fn vercmp(v1: &str, v2: &str) -> Ordering {
-    // RPM only cares about ASCII digits, ASCII alphabetic, and tilde
-    fn is_version_char(&c: &char) -> bool {
-        c.is_ascii() && (c.is_digit(10) || c.is_alphabetic() || c == '~')
-    }
-    fn not_version_char(&c: &char) -> bool {
-        !is_version_char(&c)
-    }
+struct RPMSplit<'a> {
+    state: Peekable<Chars<'a>>
+}
 
-    // to avoid overflow, strip leading 0's, and then compare as string, longer string wins
+impl<'a> RPMSplit<'a> {
+    fn new(s: &str) -> RPMSplit {
+        RPMSplit{state: s.chars().peekable()}
+    }
+}
+
+impl<'a> Iterator for RPMSplit<'a> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<String> {
+        fn is_version_char(c: char) -> bool {
+            c.is_ascii() && (c.is_digit(10) || c.is_alphabetic() || c == '~')
+        }
+
+        let mut ret = String::new();
+
+        // Skip to the first meaningful char
+        let mut next_char = self.state.peek().cloned();
+        while let Some(c) = next_char {
+            if is_version_char(c) {
+                break;
+            }
+            self.state.next();
+            next_char = self.state.peek().cloned();
+        }
+
+        match next_char {
+            // Figure out what kind of version component this is: number, alpha, or a tilde
+            Some(c) => {
+                if c == '~' {
+                    ret.push('~');
+                    self.state.next();
+                } else if c.is_digit(10) {
+                    // Skip any leading 0's in the number
+                    while let Some(c) = next_char {
+                        if c != '0' {
+                            break;
+                        }
+                        self.state.next();
+                        next_char = self.state.peek().cloned();
+                    }
+
+                    // Put the rest of the numbers into ret
+                    while let Some(c) = next_char {
+                        if !is_version_char(c) || !c.is_digit(10) {
+                            break;
+                        }
+                        ret.push(c);
+                        self.state.next();
+                        next_char = self.state.peek().cloned();
+                    }
+
+                    // See if anything actually got put into ret. If not, the digits were
+                    // all 0, push a single 0
+                    if ret.is_empty() {
+                        ret.push('0');
+                    }
+                } else {
+                    // Put any alpha characters into ret
+                    while let Some(c) = next_char {
+                        if !is_version_char(c) || !c.is_alphabetic() {
+                            break;
+                        }
+                        ret.push(c);
+                        self.state.next();
+                        next_char = self.state.peek().cloned();
+                    }
+                }
+            },
+
+            // If nothing was left, iteration is done
+            None => return None
+        }
+
+        Some(ret)
+    }
+}
+
+pub fn vercmp(v1: &str, v2: &str) -> Ordering {
+    // split up the versions by component
+    let mut v1_parts = RPMSplit::new(v1);
+    let mut v2_parts = RPMSplit::new(v2);
+
+    vercmp_parts(&mut v1_parts, &mut v2_parts)
+}
+
+fn vercmp_parts(v1: &mut RPMSplit, v2: &mut RPMSplit) -> Ordering {
+    // to avoid overflow, compare integers as string, longer string wins
+    // leading 0's are already stripped
     fn compare_ints(s1: &str, s2: &str) -> Ordering {
-        fn is_zero(&c: &char) -> bool { c == '0' }
-        let s1_stripped = s1.chars().skip_while(is_zero).collect::<String>();
-        let s2_stripped = s2.chars().skip_while(is_zero).collect::<String>();
-        let s1_len = s1_stripped.len();
-        let s2_len = s2_stripped.len();
+        let s1_len = s1.len();
+        let s2_len = s2.len();
 
         if s1_len > s2_len {
             Ordering::Greater
         } else if s2_len > s1_len {
             Ordering::Less
         } else {
-            s1_stripped.cmp(&s2_stripped)
+            s1.cmp(s2)
         }
     }
 
-    // Kind of like take_while but you can get to the rest of the string, too
-    fn split_at_predicate<P>(s: &str, p: P) -> (&str, &str)  where
-            P: Fn(char) -> bool {
-        let s_index = s.find(p);
-        match s_index {
-            Some(i) => s.split_at(i),
-            None    => (s, "")
-        }
-    }
-
-    // Is there a way to compose ! and the is_* functions?
-    fn not_is_digit(c: char) -> bool {
-        !(c.is_ascii() && c.is_digit(10))
-    }
-    fn not_is_alphabetic(c: char) -> bool {
-        !(c.is_ascii() && c.is_alphabetic())
-    }
-
-    // Remove all leading characters we don't care about
-    let v1_stripped = v1.chars().skip_while(not_version_char).collect::<String>();
-    let v2_stripped = v2.chars().skip_while(not_version_char).collect::<String>();
-
-    // If both strings are empty after stripping, the versions are equal
-    if v1_stripped.is_empty() && v2_stripped.is_empty() {
-        return Ordering::Equal;
-    }
+    // can't pattern match Option<String> against Option<&str>, thanks rust
+    let v1_next = v1.next();
+    let v2_next = v2.next();
 
     // Tilde is less than everything, including the empty string
-    if v1_stripped.starts_with('~') && v2_stripped.starts_with('~') {
-        let (_, v1_rest) = v1_stripped.split_at(1);
-        let (_, v2_rest) = v2_stripped.split_at(1);
-        return vercmp(v1_rest, v2_rest);
-    } else if v1_stripped.starts_with('~') {
-        return Ordering::Less;
-    } else if v2_stripped.starts_with('~') {
-        return Ordering::Greater;
-    } else if v1_stripped.is_empty() {
-        return Ordering::Less;
-    } else if v2_stripped.is_empty() {
-        return Ordering::Greater;
-    }
-
-    // Now we have two definitely not-empty strings that do not start with ~
-    // rpm compares strings by digit and non-digit components, so split out
-    // the current component
-
-    let v1_first = v1_stripped.clone().chars().nth(0).unwrap();
-    let v2_first = v2_stripped.clone().chars().nth(0).unwrap();
-
-    let ((v1_prefix, v1_rest), (v2_prefix, v2_rest)) =
-        if v1_first.is_digit(10) {
-            (split_at_predicate(&v1_stripped, not_is_digit),
-             split_at_predicate(&v2_stripped, not_is_digit))
-        } else {
-            (split_at_predicate(&v1_stripped, not_is_alphabetic),
-             split_at_predicate(&v2_stripped, not_is_alphabetic))
-        };
-
-
-    // Number segments are greater than non-number segments, so if we're looking at an alpha in v1
-    // and a number in v2, v2 is greater. The opposite case, v1 being a number and v2 being a non-number,
-    // is handled by v1_prefix being empty and therefore less in the eyes of compare_ints.
-    if !v1_first.is_digit(10) && v2_first.is_digit(10) {
+    if v1_next == Some("~".to_string()) && v2_next == Some("~".to_string()) {
+        vercmp_parts(v1, v2)
+    } else if v1_next == Some("~".to_string()) {
         Ordering::Less
-    } else if v1_first.is_digit(10) {
-        match compare_ints(v1_prefix, v2_prefix) {
-            Ordering::Less => Ordering::Less,
-            Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => vercmp(v1_rest, v2_rest)
-        }
+    } else if v2_next == Some("~".to_string()) {
+        Ordering::Greater
     } else {
-        match v1_prefix.cmp(v2_prefix) {
-            Ordering::Less => Ordering::Less,
-            Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => vercmp(v1_rest, v2_rest)
+        match (v1_next, v2_next) {
+            // If both are empty, the versions are equal
+            (None, None) => Ordering::Equal,
+
+            // If one string is empty and the other is not tilde, empty loses
+            (Some(_), None) => Ordering::Greater,
+            (None, Some(_)) => Ordering::Less,
+
+            (Some(s1), Some(s2)) => {
+                // Number segments are greater than non-number segments
+                // RPMSplit::next() will never return Some(""), so unwrap should be safe
+                let s1_first = s1.chars().next().unwrap();
+                let s2_first = s2.chars().next().unwrap();
+                if s1_first.is_digit(10) {
+                    if !s2_first.is_digit(10) {
+                        Ordering::Greater
+                    } else {
+                        compare_ints(s1.as_str(), s2.as_str()).then_with(|| vercmp_parts(v1, v2))
+                    }
+                } else if s2_first.is_digit(10) {
+                    Ordering::Less
+                } else {
+                    s1.cmp(&s2).then_with(|| vercmp_parts(v1, v2))
+                }
+            }
         }
     }
 }
