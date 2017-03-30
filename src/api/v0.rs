@@ -234,6 +234,7 @@ pub fn compose_status() -> CORS<&'static str> {
 #[get("/compose/status/<id>")]
 #[allow(unused_variables)]
 pub fn compose_status_id(id: &str) -> CORS<&'static str> {
+    #![cfg_attr(feature="strict", allow(unused_variables))]
     CORS("Unimplemented")
 }
 
@@ -257,6 +258,7 @@ pub fn compose_status_id(id: &str) -> CORS<&'static str> {
 #[get("/compose/log/<kbytes>")]
 #[allow(unused_variables)]
 pub fn compose_log(kbytes: usize) -> CORS<&'static str> {
+    #![cfg_attr(feature="strict", allow(unused_variables))]
     CORS("Unimplemented")
 }
 
