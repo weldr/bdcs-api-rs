@@ -49,8 +49,10 @@ fn test_evr_ord() {
 
     for (e1, e2, result) in evr_test_cases {
         // Test both the ordering and the reverse
-        assert_eq!(e1.cmp(&e2), result);
-        assert_eq!(e2.cmp(&e1), reverse_ord(result));
+        assert_eq!(e1.cmp(&e2), result,
+            "testing {} {:?} {}", e1, result, e2);
+        assert_eq!(e2.cmp(&e1), reverse_ord(result),
+            "testing reverse of {} {:?} {}", e1, result, e2);
 
         // Test that Eq works
         match result {
@@ -440,6 +442,10 @@ fn test_vercmp() {
         ("10xyz", "10.1xyz", Ordering::Less),
         ("10.1xyz", "10xyz", Ordering::Greater),
 
+        ("10.10", "101.0", Ordering::Less),
+        ("101.0", "10.10", Ordering::Greater),
+        ("10a.1", "10.a1", Ordering::Equal),
+
         ("xyz10", "xyz10", Ordering::Equal),
         ("xyz10", "xyz10.1", Ordering::Less),
         ("xyz10.1", "xyz10", Ordering::Greater),
@@ -464,6 +470,8 @@ fn test_vercmp() {
         ("1.0aa", "1.0aa", Ordering::Equal),
         ("1.0a", "1.0aa", Ordering::Less),
         ("1.0aa", "1.0a", Ordering::Greater),
+
+        ("10.b.2", "10b2", Ordering::Equal),
 
         ("10.0001", "10.0001", Ordering::Equal),
         ("10.0001", "10.1", Ordering::Equal),
@@ -506,6 +514,7 @@ fn test_vercmp() {
     ];
 
     for (s1, s2, result) in vercmp_test_cases {
-        assert_eq!(vercmp(&s1, &s2), result);
+        assert_eq!(vercmp(&s1, &s2), result,
+            "testing {} {:?} {}", s1, result, s2);
     };
 }
