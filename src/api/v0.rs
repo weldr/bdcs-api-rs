@@ -88,6 +88,11 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
+
+// A lot of the code generated via rocket uses pass-by-value that clippy
+// disagrees with. Ignore these warnings.
+#![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+
 use std::rc::Rc;
 
 use rocket::State;
