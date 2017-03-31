@@ -142,7 +142,7 @@ pub fn test() -> CORS<&'static str> {
 /// * Change it to a meaningful error code and JSON response
 ///
 #[get("/isos")]
-pub fn isos<'r>() -> CORS<&'static str> {
+pub fn isos() -> CORS<&'static str> {
     CORS("Unimplemented")
 }
 
@@ -165,7 +165,7 @@ pub fn isos<'r>() -> CORS<&'static str> {
 /// * Return an id that can be used for cancel and status
 ///
 #[post("/compose")]
-pub fn compose<'r>() -> CORS<&'static str> {
+pub fn compose() -> CORS<&'static str> {
     CORS("Unimplemented")
 }
 
@@ -187,7 +187,7 @@ pub fn compose<'r>() -> CORS<&'static str> {
 /// * Pass it an id of a running compose
 ///
 #[post("/compose/cancel")]
-pub fn compose_cancel<'r>() -> CORS<&'static str> {
+pub fn compose_cancel() -> CORS<&'static str> {
     CORS("Unimplemented")
 }
 
