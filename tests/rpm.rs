@@ -57,7 +57,7 @@ fn test_evr_ord() {
         // Test that Eq works
         match result {
             Ordering::Equal => assert_eq!(e1, e2),
-            _               => assert!(e1 != e2)
+            _               => assert_ne!(e1, e2)
         };
     };
 }
@@ -235,25 +235,25 @@ mod test_reqoperator_parse {
 
 #[test]
 fn test_reqoperator_cmp() {
-    assert!(ReqOperator::GreaterThanEqual == Ordering::Greater);
-    assert!(ReqOperator::GreaterThanEqual == Ordering::Equal);
-    assert!(ReqOperator::GreaterThanEqual != Ordering::Less);
+    assert_eq!(ReqOperator::GreaterThanEqual, Ordering::Greater);
+    assert_eq!(ReqOperator::GreaterThanEqual, Ordering::Equal);
+    assert_ne!(ReqOperator::GreaterThanEqual, Ordering::Less);
 
-    assert!(ReqOperator::GreaterThan == Ordering::Greater);
-    assert!(ReqOperator::GreaterThan != Ordering::Equal);
-    assert!(ReqOperator::GreaterThan != Ordering::Less);
+    assert_eq!(ReqOperator::GreaterThan, Ordering::Greater);
+    assert_ne!(ReqOperator::GreaterThan, Ordering::Equal);
+    assert_ne!(ReqOperator::GreaterThan, Ordering::Less);
 
-    assert!(ReqOperator::EqualTo != Ordering::Greater);
-    assert!(ReqOperator::EqualTo == Ordering::Equal);
-    assert!(ReqOperator::EqualTo != Ordering::Less);
+    assert_ne!(ReqOperator::EqualTo, Ordering::Greater);
+    assert_eq!(ReqOperator::EqualTo, Ordering::Equal);
+    assert_ne!(ReqOperator::EqualTo, Ordering::Less);
 
-    assert!(ReqOperator::LessThanEqual != Ordering::Greater);
-    assert!(ReqOperator::LessThanEqual == Ordering::Equal);
-    assert!(ReqOperator::LessThanEqual == Ordering::Less);
+    assert_ne!(ReqOperator::LessThanEqual, Ordering::Greater);
+    assert_eq!(ReqOperator::LessThanEqual, Ordering::Equal);
+    assert_eq!(ReqOperator::LessThanEqual, Ordering::Less);
 
-    assert!(ReqOperator::LessThan != Ordering::Greater);
-    assert!(ReqOperator::LessThan != Ordering::Equal);
-    assert!(ReqOperator::LessThan == Ordering::Less);
+    assert_ne!(ReqOperator::LessThan, Ordering::Greater);
+    assert_ne!(ReqOperator::LessThan, Ordering::Equal);
+    assert_eq!(ReqOperator::LessThan, Ordering::Less);
 }
 
 #[test]
