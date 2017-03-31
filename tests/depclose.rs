@@ -112,10 +112,12 @@ pub fn cmp_expression(e1: &DepExpression, e2: &DepExpression) -> bool {
 
             for r1 in lst1.iter() {
                 let l1 = r1.borrow();
-                if !lst2.iter().any(|r2| {
+                let cmp_result = lst2.iter().any(|r2| {
                     let l2 = r2.borrow();
                     cmp_expression(&l1, &l2)
-                }) {
+                });
+
+                if !cmp_result {
                     return false;
                 }
             }
