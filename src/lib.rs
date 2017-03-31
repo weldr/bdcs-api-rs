@@ -64,6 +64,10 @@ pub mod depsolve;
 pub mod recipe;
 pub mod rpm;
 
+// FIXME figure out how to conditionally compile this but also have it
+// available for integration tests
+pub mod test_helper;
+
 /// Configuration file used by Rocket
 #[derive(Debug, Serialize)]
 pub struct RocketToml {
