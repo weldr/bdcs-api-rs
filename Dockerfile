@@ -3,7 +3,7 @@ FROM weld/fedora:24
 MAINTAINER Brian C. Lane <bcl@redhat.com>
 
 RUN curl https://sh.rustup.rs -sSf \
-  | sh -s -- -y --default-toolchain nightly-2017-03-16
+  | sh -s -- -y --default-toolchain nightly-2017-03-31
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
