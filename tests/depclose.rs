@@ -47,6 +47,7 @@ pub fn req(input: &str) -> Requirement {
 }
 
 // make generating a TestPkg easier
+#[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
 pub fn testpkg(name: &str, epoch: Option<u32>, version: &str, release: &str, arch: &str,
                provides: &[&str], requires: &[&str], obsoletes: &[&str], conflicts: &[&str]) -> TestPkg {
     fn req_ref(input: &&str) -> Requirement { req(input) }
