@@ -39,9 +39,9 @@ json mock api files by adding `--mockfiles /path/to/files/`
 
 ## Running the API Server in Docker
 
-The docker image depends on a base image, named weld/fedora:24, which needs
+The docker image depends on a base image, named weld/fedora:25, which needs
 have been previously built. If it is not available it can be built from
-the welder-deployment repository by running `make weld-f24`.
+the welder-deployment repository by running `make weld-f25`.
 
 Build the docker image by running:
 
