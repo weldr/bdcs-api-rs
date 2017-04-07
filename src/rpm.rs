@@ -191,11 +191,11 @@ impl FromStr for ReqOperator {
 impl PartialEq<Ordering> for ReqOperator {
     fn eq(&self, o: &Ordering) -> bool {
         match *self {
-            ReqOperator::GreaterThanEqual => o == &Ordering::Greater || o == &Ordering::Equal,
-            ReqOperator::GreaterThan      => o == &Ordering::Greater,
-            ReqOperator::EqualTo          => o == &Ordering::Equal,
-            ReqOperator::LessThanEqual    => o == &Ordering::Less || o == &Ordering::Equal,
-            ReqOperator::LessThan         => o == &Ordering::Less
+            ReqOperator::GreaterThanEqual => *o == Ordering::Greater || *o == Ordering::Equal,
+            ReqOperator::GreaterThan      => *o == Ordering::Greater,
+            ReqOperator::EqualTo          => *o == Ordering::Equal,
+            ReqOperator::LessThanEqual    => *o == Ordering::Less || *o == Ordering::Equal,
+            ReqOperator::LessThan         => *o == Ordering::Less
         }
     }
 }
@@ -277,11 +277,11 @@ impl Requirement {
         // e.g. Provides: whatever <= 1.0, Requires: whatever >= 1.0-9
         if provides_evr.epoch.unwrap_or(0) == requires_evr.epoch.unwrap_or(0) &&
                 provides_evr.version == requires_evr.version {
-            if provides_operator == &Ordering::Equal && provides_evr.release == "" && requires_evr.release != "" {
+            if *provides_operator == Ordering::Equal && provides_evr.release == "" && requires_evr.release != "" {
                 return true;
             }
 
-            if requires_operator == &Ordering::Equal && requires_evr.release == "" && provides_evr.release != "" {
+            if *requires_operator == Ordering::Equal && requires_evr.release == "" && provides_evr.release != "" {
                 return true;
             }
         }
@@ -289,15 +289,15 @@ impl Requirement {
         // Now unravel whether the ranges overlap
         match provides_evr.cmp(requires_evr) {
             // true if Provides: >[=] x || Requires: <[=] y
-            Ordering::Less    => provides_operator == &Ordering::Greater || requires_operator == &Ordering::Less,
+            Ordering::Less    => *provides_operator == Ordering::Greater || *requires_operator == Ordering::Less,
 
             // true if Provides <[=] x || Requires: >[=] y
-            Ordering::Greater => provides_operator == &Ordering::Less || requires_operator == &Ordering::Greater,
+            Ordering::Greater => *provides_operator == Ordering::Less || *requires_operator == Ordering::Greater,
 
             // true if the directions match
-            Ordering::Equal   => (provides_operator == &Ordering::Less && requires_operator == &Ordering::Less) ||
-                                 (provides_operator == &Ordering::Equal && requires_operator == &Ordering::Equal) ||
-                                 (provides_operator == &Ordering::Greater && requires_operator == &Ordering::Greater)
+            Ordering::Equal   => (*provides_operator == Ordering::Less && *requires_operator == Ordering::Less) ||
+                                 (*provides_operator == Ordering::Equal && *requires_operator == Ordering::Equal) ||
+                                 (*provides_operator == Ordering::Greater && *requires_operator == Ordering::Greater)
         }
     }
 }

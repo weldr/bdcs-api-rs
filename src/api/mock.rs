@@ -221,7 +221,7 @@ fn filter_json(route: &str, action: &str, param: &str, offset: i64, limit: i64) 
         if api_route.is_array() {
             if let Some(json_array) = api_route.as_array() {
                 for item in json_array {
-                    if item.get("name").unwrap_or(&Value::String("".to_string())) == &Value::String(param.to_string()) {
+                    if item.get("name") == Some(&Value::String(param.to_string())) {
                         info!("Found it!"; "json" => format!("{:?}", item));
                         return CORS(JSON(Value::Object(json_map! { route => Value::Array(vec![item.clone()]),
                                     "offset" => serde_json::to_value(offset).unwrap(),
