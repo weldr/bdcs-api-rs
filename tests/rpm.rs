@@ -544,7 +544,7 @@ fn test_vercmp() {
     ];
 
     for (s1, s2, result) in vercmp_test_cases {
-        assert_eq!(vercmp(&s1, &s2), result,
+        assert_eq!(vercmp(s1, s2), result,
             "testing {} {:?} {}", s1, result, s2);
     };
 }

@@ -223,7 +223,7 @@ fn find_last_commit(repo: &Repository) -> Result<Commit, git2::Error> {
 ///
 fn recipe_filename(name: &str) -> Result<String, RecipeError> {
     if !name.is_empty() {
-        Ok(format!("{}.toml", name.clone().replace(" ", "-")))
+        Ok(format!("{}.toml", name.replace(" ", "-")))
     } else {
         Err(RecipeError::RecipeName)
     }
@@ -365,7 +365,7 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&
     match repo.find_branch(branch, BranchType::Local) {
         Ok(_) => {}
         Err(_) => {
-            let parent_commit = try!(find_last_commit(&repo));
+            let parent_commit = try!(find_last_commit(repo));
             try!(repo.branch(branch, &parent_commit, false));
         }
     }
@@ -622,7 +622,7 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
     revwalk.set_sorting(git2::SORT_TIME);
     try!(revwalk.push_ref(&format!("refs/heads/{}", branch)));
 
-    let filename = try!(recipe_filename(&name));
+    let filename = try!(recipe_filename(name));
     let mut diffopts = DiffOptions::new();
     diffopts.pathspec(&filename);
 
@@ -717,7 +717,7 @@ pub fn diff(repo: &Repository,
         }
     };
 
-    let filename = try!(recipe_filename(&name));
+    let filename = try!(recipe_filename(name));
     let mut opts = DiffOptions::new();
     opts.patience(true)
         .minimal(true)

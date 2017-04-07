@@ -275,7 +275,7 @@ fn depclose_package(conn: &Connection, arches: &[String], group_id: GroupId, par
                 // if the providers are new, recurse over their requirements
                 let mut req_providers: Vec<DepExpression> = Vec::new();
                 for p in &provider_ids {
-                    req_providers.push(try!(depclose_package(conn, arches, p.clone(), &parent_groups_copy, cache)));
+                    req_providers.push(try!(depclose_package(conn, arches, *p, &parent_groups_copy, cache)));
                 }
 
                 // If only one group comes back as the requirement (i.e., there is only one
