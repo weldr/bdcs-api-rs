@@ -7,10 +7,6 @@ before_install:
 env:
   - _CMD=test
   - _CMD=clippy
-matrix:
-  include:
-  - env: _CMD=clippy
-    rust: nightly-2017-03-28
 script:
   - make $_CMD
 notifications:
