@@ -18,6 +18,7 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 extern crate bdcs;
+#[macro_use] extern crate pretty_assertions;
 extern crate rusqlite;
 
 use rusqlite::Connection;

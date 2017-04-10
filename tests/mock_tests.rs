@@ -20,6 +20,7 @@
 
 extern crate bdcs;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate pretty_assertions;
 extern crate rocket;
 extern crate toml;
 

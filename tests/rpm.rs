@@ -18,6 +18,7 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 extern crate bdcs;
+#[macro_use] extern crate pretty_assertions;
 
 use bdcs::rpm::{self, EVR, ReqOperator, Requirement, vercmp};
 use std::cmp::Ordering;
