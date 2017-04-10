@@ -112,14 +112,9 @@ pub struct Files {
     #[serde(skip_serializing)]
     pub id: i64,
     pub path: String,           // Could use rust's Path type?
-    pub digest: String,
-    pub file_type: String,
-    pub file_mode: i64,
     pub file_user: String,
     pub file_group: String,
-    pub file_size: i64,
     pub mtime: i64,
-    pub symlink_target: Option<String>,
 }
 
 /// File attribute types

@@ -663,22 +663,14 @@ mod test_req_provider_ids {
 
         // Add another file to test-package-3
         let package_3_id = get_nevra_group_id(&test_data, "test-package-3", None, "1.0", "1", "x86_64");
-        let file_type_id: i64 = try!(test_data.query_row("select id from file_types where file_type = 'regular file'",
-                                                         &[],
-                                                         |row| row.get(0)));
 
         try!(test_data.execute_named("
-            insert into files (path, digest, file_type_id, file_mode, file_user, file_group, file_size, mtime, symlink_target)
-            values (:path, :digest, :file_type_id, :file_mode, :file_user, :file_group, :file_size, :mtime, :symlink_target)",
+            insert into files (path, file_user, file_group, mtime)
+            values (:path, :file_user, :file_group, :mtime)",
             &[(":path", &"/actual/file".to_string()),
-              (":digest", &"".to_string()),
-              (":file_type_id", &file_type_id),
-              (":file_mode", &0o0644),
               (":file_user", &"root".to_string()),
               (":file_group", &"root".to_string()),
-              (":file_size", &0),
-              (":mtime", &0),
-              (":symlink_target", &"".to_string())]));
+              (":mtime", &0)]));
         let file_id = test_data.last_insert_rowid();
 
         try!(test_data.execute_named("insert into group_files (group_id, file_id) values (:group_id, :file_id)",

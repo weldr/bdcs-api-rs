@@ -32,14 +32,9 @@ pub struct TestKeyValues {
 
 pub struct TestFiles {
     pub path: String,
-    pub digest: String,
-    pub file_type: String,
-    pub file_mode: i64,
     pub file_user: String,
     pub file_group: String,
-    pub file_size: i64,
     pub mtime: i64,
-    pub symlink_target: Option<String>,
     pub key_vals: Vec<TestKeyValues>
 }
 
@@ -114,24 +109,13 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
         }
 
         fn insert_file(conn: &Connection, file: &TestFiles) -> rusqlite::Result<i64> {
-            fn get_file_type_id(conn: &Connection, file_type: &str) -> rusqlite::Result<i64> {
-                conn.query_row_named("select id from file_types where file_type == :file_type",
-                                     &[(":file_type", &file_type)],
-                                     |row| row.get(0) )
-            }
-
             try!(conn.execute_named("
-                insert into files (path, digest, file_type_id, file_mode, file_user, file_group, file_size, mtime, symlink_target)
-                values (:path, :digest, :file_type_id, :file_mode, :file_user, :file_group, :file_size, :mtime, :symlink_target)",
+                insert into files (path, file_user, file_group, mtime)
+                values (:path, :file_user, :file_group, :mtime)",
                 &[(":path", &file.path),
-                  (":digest", &file.digest),
-                  (":file_type_id", &try!(get_file_type_id(conn, &file.file_type))),
-                  (":file_mode", &file.file_mode),
                   (":file_user", &file.file_user),
                   (":file_group", &file.file_group),
-                  (":file_size", &file.file_size),
-                  (":mtime", &file.mtime),
-                  (":symlink_target", &file.symlink_target)]));
+                  (":mtime", &file.mtime)]));
             let file_id = conn.last_insert_rowid();
 
             for kv in &file.key_vals {
@@ -329,30 +313,12 @@ create table build_signatures (
 );
 create index build_signatures_build_id_idx on build_signatures(build_id);
 
-create table file_types (
-    id integer primary key,
-    file_type text not null
-);
-insert into file_types (file_type) values
-    ('regular file'),
-    ('directory'),
-    ('socket'),
-    ('symbolic link'),
-    ('block device'),
-    ('character device'),
-    ('FIFO');
-
 create table files (
     id integer primary key,
     path text not null,
-    digest text not null,
-    file_type_id integer references file_types(id) not null,
-    file_mode integer not null,
     file_user text not null,
     file_group text not null,
-    file_size integer not null,
-    mtime integer not null,
-    symlink_target text
+    mtime integer not null
 );
 create index files_path_idx on files(path);
 
