@@ -880,7 +880,8 @@ pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JS
     // TODO Get the user's branch name. Use master for now.
 
     let mut result = recipe::list(&repo.repo(), "master", None).unwrap_or_default();
-    result.sort();
+    // Sort by case-insensitive name
+    result.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
     result.dedup();
     let total = result.len() as i64;
     result.truncate(limit as usize);
