@@ -790,7 +790,8 @@ pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i6
     let modules: Vec<&str> = modules.split(',').collect();
     let mut result = get_groups_vec(&db.conn(), &modules)
                      .unwrap_or_default();
-    result.sort();
+    // Sort by case-insensitive name
+    result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     // Groups includes the unique id, so dedupe using the name.
     result.dedup_by(|a, b| a.name.eq(&b.name));
     let total = result.len() as i64;
