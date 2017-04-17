@@ -1121,7 +1121,8 @@ pub fn recipes_changes(recipe_names: &str, offset: i64, limit: i64, repo: State<
             }
         }
     }
-    result.sort();
+    // Sort by case-insensitive name
+    result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
     CORS(JSON(RecipesChangesResponse {
         recipes: result,
