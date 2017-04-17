@@ -980,7 +980,8 @@ pub fn recipes_info(recipe_names: &str, repo: State<RecipeRepo>) -> CORS<JSON<Re
             result.push(recipe);
         });
     }
-    result.sort();
+    // Sort by case-insensitive name
+    result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     result.dedup();
 
     CORS(JSON(RecipesInfoResponse {
