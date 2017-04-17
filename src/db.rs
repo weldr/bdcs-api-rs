@@ -639,7 +639,7 @@ pub fn get_projects_name(conn: &Connection, project: &str, offset: i64, limit: i
     let mut stmt = try!(conn.prepare("
             select projects.*
             from projects
-            where projects.name GLOB :project ORDER BY projects.id LIMIT :limit OFFSET :offset"));
+            where projects.name GLOB :project ORDER BY projects.name COLLATE NOCASE LIMIT :limit OFFSET :offset"));
     let mut rows = try!(stmt.query_named(&[(":project", &project), (":offset", &offset), (":limit", &limit)]));
 
     let mut contents = Vec::new();
