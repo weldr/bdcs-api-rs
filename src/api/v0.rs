@@ -782,13 +782,19 @@ pub fn modules_list_noargs_default(db: State<DBPool>) -> CORS<JSON<ModulesListRe
 /// }
 /// ```
 ///
-pub fn modules_list(mut modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
-    if modules.is_empty() {
-        modules = "*";
-    }
+pub fn modules_list(modules: &str, db: State<DBPool>, offset: i64, limit: i64) -> CORS<JSON<ModulesListResponse>> {
     info!("/modules/list/"; "modules" => modules, "offset" => offset, "limit" => limit);
-    let modules: Vec<&str> = modules.split(',').collect();
-    let mut result = get_groups_vec(&db.conn(), &modules)
+
+    // FIXME What's the right way to do this?
+    let s2 = modules.replace("*", "%");
+    let search_str = if modules.is_empty() {
+                         "%"
+                     } else {
+                         &s2
+                     };
+
+    let groups: Vec<&str> = search_str.split(',').collect();
+    let mut result = get_groups_vec(&db.conn(), &groups)
                      .unwrap_or_default();
     // Sort by case-insensitive name
     result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));

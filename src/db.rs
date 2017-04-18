@@ -799,6 +799,41 @@ pub fn get_build_kv_build_id(conn: &Connection, build_id: i64) -> rusqlite::Resu
 }
 
 
+/// Find all groups matching a group name, case insensitive match
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+/// * `group` - The name of the group, LIKE search patterns allowed
+/// * `offset` - Number of results to skip before returning `limit`
+/// * `limit` - Maximum number of results to return
+///
+/// # Returns
+///
+/// * A Vector of [Groups](struct.Groups.html) for the matching group name,
+///   sorted by case-insensitive name.
+///
+pub fn get_groups_iname(conn: &Connection, group: &str, offset: i64, limit: i64) -> rusqlite::Result<Vec<Groups>> {
+    let mut stmt = try!(conn.prepare("
+            select groups.*
+            from groups
+            where groups.name LIKE :group ORDER BY groups.name COLLATE NOCASE LIMIT :limit OFFSET :offset"));
+    let mut rows = try!(stmt.query_named(&[(":group", &group), (":offset", &offset), (":limit", &limit)]));
+
+    let mut contents = Vec::new();
+    while let Some(row) = rows.next() {
+        let row = try!(row);
+        // Sure would be nice not to use indexes here!
+        contents.push(Groups {
+                        id: row.get(0),
+                        name: row.get(1),
+                        group_type: row.get(2),
+                    });
+    }
+    Ok(contents)
+}
+
+
 /// Find all groups matching a group name
 ///
 /// # Arguments
@@ -861,7 +896,7 @@ pub fn get_groups_id(conn: &Connection, id: &i64) -> rusqlite::Result<Option<Gro
     }
 }
 
-/// Find all groups matching a vector of group names
+/// Find all groups matching a vector of group names, using case-insensitive matching
 ///
 /// # Arguments
 ///
@@ -875,7 +910,7 @@ pub fn get_groups_id(conn: &Connection, id: &i64) -> rusqlite::Result<Option<Gro
 pub fn get_groups_vec(conn: &Connection, groups: &[&str]) -> rusqlite::Result<Vec<Groups>> {
     let max = i64::max_value();
     Ok(groups.into_iter()
-             .flat_map(|group_name| get_groups_name(conn, group_name, 0, max).unwrap_or_default())
+             .flat_map(|group_name| get_groups_iname(conn, group_name, 0, max).unwrap_or_default())
              .collect())
 }
 
