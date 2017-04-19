@@ -1371,6 +1371,17 @@ pub fn recipes_new_toml(recipe: TOML<Recipe>, repo: State<RecipeRepo>) -> CORS<J
 }
 
 
+/// The CORS system 'protects' the client via an OPTIONS request to make sure it is allowed
+///
+/// This returns an empty response, with the CORS headers set by [CORS](struct.CORS.html).
+// Rocket has a collision with Diesel so uses route instead
+//#[options("/recipes/new/")]
+#[route(OPTIONS, "/recipes/delete/<recipe_name>")]
+#[allow(unused_variables)]
+pub fn options_recipes_delete(recipe_name: &str) -> CORS<&'static str> {
+    CORS("")
+}
+
 /// Hold the JSON response for /recipes/new/
 #[derive(Debug, Serialize)]
 pub struct RecipesDeleteResponse {

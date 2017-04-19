@@ -151,7 +151,7 @@ impl<'r, R: Responder<'r>> Responder<'r> for CORS<R> {
         Response::build_from(try!(self.0.respond()))
             .header(header::AccessControlAllowOrigin::Any)
             .header(header::AccessControlAllowMethods(vec![
-                Method::Get, Method::Post, Method::Options]))
+                Method::Get, Method::Post, Method::Delete, Method::Options]))
             .header(header::AccessControlAllowHeaders(vec![
                 // Hyper uses the `unicase::Unicase` type to ensure comparisons are done
                 // case-insensitively. Here, we use `into()` to convert to one from a `&str`
