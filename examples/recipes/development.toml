@@ -34,7 +34,7 @@ name = "glibc-devel"
 version = "*"
 
 [[package]]
-name = "gnupg"
+name = "gnupg2"
 version = "*"
 
 [[package]]
