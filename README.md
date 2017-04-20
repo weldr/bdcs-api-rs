@@ -76,11 +76,14 @@ See the [documentation on the mock api](src/api/mock.rs) for more information.
 
 ## Testing
 
-To execute the available tests:
+All available tests are executed in Travis CI. To execute them type:
 
 `cargo test`
 
 Use `RUST_TEST_THREADS=1` to force sequential execution and debug failing tests!
+
+Information about depclose integration testing can be found at
+[tests/depclose-integration/README.md](blob/master/tests/depclose-integration/)
 
 General information about testing in Rust can be found at
 
