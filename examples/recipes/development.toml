@@ -1,82 +1,82 @@
 name = "development"
 description = "A general purpose development image"
 
-[[package]]
+[[packages]]
 name = "cmake"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "curl"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "file"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "gcc"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "gcc-c++"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "gdb"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "git"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "glibc-devel"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "gnupg2"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "libcurl-devel"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "make"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "openssl-devel"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "openssl-devel"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "sqlite"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "sqlite-devel"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "sudo"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "tar"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "xz"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "xz-devel"
 version = "*"
 
-[[package]]
+[[packages]]
 name = "zlib-devel"
 version = "*"
