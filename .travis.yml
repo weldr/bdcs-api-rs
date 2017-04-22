@@ -4,9 +4,11 @@ rust:
   - nightly
 before_install:
     - sudo apt-get install libssh2-1-dev
+    - pip install -r ./tests/depclose-integration/requirements.txt
 env:
   - _CMD=test
   - _CMD=clippy
+  - _CMD=depclose-travis
 script:
   - make $_CMD
 notifications:
