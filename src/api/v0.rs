@@ -1194,14 +1194,15 @@ pub fn recipes_freeze(recipe_names: &str, db: State<DBPool>, repo: State<RecipeR
 ///
 /// TODO Figure out how to add custom content types
 #[get("/recipes/freeze/<recipe_name>?<format>", rank=3)]
-pub fn recipes_freeze_toml(recipe_name: &str, format: Format, repo: State<RecipeRepo>) -> CORS<TOML<Recipe>> {
+pub fn recipes_freeze_toml(recipe_name: &str, format: Format, db: State<DBPool>, repo: State<RecipeRepo>) -> CORS<TOML<Recipe>> {
     info!("/recipes/freeze/ (TOML)"; "recipe_name" => recipe_name, "format" => format!("{:?}", format));
     // TODO Get the user's branch name. Use master for now.
 
     // TODO Error handling for format requests other than toml
-    CORS(TOML(
-        recipe::read(&repo.repo(), recipe_name, "master", None).unwrap()
-    ))
+    let (recipe, pkg_nevras) = depsolve_recipe(&db, &repo, recipe_name).unwrap();
+    let new_recipe = freeze_recipe(&recipe, &pkg_nevras);
+
+    CORS(TOML(new_recipe))
 }
 
 
