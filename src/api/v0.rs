@@ -43,6 +43,9 @@
 //! * `/api/v0/recipes/info/<recipes>`
 //!  - Return the contents of the recipe.
 //!  - [Example JSON](fn.recipes_info.html#examples)
+//! * `/api/v0/recipes/freeze/<recipes>`
+//!  - Return the contents of the recipe with frozen dependencies instead of expressions.
+//!  - [Example JSON](fn.recipes_freeze.html#examples)
 //! * `/api/v0/recipes/changes/<recipes>`
 //!  - Return the commit history of the recipes
 //!  - [Example JSON](fn.recipes_changes.html#examples)
@@ -590,6 +593,77 @@ fn depsolve_helper(conn: &Connection, projects: &[String]) -> Vec<PackageNEVRA> 
     }
 }
 
+/// Depsolve the recipe and return the list of package versions
+///
+/// Return a tuple of the Recipe and the package NEVRAs if all goes well
+fn  depsolve_recipe(db: &State<DBPool>, repo: &State<RecipeRepo>, name: &str) -> Result<(Recipe, Vec<PackageNEVRA>), recipe::RecipeError> {
+    let recipe = try!(recipe::read(&repo.repo(), name, "master", None));
+
+    let mut projects = Vec::new();
+    projects.extend(recipe.clone().modules.iter().map(|m| m.name.clone()));
+    projects.extend(recipe.clone().packages.iter().map(|p| p.name.clone()));
+    projects.sort();
+    projects.dedup();
+
+    debug!("depsolve_recipe"; "projs" => format!("{:?}", projects));
+    // deps for the whole recipe
+    let pkg_nevras = depsolve_helper(&db.conn(), &projects);
+    return Ok((recipe, pkg_nevras));
+}
+
+/// Create a new recipe with the frozen package NEVRAs instead of version expressions
+///
+/// Returns a new Recipe
+fn freeze_recipe(recipe: &Recipe, pkg_nevras: &Vec<PackageNEVRA>) -> Recipe {
+    // Make a new list of modules, with the version numbers
+    let mut modules = Vec::new();
+    for m in &recipe.modules {
+        modules.push(
+            match pkg_nevras.binary_search_by_key(&m.name, |s| s.name.clone()) {
+                Ok(idx) => recipe::Modules {
+                    name: m.name.clone(),
+                    version: Some(pkg_nevras[idx].version_string())
+                },
+
+                Err(_) =>  recipe::Modules {
+                    name:    m.name.clone(),
+                    version: m.version.clone()
+                }
+        });
+    }
+    modules.sort();
+    modules.dedup();
+
+
+    // Make a new list of packages, with the version numbers
+    let mut packages = Vec::new();
+    for p in &recipe.packages {
+        packages.push(
+            match pkg_nevras.binary_search_by_key(&p.name, |s| s.name.clone()) {
+                Ok(idx) => recipe::Packages {
+                    name: p.name.clone(),
+                    version: Some(pkg_nevras[idx].version_string())
+                },
+
+                Err(_) =>  recipe::Packages {
+                    name:    p.name.clone(),
+                    version: p.version.clone()
+                }
+        });
+    }
+    modules.sort();
+    modules.dedup();
+
+    // Make a new recipe with the same name/version/description and complete modules/packages
+    return Recipe {
+        name:        recipe.name.clone(),
+        description: recipe.description.clone(),
+        version:     recipe.version.clone(),
+        modules:     modules,
+        packages:    packages
+    }
+}
+
 
 // /modules/info/<modules>
 
@@ -1013,6 +1087,123 @@ pub fn recipes_info_toml(recipe_name: &str, format: Format, repo: State<RecipeRe
         recipe::read(&repo.repo(), recipe_name, "master", None).unwrap()
     ))
 }
+
+// /recipes/freeze/<names>
+
+/// Hold the JSON response for /recipes/freeze/
+#[derive(Debug, Serialize)]
+pub struct RecipesFreezeResponse {
+    recipes: Vec<Recipe>,
+}
+
+
+/// Handler for `/recipes/freeze/` without arguments.
+/// Return the contents of a recipe or list of recipes with frozen versions
+///
+/// # Arguments
+///
+/// * `recipe_names` - Comma separated list of recipe names to return
+///
+/// # Response
+///
+/// * JSON response with recipe contents, using the recipe name(s) as keys
+///   and depsolved version requirements.
+///
+/// # Panics
+///
+/// * Failure to serialize the response
+///
+/// If the depsolve fails for any of the modules or packages the version expression
+/// from the original recipe will be used instead.
+///
+/// # Examples
+///
+/// ```json
+/// {
+///     "recipes": [
+///         {
+///             "name": "http-server",
+///             "description": "An example http server with PHP and MySQL support. Modified and pushed back to the server by bdcs-cli",
+///             "version": "0.0.3",
+///             "modules": [
+///                 {
+///                     "name": "httpd",
+///                     "version": "2.4.6-45.el7.x86_64"
+///                 },
+///                 {
+///                     "name": "mod_auth_kerb",
+///                     "version": "5.4-28.el7.x86_64"
+///                 },
+///                 {
+///                     "name": "mod_ssl",
+///                     "version": "1:2.4.6-45.el7.x86_64"
+///                 },
+///                 {
+///                     "name": "php",
+///                     "version": "5.4.16-42.el7.x86_64"
+///                 },
+///                 {
+///                     "name": "php-mysql",
+///                     "version": "5.4.16-42.el7.x86_64"
+///                 }
+///             ],
+///             "packages": [
+///                 {
+///                     "name": "tmux",
+///                     "version": "1.8-4.el7.x86_64"
+///                 },
+///                 {
+///                     "name": "openssh-server",
+///                     "version": "6.6.1p1-31.el7.x86_64"
+///                 },
+///                 {
+///                     "name": "rsync",
+///                     "version": "3.0.9-17.el7.x86_64"
+///                 }
+///             ]
+///         }
+///     ]
+/// }
+/// ```
+///
+#[get("/recipes/freeze/<recipe_names>")]
+pub fn recipes_freeze(recipe_names: &str, db: State<DBPool>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesFreezeResponse>> {
+    info!("/recipes/freeze/ (JSON)"; "recipe_names" => recipe_names);
+    // TODO Get the user's branch name. Use master for now.
+
+    let mut result = Vec::new();
+    for name in recipe_names.split(',') {
+        let _ = depsolve_recipe(&db, &repo, name).and_then(|(recipe, pkg_nevras)| {
+            let new_recipe = freeze_recipe(&recipe, &pkg_nevras);
+            result.push(new_recipe);
+            Ok((recipe, pkg_nevras))
+        });
+    }
+    CORS(JSON(RecipesFreezeResponse {
+        recipes: result
+    }))
+}
+
+/// Return the requested recipe as TOML
+/// Note that this only supports 1 recipe at a time
+///
+/// The request should be: `/recipes/freeze/<recipe_name>?format=toml`
+///
+/// NOTE this is accomplished this way because Rocket doesn't have a way to specify a
+/// custom Content-Type for GET requests.
+///
+/// TODO Figure out how to add custom content types
+#[get("/recipes/freeze/<recipe_name>?<format>", rank=3)]
+pub fn recipes_freeze_toml(recipe_name: &str, format: Format, repo: State<RecipeRepo>) -> CORS<TOML<Recipe>> {
+    info!("/recipes/freeze/ (TOML)"; "recipe_name" => recipe_name, "format" => format!("{:?}", format));
+    // TODO Get the user's branch name. Use master for now.
+
+    // TODO Error handling for format requests other than toml
+    CORS(TOML(
+        recipe::read(&repo.repo(), recipe_name, "master", None).unwrap()
+    ))
+}
+
 
 /// Hold the JSON response for /recipes/changes/
 #[derive(Debug, Serialize)]
@@ -1567,19 +1758,18 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
 
     let mut result = Vec::new();
     for name in recipe_names.split(',') {
-        let _ = recipe::read(&repo.repo(), name, "master", None).map(|recipe| {
+        let _ = depsolve_recipe(&db, &repo, name).and_then(|(recipe, pkg_nevras)| {
+            // Get the version chosen for each individual recipe module/package
+            let mut recipe_nevras = Vec::new();
+
+            // TODO need a better way to do this
+            // iterate recipe and lookup each instead.
             let mut projects = Vec::new();
             projects.extend(recipe.clone().modules.iter().map(|m| m.name.clone()));
             projects.extend(recipe.clone().packages.iter().map(|p| p.name.clone()));
             projects.sort();
             projects.dedup();
 
-            debug!("recipes_depsolve"; "projs" => format!("{:?}", projects));
-            // deps for the whole recipe
-            let pkg_nevras = depsolve_helper(&db.conn(), &projects);
-
-            // Get the version chosen for each individual recipe module/package
-            let mut recipe_nevras = Vec::new();
             for proj in projects {
                 recipe_nevras.push(
                     match pkg_nevras.binary_search_by_key(&proj, |s| s.name.clone()) {
@@ -1594,12 +1784,14 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
                 });
             }
             recipe_nevras.sort();
+            recipe_nevras.dedup();
 
             result.push(RecipeDeps {
                 recipe:       recipe,
                 modules:      recipe_nevras,
                 dependencies: pkg_nevras
             });
+            Ok(())
         });
     }
     result.sort();
