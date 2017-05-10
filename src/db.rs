@@ -1073,6 +1073,15 @@ impl fmt::Display for PackageNEVRA {
     }
 }
 
+impl PackageNEVRA {
+    pub fn version_string(&self) -> String {
+        match self.epoch {
+            0 => format!("{}-{}.{}", self.version, self.release, self.arch),
+            _ => format!("{}:{}-{}.{}", self.epoch, self.version, self.release, self.arch)
+        }
+    }
+}
+
 
 /// Get the package NEVRA associated with a group id
 ///
