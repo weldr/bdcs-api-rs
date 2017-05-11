@@ -67,6 +67,7 @@ impl TestFramework {
                                             v0::modules_list_noargs_default, v0::modules_list_noargs_filter,
                                             v0::recipes_list_default, v0::recipes_list_filter,
                                             v0::recipes_info,
+                                            v0::recipes_freeze,
                                             v0::recipes_changes_default, v0::recipes_changes_filter,
                                             v0::recipes_diff,
                                             v0::recipes_new_json, v0::recipes_new_toml,
@@ -331,6 +332,7 @@ fn test_v0_recipes_changes() {
     assert_eq!(j["recipes"][0]["total"], Value::from(1));
 }
 
+// NOTE the minimal database doesn't depsolve, so this checks for an empty response
 #[test]
 fn test_recipes_depsolve() {
     assert_eq!(FRAMEWORK.initialized, true);
@@ -340,6 +342,23 @@ fn test_recipes_depsolve() {
     let expected = include_str!("results/v0/recipes-depsolve.json").trim_right();
 
     let mut req = MockRequest::new(Method::Get, "/recipes/depsolve/kubernetes");
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected.to_string()));
+}
+
+// NOTE the minimal database doesn't depsolve, so this checks for an empty response
+#[test]
+fn test_recipes_freeze() {
+    assert_eq!(FRAMEWORK.initialized, true);
+    let rocket = &FRAMEWORK.rocket;
+
+    // v0_recipes_freeze()
+    let expected = include_str!("results/v0/recipes-freeze.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/freeze/http-server");
     let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
