@@ -889,10 +889,6 @@ pub fn modules_list(modules: &str, db: State<DBPool>, offset: i64, limit: i64) -
 
 // TODO These should go into a versioned recipe module
 
-// NOTE We have to use rustc-serialize here because the toml package is also used by rocket
-// and has already been imported using rustc-serialize. If rocket switches to using toml with
-// serde then we can change.
-
 // /recipes/list
 
 /// Hold the JSON response for /recipes/list

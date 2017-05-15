@@ -48,7 +48,6 @@ extern crate bdcs;
 #[macro_use] extern crate clap;
 extern crate rocket;
 extern crate rusqlite;
-extern crate rustc_serialize;
 #[macro_use] extern crate slog;
 extern crate slog_json;
 #[macro_use] extern crate slog_scope;
