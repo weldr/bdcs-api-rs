@@ -608,7 +608,7 @@ fn  depsolve_recipe(db: &State<DBPool>, repo: &State<RecipeRepo>, name: &str) ->
     debug!("depsolve_recipe"; "projs" => format!("{:?}", projects));
     // deps for the whole recipe
     let pkg_nevras = depsolve_helper(&db.conn(), &projects);
-    return Ok((recipe, pkg_nevras));
+    Ok((recipe, pkg_nevras))
 }
 
 /// Create a new recipe with the frozen package NEVRAs instead of version expressions
@@ -655,7 +655,7 @@ fn freeze_recipe(recipe: &Recipe, pkg_nevras: &Vec<PackageNEVRA>) -> Recipe {
     modules.dedup();
 
     // Make a new recipe with the same name/version/description and complete modules/packages
-    return Recipe {
+    Recipe {
         name:        recipe.name.clone(),
         description: recipe.description.clone(),
         version:     recipe.version.clone(),
