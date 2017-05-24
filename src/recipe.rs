@@ -384,6 +384,10 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&
     // If it has an invalid semver in version, return an error.
     let new_version = try!(semver::Version::parse(&recipe.version));
 
+    // Save it with sorted packages and modules
+    recipe.packages.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    recipe.modules.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
     // Read the previous version of this recipe, compare its .version to the new one.
     // If they are the same bump the patch level before saving the new one.
     if let Ok(last_version) = read(repo, &recipe.name, branch, None)
@@ -449,7 +453,10 @@ pub fn read(repo: &Repository, name: &str, branch: &str, commit: Option<&str>) -
     let object = try!(repo.revparse_single(&spec[..]));
     let blob = try!(repo.find_blob(object.id()));
     let blob_str = try!(str::from_utf8(blob.content()));
-    Ok(try!(toml::from_str::<Recipe>(blob_str).or(Err(RecipeError::ParseTOML))))
+    let mut recipe = try!(toml::from_str::<Recipe>(blob_str).or(Err(RecipeError::ParseTOML)));
+    recipe.packages.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    recipe.modules.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(recipe)
 }
 
 
