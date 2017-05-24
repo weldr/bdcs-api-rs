@@ -299,35 +299,35 @@ fn test_v0_recipes_changes() {
     let rocket = &FRAMEWORK.rocket;
 
     // v0_recipes_changes()
-    let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave,kubernetes");
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/atlas,kubernetes");
     let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
-    assert_eq!(j["recipes"][0]["name"], "kubernetes".to_string());
-    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe kubernetes, version 0.0.1 saved".to_string());
+    assert_eq!(j["recipes"][0]["name"], "atlas".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe atlas, version 0.0.1 saved".to_string());
     assert_eq!(j["recipes"][0]["total"], Value::from(1));
-    assert_eq!(j["recipes"][1]["name"], "octave".to_string());
-    assert_eq!(j["recipes"][1]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
+    assert_eq!(j["recipes"][1]["name"], "kubernetes".to_string());
+    assert_eq!(j["recipes"][1]["changes"][0]["message"], "Recipe kubernetes, version 0.0.1 saved".to_string());
     assert_eq!(j["recipes"][1]["total"], Value::from(1));
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?limit=1");
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/atlas?limit=1");
     let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
-    assert_eq!(j["recipes"][0]["name"], "octave".to_string());
-    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe octave, version 0.0.1 saved".to_string());
+    assert_eq!(j["recipes"][0]["name"], "atlas".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["message"], "Recipe atlas, version 0.0.1 saved".to_string());
 
-    let mut req = MockRequest::new(Method::Get, "/recipes/changes/octave?offset=1&limit=1");
+    let mut req = MockRequest::new(Method::Get, "/recipes/changes/atlas?offset=1&limit=1");
     let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
-    assert_eq!(j["recipes"][0]["name"], "octave".to_string());
+    assert_eq!(j["recipes"][0]["name"], "atlas".to_string());
     assert_eq!(j["recipes"][0]["changes"], Value::Array(vec![]));
     assert_eq!(j["recipes"][0]["total"], Value::from(1));
 }
