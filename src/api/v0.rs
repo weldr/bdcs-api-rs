@@ -1780,7 +1780,7 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
                         }
                 });
             }
-            recipe_nevras.sort();
+            recipe_nevras.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
             recipe_nevras.dedup();
 
             result.push(RecipeDeps {
