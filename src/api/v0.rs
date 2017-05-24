@@ -583,7 +583,7 @@ fn depsolve_helper(conn: &Connection, projects: &[String]) -> Vec<PackageNEVRA> 
     match solve_dependencies(conn, &mut exprs) {
         Ok(ids) => {
             let mut nevras = pkg_nevra_groups_vec(conn, &ids);
-            nevras.sort();
+            nevras.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
             nevras
         },
         Err(e) => {
