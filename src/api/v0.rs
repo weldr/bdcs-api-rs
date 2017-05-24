@@ -631,7 +631,7 @@ fn freeze_recipe(recipe: &Recipe, pkg_nevras: &Vec<PackageNEVRA>) -> Recipe {
                 }
         });
     }
-    modules.sort();
+    modules.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     modules.dedup();
 
 
@@ -651,8 +651,8 @@ fn freeze_recipe(recipe: &Recipe, pkg_nevras: &Vec<PackageNEVRA>) -> Recipe {
                 }
         });
     }
-    modules.sort();
-    modules.dedup();
+    packages.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    packages.dedup();
 
     // Make a new recipe with the same name/version/description and complete modules/packages
     Recipe {
