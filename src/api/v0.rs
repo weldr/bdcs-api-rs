@@ -269,7 +269,7 @@ pub fn compose_log(kbytes: usize) -> CORS<&'static str> {
 // /compose/types
 
 /// Structure to hold the types of composes and whether or not they are actually available.
-#[derive(Serialize)]
+#[derive(Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ComposeTypes {
     name: String,
     enabled: bool
@@ -344,6 +344,7 @@ pub fn compose_types() -> CORS<JSON<ComposeTypesResponse>> {
     types.push(ComposeTypes::new("qcow2", true));
     types.push(ComposeTypes::new("vmdk", false));
     types.push(ComposeTypes::new("vhdx", true));
+    types.sort();
 
     CORS(JSON(ComposeTypesResponse { types: types }))
 }
