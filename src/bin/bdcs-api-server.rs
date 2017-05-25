@@ -69,9 +69,14 @@ use slog::DrainExt;
 
 /// Process Command Line Arguments and Serve the http API
 fn main() {
+    let version = match option_env!("GIT_COMMIT") {
+        Some(version) => version,
+        None          => crate_version!()
+    };
+
     let matches = App::new("bdcs-api")
                             .about("A REST API on top of the BDCS")
-                            .version(crate_version!())
+                            .version(version)
                             .arg(Arg::with_name("host")
                                         .long("host")
                                         .value_name("HOSTNAME|IP")
@@ -131,7 +136,7 @@ fn main() {
     let log = slog::Logger::root(slog::duplicate(term_drain, file_drain).fuse(), o!());
     slog_scope::set_global_logger(log);
 
-    info!(format!("BDCS API v{} started", crate_version!()));
+    info!(format!("BDCS API {} started", version));
     info!("Config:"; "rocket_config" => format!("{:?}", rocket_config));
 
     // Import the recipes from recipe_path into master branch of the git repository
@@ -141,7 +146,8 @@ fn main() {
     }
 
     rocket::ignite()
-        .mount("/api/v0/", routes![ v0::test, v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,
+        .mount("/api/v0/", routes![v0::test, v0::version,
+                                   v0::isos, v0::compose, v0::compose_types, v0::compose_cancel,
                                    v0::compose_status, v0::compose_status_id, v0::compose_log,
                                    v0::projects_list_default, v0::projects_list_filter,
                                    v0::projects_info,

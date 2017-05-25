@@ -16,4 +16,4 @@ VOLUME /mddb /bdcs-recipes /mockfiles
 ## Do the things more likely to change below here. ##
 ## Run rustup update to pick up the latest nightly ##
 COPY . /bdcs-api-rs/
-RUN cd /bdcs-api-rs/ && rm -rf ./target/ Cargo.lock && rustup update && cargo build && cargo doc
+RUN cd /bdcs-api-rs/ && rm -rf ./target/ Cargo.lock && rustup update && make bdcs-api doc

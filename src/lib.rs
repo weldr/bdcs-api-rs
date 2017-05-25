@@ -28,6 +28,7 @@
 #![plugin(rocket_codegen)]
 
 extern crate chrono;
+#[macro_use] extern crate clap;
 extern crate git2;
 extern crate glob;
 extern crate hyper;

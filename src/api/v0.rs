@@ -9,6 +9,9 @@
 //! # v0 API routes
 //!
 //! * `/api/v0/test`
+//! * `/api/v0/version`
+//!  - Return the build and api version for the running code.
+//!  - [Example JSON](fn.version.html#examples)
 //! * `/api/v0/isos`
 //! * `/api/v0/compose`
 //! * `/api/v0/compose/cancel`
@@ -128,6 +131,41 @@ use api::toml::TOML;
 pub fn test() -> CORS<&'static str> {
     info!("/test");
    CORS("API v0 test")
+}
+
+
+/// Structure to hold the version details
+#[derive(Serialize)]
+pub struct BuildVersion {
+    build: String,
+    api:   u64
+}
+
+/// Return the build version of the API
+///
+/// # Response
+///
+/// * a JSON object
+///
+/// # Examples
+///
+/// ```json
+/// {
+///     "build": "v0.3.0-67-g485875e",
+///     "api": 0
+/// }
+/// ```
+#[get("/version")]
+pub fn version() -> CORS<JSON<BuildVersion>> {
+    let version = match option_env!("GIT_COMMIT") {
+        Some(version) => version,
+        None          => crate_version!()
+    };
+
+    CORS(JSON(BuildVersion {
+        build:   version.to_string(),
+        api:     0
+    }))
 }
 
 
