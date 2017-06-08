@@ -107,6 +107,7 @@ pub mod v0;
 pub mod mock;
 pub mod docs;
 pub mod toml;
+pub mod bdcs_server;
 
 // defaults for queries that return multiple responses
 pub static OFFSET: i64 = 0;

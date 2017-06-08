@@ -20,6 +20,7 @@
 //! * `--port` - Port to use, defaults to `4000`
 //! * `--log` - Path to logfile, which uses the slog JSON format. Defaults to `/var/log/bdcs-api.log`
 //! * `--mockfiles` - Path to JSON files used for `/api/mock/` paths. Defaults to `/var/tmp/bdcs-mockfiles/`
+//! * `--bdcs` - Path to the content store. Static files are served from the /api/bdcs/ path.
 //! * `DB` - Path to the metadata sqlite database created by the Haskell bdcs utility.
 //! * `RECIPES` - Path to the directory holding the TOML formatted recipes.
 //!
@@ -59,8 +60,9 @@ extern crate toml;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
+use bdcs::api::bdcs_server::BDCSPath;
 use bdcs::{RocketToml, RocketConfig};
-use bdcs::api::{v0, mock, docs};
+use bdcs::api::{v0, mock, docs, bdcs_server};
 use bdcs::db::DBPool;
 use bdcs::recipe::{self, RecipeRepo};
 use clap::{Arg, App};
@@ -97,6 +99,11 @@ fn main() {
                                         .value_name("MOCKFILES")
                                         .help("Path to JSON files used for /api/mock/ paths")
                                         .takes_value(true))
+                            .arg(Arg::with_name("bdcs")
+                                        .long("bdcs")
+                                        .value_name("BDCS")
+                                        .help("Path to the content store directory")
+                                        .takes_value(true))
                             .arg(Arg::with_name("DB")
                                         .help("Path to the BDCS sqlite database")
                                         .required(true)
@@ -112,6 +119,7 @@ fn main() {
         global: RocketConfig {
             address: matches.value_of("host").unwrap_or("127.0.0.1").to_string(),
             port: matches.value_of("port").unwrap_or("").parse().unwrap_or(4000),
+            bdcs_path: matches.value_of("bdcs").unwrap_or("/mddb/cs.repo").to_string(),
             db_path: matches.value_of("DB").unwrap().to_string(),
             recipe_path: matches.value_of("RECIPES").unwrap().to_string(),
             log_path: matches.value_of("log").unwrap_or("/var/log/bdcs-api.log").to_string(),
@@ -168,7 +176,9 @@ fn main() {
                                      mock::static_route_param, mock::static_route_param_filter,
                                      mock::static_route_action, mock::static_route_action_filter])
         .mount("/api/docs/", routes![docs::index, docs::files])
+        .mount("/api/bdcs/", routes![bdcs_server::files])
         .manage(DBPool::new(&rocket_config.global.db_path))
         .manage(RecipeRepo::new(&rocket_config.global.recipe_path))
+        .manage(BDCSPath(rocket_config.global.bdcs_path))
         .launch();
 }

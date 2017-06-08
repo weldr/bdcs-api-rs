@@ -79,6 +79,7 @@ pub struct RocketToml {
 pub struct RocketConfig {
     pub address: String,
     pub port: usize,
+    pub bdcs_path: String,
     pub db_path: String,
     pub recipe_path: String,
     pub log_path: String,
