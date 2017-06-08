@@ -115,6 +115,7 @@ fn write_config() {
         global: RocketConfig {
             address: "127.0.0.1".to_string(),
             port: 4000,
+            bdcs_path: "".to_string(),
             db_path: DB_PATH.to_string(),
             recipe_path: RECIPE_PATH.to_string(),
             log_path: "/var/log/bdcs-api.log".to_string(),
