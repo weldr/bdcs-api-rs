@@ -3,14 +3,28 @@ language: rust
 rust:
   - nightly
 before_install:
-    - sudo apt-get install libssh2-1-dev
+    - sudo apt-get update
     - pip install -r ./tests/depclose-integration/requirements.txt
+    - if [ "$_CMD" == "test" ]; then cargo install cargo-travis; fi
+addons:
+  apt:
+    packages:
+      # dependencies for bdcs-api-rs
+      - libssh2-1-dev
+      # dependencies of kcov, used by coverage
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - binutils-dev
+      - cmake
 env:
   - _CMD=test
   - _CMD=clippy
   - _CMD=depclose-travis
 script:
   - make $_CMD
+after_success:
+  - if [ "$_CMD" == "test" ]; then cargo coveralls; fi
 notifications:
   email:
     on_failure: change
