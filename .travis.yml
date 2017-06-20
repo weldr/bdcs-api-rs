@@ -11,6 +11,8 @@ addons:
     packages:
       # dependencies for bdcs-api-rs
       - libssh2-1-dev
+      # used by Makefile
+      - realpath
       # dependencies of kcov, used by coverage
       - libcurl4-openssl-dev
       - libelf-dev

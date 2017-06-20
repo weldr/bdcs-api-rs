@@ -21,4 +21,4 @@ test: bdcs-api
 depclose-travis: bdcs-api
 	wget https://s3.amazonaws.com/atodorov/metadata_centos7.db.gz
 	gunzip ./metadata_centos7.db.gz
-	METADATA_DB=./metadata_centos7.db make -C ./tests/depclose-integration/ test
+	METADATA_DB=`realpath ./metadata_centos7.db` make -C ./tests/depclose-integration/ test
