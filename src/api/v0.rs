@@ -653,7 +653,7 @@ fn  depsolve_recipe(db: &State<DBPool>, repo: &State<RecipeRepo>, name: &str) ->
 /// Create a new recipe with the frozen package NEVRAs instead of version expressions
 ///
 /// Returns a new Recipe
-fn freeze_recipe(recipe: &Recipe, pkg_nevras: &Vec<PackageNEVRA>) -> Recipe {
+fn freeze_recipe(recipe: &Recipe, pkg_nevras: &[PackageNEVRA]) -> Recipe {
     // Make a new list of modules, with the version numbers
     let mut modules = Vec::new();
     for m in &recipe.modules {

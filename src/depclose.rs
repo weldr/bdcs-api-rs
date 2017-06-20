@@ -386,6 +386,8 @@ pub fn close_dependencies(conn: &Connection, arches: &[String], packages: &[Stri
 // Test functions
 // TODO share this between here and tests/db.rs
 #[cfg(test)]
+// clippy isn't very good at firguring out we use this in tests
+#[cfg_attr(feature="cargo-clippy", allow(unused_macros))]
 macro_rules! assert_eq_no_order {
     ($a:expr, $b:expr) => {
         {
