@@ -1,0 +1,6 @@
+.git
+target
+Cargo.lock
+Rocket.toml
+*swp
+*.pyc
