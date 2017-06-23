@@ -24,7 +24,7 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::clone::Clone;
-use std::fs::{File, create_dir_all};
+use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::path::Path;
@@ -133,17 +133,17 @@ pub struct Recipe {
 
 impl Recipe {
     /// Convert the recipe name to a filename
-    fn filename(&self) -> Result<String, RecipeError> {
+    pub fn filename(&self) -> Result<String, RecipeError> {
         recipe_filename(&self.name)
     }
 
     /// Convert the version string to a SemVer Version
-    fn version(&self) -> Result<semver::Version, RecipeError> {
+    pub fn version(&self) -> Result<semver::Version, RecipeError> {
         Ok(try!(semver::Version::parse(&self.version)))
     }
 
     /// Increment the patch number (z in x.y.z)
-    fn increment_patch(&mut self) -> Result<(), RecipeError> {
+    pub fn increment_patch(&mut self) -> Result<(), RecipeError> {
         let mut version = try!(semver::Version::parse(&self.version));
         version.increment_patch();
         self.version = version.to_string();
@@ -152,7 +152,7 @@ impl Recipe {
 
     /// Increment the minor number (y in x.y.z), and set z=0
     #[allow(dead_code)]
-    fn increment_minor(&mut self) -> Result<(), RecipeError> {
+    pub fn increment_minor(&mut self) -> Result<(), RecipeError> {
         let mut version = try!(semver::Version::parse(&self.version));
         version.increment_minor();
         self.version = version.to_string();
@@ -161,14 +161,14 @@ impl Recipe {
 
     /// Increment the major number (x in x.y.z) and set z=0
     #[allow(dead_code)]
-    fn increment_major(&mut self) -> Result<(), RecipeError> {
+    pub fn increment_major(&mut self) -> Result<(), RecipeError> {
         let mut version = try!(semver::Version::parse(&self.version));
         version.increment_major();
         self.version = version.to_string();
         Ok(())
     }
-
 }
+
 
 /// Recipe Modules
 ///
@@ -179,6 +179,7 @@ pub struct Modules {
     pub name: String,
     pub version: Option<String>
 }
+
 
 /// Recipe Packages
 ///
@@ -221,7 +222,7 @@ fn find_last_commit(repo: &Repository) -> Result<Commit, git2::Error> {
 ///
 /// This appends '.toml' to the recipe name after replacing spaces with '-'
 ///
-fn recipe_filename(name: &str) -> Result<String, RecipeError> {
+pub fn recipe_filename(name: &str) -> Result<String, RecipeError> {
     if !name.is_empty() {
         Ok(format!("{}.toml", name.replace(" ", "-")))
     } else {
@@ -259,7 +260,6 @@ pub fn init_repo(path: &str) -> Result<Repository, RecipeError> {
         return Ok(try!(Repository::open(&repo_path)));
     }
 
-    try!(create_dir_all(&repo_path));
     let repo = try!(Repository::init_bare(&repo_path));
     {
         // Make an initial empty commit

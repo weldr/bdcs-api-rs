@@ -110,6 +110,7 @@ use depsolve::*;
 use recipe::{self, RecipeRepo, Recipe, RecipeCommit};
 use api::{CORS, Filter, Format, OFFSET, LIMIT};
 use api::toml::TOML;
+use workspace::{write_to_workspace, read_from_workspace, workspace_dir};
 
 
 
@@ -1084,14 +1085,22 @@ pub struct RecipesInfoResponse {
 /// ```
 ///
 #[get("/recipes/info/<recipe_names>")]
-pub fn recipes_info(recipe_names: &str, repo: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
+pub fn recipes_info(recipe_names: &str, repo_state: State<RecipeRepo>) -> CORS<JSON<RecipesInfoResponse>> {
     info!("/recipes/info/ (JSON)"; "recipe_names" => recipe_names);
     // TODO Get the user's branch name. Use master for now.
 
+    let repo = repo_state.repo();
     let mut result = Vec::new();
     for name in recipe_names.split(',') {
-        let _ = recipe::read(&repo.repo(), name, "master", None).map(|recipe| {
-            result.push(recipe);
+        let _ = recipe::read(&repo, name, "master", None).map(|recipe| {
+            debug!("recipes_info"; "recipe" => format!("{:?}", recipe));
+            let ws_recipe = match read_from_workspace(&workspace_dir(&repo, "master"), name) {
+                Some(r) => r,
+                None => recipe
+            };
+            let changed = recipe != ws_recipe;
+            debug!("workspace vs. git"; "changed" => format!("{:?}", changed));
+            result.push(ws_recipe);
         });
     }
     // Sort by case-insensitive name
@@ -1117,10 +1126,21 @@ pub fn recipes_info_toml(recipe_name: &str, format: Format, repo: State<RecipeRe
     info!("/recipes/info/ (TOML)"; "recipe_name" => recipe_name, "format" => format!("{:?}", format));
     // TODO Get the user's branch name. Use master for now.
 
+    let result = match recipe::read(&repo.repo(), recipe_name, "master", None) {
+        Ok(recipe) => {
+            let ws_recipe = match read_from_workspace(&workspace_dir(&repo.repo(), "master"), recipe_name) {
+                Some(r) => r,
+                None => recipe
+            };
+            let changed = recipe == ws_recipe;
+            debug!("workspace vs. git"; "changed" => format!("{:?}", changed));
+            ws_recipe
+        }
+        Err(e) => Err(e)
+    });
+
     // TODO Error handling for format requests other than toml
-    CORS(TOML(
-        recipe::read(&repo.repo(), recipe_name, "master", None).unwrap()
-    ))
+    Ok(CORS(TOML(result)))
 }
 
 // /recipes/freeze/<names>
@@ -1551,17 +1571,32 @@ pub fn options_recipes_new() -> CORS<&'static str> {
 /// }
 /// ```
 #[post("/recipes/new", format="application/json", data="<recipe>")]
-pub fn recipes_new_json(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+pub fn recipes_new_json(recipe: JSON<Recipe>, repo_state: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
     info!("/recipes/new/ (JSON)"; "recipe.name" => recipe.name);
     // TODO Get the user's branch name. Use master for now.
 
-    let status = match recipe::write(&repo.repo(), &recipe, "master", None) {
+    let repo = repo_state.repo();
+    let mut status = match recipe::write(&repo, &recipe, "master", None) {
         Ok(result) => result,
         Err(e) => {
             error!("recipes_new"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
             false
         }
     };
+
+    if status == true {
+        // Read the latest commit, the version may have been changed so it could be different
+        let _ = recipe::read(&repo, &recipe.name, "master", None).map(|new_recipe| {
+            // Update the workspace copy, log any errors
+            match write_to_workspace(&workspace_dir(&repo, "master"), &new_recipe) {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("recipes_new workspace"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+                    status = false;
+                }
+            };
+        });
+    }
 
     // TODO Return error information
     CORS(JSON(RecipesNewResponse {
@@ -1578,15 +1613,25 @@ pub fn recipes_new_json(recipe: JSON<Recipe>, repo: State<RecipeRepo>) -> CORS<J
 /// eg. `curl -H "Content-Type: text/x-toml" -X POST --data-binary @nginx.toml http://API/URL`
 ///
 #[post("/recipes/new", data="<recipe>", rank=2)]
-pub fn recipes_new_toml(recipe: TOML<Recipe>, repo: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+pub fn recipes_new_toml(recipe: TOML<Recipe>, repo_state: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
     info!("/recipes/new/ (TOML)"; "recipe.name" => recipe.name);
     // TODO Get the user's branch name. Use master for now.
 
-    let status = match recipe::write(&repo.repo(), &recipe, "master", None) {
+    let repo = repo_state.repo();
+    let mut status = match recipe::write(&repo, &recipe, "master", None) {
         Ok(result) => result,
         Err(e) => {
-            error!("recipes_new"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+            error!("recipes_new_toml"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
             false
+        }
+    };
+
+    // Update the workspace copy, log any errors
+    match write_to_workspace(&workspace_dir(&repo, "master"), &recipe) {
+        Ok(_) => (),
+        Err(e) => {
+            error!("recipes_new_toml workspace"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+            status = false;
         }
     };
 

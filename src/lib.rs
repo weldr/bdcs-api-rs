@@ -57,6 +57,18 @@ macro_rules! try_opt {
     )
 }
 
+// A macro to turn a Result Err() into a None return value
+macro_rules! err_opt {
+    ($e:expr, $r:expr) => (
+        match $e {
+            Ok(t) => t,
+            Err(_) => return $r,
+        }
+    )
+}
+
+
+
 
 pub mod api;
 pub mod db;
@@ -64,6 +76,7 @@ pub mod depclose;
 pub mod depsolve;
 pub mod recipe;
 pub mod rpm;
+pub mod workspace;
 
 // FIXME figure out how to conditionally compile this but also have it
 // available for integration tests

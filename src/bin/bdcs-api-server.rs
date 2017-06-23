@@ -59,12 +59,14 @@ extern crate toml;
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::path::PathBuf;
 
 use bdcs::api::bdcs_server::BDCSPath;
 use bdcs::{RocketToml, RocketConfig};
 use bdcs::api::{v0, mock, docs, bdcs_server};
 use bdcs::db::DBPool;
 use bdcs::recipe::{self, RecipeRepo};
+use bdcs::workspace::check_workspace_dir;
 use clap::{Arg, App};
 use slog::DrainExt;
 
@@ -151,6 +153,9 @@ fn main() {
     {
         let repo = recipe::init_repo(&rocket_config.global.recipe_path).unwrap();
         recipe::add_dir(&repo, &rocket_config.global.recipe_path, "master", false).unwrap();
+
+        // Setup the workspace directory
+        check_workspace_dir(&PathBuf::from(repo.path()).join("workspace")).unwrap();
     }
 
     rocket::ignite()
