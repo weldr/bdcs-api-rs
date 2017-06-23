@@ -53,7 +53,7 @@ fn group_matches_arch(conn: &Connection, group_id: i64, arches: &[String]) -> bo
     match get_groups_kv_group_id(conn, group_id) {
         Ok(kvs) => { for kv in kvs {
                          if kv.key_value == "arch" {
-                             return kv.val_value == "noarch" || arches.contains(&kv.val_value);
+                             return kv.val_value == Some("noarch".to_string()) || arches.contains(&kv.val_value.unwrap_or_default());
                          }
                      }
 
@@ -84,10 +84,10 @@ fn group_id_to_requirement(conn: &Connection, group_id: GroupId) -> Result<(Grou
         Ok(group_key_vals) => {
             for kv in group_key_vals {
                 match kv.key_value.as_str() {
-                    "name"    => name =    Some(kv.val_value),
-                    "version" => version = Some(kv.val_value),
-                    "epoch"   => epoch =   Some(kv.val_value),
-                    "release" => release = Some(kv.val_value),
+                    "name"    => name =    kv.val_value,
+                    "version" => version = kv.val_value,
+                    "epoch"   => epoch =   kv.val_value,
+                    "release" => release = kv.val_value,
                     _         => ()
                 }
             }
@@ -403,14 +403,14 @@ macro_rules! assert_eq_no_order {
 #[test]
 fn test_provider_to_requirement_err() {
     assert!(provider_to_requirement(&Groups{id: 1, name: "whatever".to_string(), group_type: "test".to_string()},
-                                    &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: "something".to_string(), ext_value: None}
+                                    &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: Some("something".to_string()), ext_value: None}
                                    ).is_err());
 }
 
 #[test]
 fn test_provider_to_requirement_ok() -> () {
     assert_eq!(provider_to_requirement(&Groups{id: 47, name: "whatever".to_string(), group_type: "test".to_string()},
-                                       &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: "something".to_string(), ext_value: Some("something >= 1.0".to_string())}),
+                                       &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: Some("something".to_string()), ext_value: Some("something >= 1.0".to_string())}),
                Ok((47, Requirement::from("something >= 1.0"))));
 }
 

@@ -153,7 +153,7 @@ pub struct KeyVal {
     #[serde(skip_serializing)]
     pub id: i64,
     pub key_value: String,
-    pub val_value: String,
+    pub val_value: Option<String>,
     pub ext_value: Option<String>
 }
 
@@ -185,8 +185,8 @@ impl KeyVal {
 /// * HashMap of Key, (Value, Ext Value)
 ///
 ///
-fn keyval_hash(kvs: &[KeyVal]) -> HashMap<String, (String, Option<String>)> {
-    let mut hash: HashMap<String, (String, Option<String>)> = HashMap::new();
+fn keyval_hash(kvs: &[KeyVal]) -> HashMap<String, (Option<String>, Option<String>)> {
+    let mut hash: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
     for kv in kvs {
         hash.entry(kv.key_value.clone()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
     }
@@ -1101,11 +1101,14 @@ pub fn pkg_nevra_group_id(conn: &Connection, group_id: i64) -> Option<PackageNEV
     let mut group_md = keyval_hash(&kvs);
 
     Some(PackageNEVRA {
-        name:    try_opt!(group_md.remove("name"), None).0,
-        epoch:   group_md.remove("epoch").and_then(|e| e.0.parse().ok()).unwrap_or(0),
-        version: try_opt!(group_md.remove("version"), None).0,
-        release: try_opt!(group_md.remove("release"), None).0,
-        arch:    try_opt!(group_md.remove("arch"), None).0
+        // In the keyval_hash, the vals are an Option type, so they could be None.
+        // They shouldn't be, but it's possible according to the schema.  If any of
+        // them ends up being None, raise an error.  It's okay if Epoch is, though.
+        name:    try_opt!(try_opt!(group_md.remove("name"), None).0, None),
+        epoch:   group_md.remove("epoch").and_then(|e| e.0.unwrap_or_default().parse().ok()).unwrap_or(0),
+        version: try_opt!(try_opt!(group_md.remove("version"), None).0, None),
+        release: try_opt!(try_opt!(group_md.remove("release"), None).0, None),
+        arch:    try_opt!(try_opt!(group_md.remove("arch"), None).0, None)
     })
 }
 
@@ -1137,7 +1140,7 @@ pub struct ProjectInfo {
     description: String,
     homepage: Option<String>,
     upstream_vcs: String,
-    metadata: Option<HashMap<String, (String, Option<String>)>>,
+    metadata: Option<HashMap<String, (Option<String>, Option<String>)>>,
     builds: Option<Vec<BuildInfo>>,
 }
 
@@ -1150,7 +1153,7 @@ pub struct BuildInfo {
     changelog: String,
     build_config_ref: String,
     build_env_ref: String,
-    metadata: Option<HashMap<String, (String, Option<String>)>>,
+    metadata: Option<HashMap<String, (Option<String>, Option<String>)>>,
     source: Option<SourceInfo>,
 }
 
@@ -1159,7 +1162,7 @@ pub struct SourceInfo {
     license: String,
     version: String,
     source_ref: String,
-    metadata: Option<HashMap<String, (String, Option<String>)>>
+    metadata: Option<HashMap<String, (Option<String>, Option<String>)>>
 }
 
 

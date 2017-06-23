@@ -26,7 +26,7 @@ use std::str::FromStr;
 // id-less data types for creating test data
 pub struct TestKeyValues {
     pub key_value: String,
-    pub val_value: String,
+    pub val_value: Option<String>,
     pub ext_value: Option<String>
 }
 
@@ -333,7 +333,7 @@ create index build_files_file_id_idx on build_files(file_id);
 create table key_val (
     id integer primary key,
     key_value text not null,
-    val_value text not null,
+    val_value text,
     ext_value text
 );
 
@@ -459,25 +459,25 @@ pub fn testpkg(name: &str, epoch: Option<u32>, version: &str, release: &str, arc
 pub fn create_test_packages(data: &[TestPkg]) -> rusqlite::Result<Connection> {
     fn pkg_to_group(pkg: &TestPkg) -> TestData {
         let mut key_vals: Vec<TestKeyValues> = vec![
-            TestKeyValues{key_value: "name".to_string(), val_value: pkg.name.clone(), ext_value: None},
-            TestKeyValues{key_value: "version".to_string(), val_value: pkg.evr.version.clone(), ext_value: None},
-            TestKeyValues{key_value: "release".to_string(), val_value: pkg.evr.release.clone(), ext_value: None},
-            TestKeyValues{key_value: "arch".to_string(), val_value: pkg.arch.clone(), ext_value: None}];
+            TestKeyValues{key_value: "name".to_string(), val_value: Some(pkg.name.clone()), ext_value: None},
+            TestKeyValues{key_value: "version".to_string(), val_value: Some(pkg.evr.version.clone()), ext_value: None},
+            TestKeyValues{key_value: "release".to_string(), val_value: Some(pkg.evr.release.clone()), ext_value: None},
+            TestKeyValues{key_value: "arch".to_string(), val_value: Some(pkg.arch.clone()), ext_value: None}];
 
         if let Some(epoch) = pkg.evr.epoch {
-            key_vals.push(TestKeyValues{key_value: "epoch".to_string(), val_value: epoch.to_string(), ext_value: None});
+            key_vals.push(TestKeyValues{key_value: "epoch".to_string(), val_value: Some(epoch.to_string()), ext_value: None});
         }
 
         for p in &pkg.provides {
-            key_vals.push(TestKeyValues{key_value: "rpm-provide".to_string(), val_value: p.name.clone(), ext_value: Some(p.to_string())});
+            key_vals.push(TestKeyValues{key_value: "rpm-provide".to_string(), val_value: Some(p.name.clone()), ext_value: Some(p.to_string())});
         }
 
         for o in &pkg.obsoletes {
-            key_vals.push(TestKeyValues{key_value: "rpm-obsolete".to_string(), val_value: o.name.clone(), ext_value: Some(o.to_string())});
+            key_vals.push(TestKeyValues{key_value: "rpm-obsolete".to_string(), val_value: Some(o.name.clone()), ext_value: Some(o.to_string())});
         }
 
         for c in &pkg.conflicts {
-            key_vals.push(TestKeyValues{key_value: "rpm-conflict".to_string(), val_value: c.name.clone(), ext_value: Some(c.to_string())});
+            key_vals.push(TestKeyValues{key_value: "rpm-conflict".to_string(), val_value: Some(c.name.clone()), ext_value: Some(c.to_string())});
         }
 
         let requirements: Vec<TestRequirements> = pkg.requires.iter().map(|r| TestRequirements{req_language: "RPM".to_string(), req_context: "Runtime".to_string(),
