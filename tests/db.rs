@@ -46,18 +46,18 @@ fn test_db_1() -> rusqlite::Result<Connection> {
                    TestData::Groups(TestGroups{name: "group-one".to_string(),
                                                group_type: "rpm".to_string(),
                                                files: vec![TestFiles{path: "/one/1".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
-                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: Some("group-one".to_string()), ext_value: None}]},
+                                                                     key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("group-one".to_string()), ext_value: None}]},
                                                            TestFiles{path: "/one/2".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
-                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: Some("group-one".to_string()), ext_value: None}]}],
+                                                                     key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("group-one".to_string()), ext_value: None}]}],
                                                children: vec![],
                                                key_vals: vec![],
                                                requirements: vec![]}),
                    TestData::Groups(TestGroups{name: "group-two".to_string(),
                                                group_type: "rpm".to_string(),
                                                files: vec![TestFiles{path: "/two/1".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
-                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: Some("group-two".to_string()), ext_value: None}]},
+                                                                     key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("group-two".to_string()), ext_value: None}]},
                                                            TestFiles{path: "/two/2".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
-                                                                     key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: Some("group-two".to_string()), ext_value: None}]}],
+                                                                     key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("group-two".to_string()), ext_value: None}]}],
                                                children: vec![],
                                                key_vals: vec![],
                                                requirements: vec![]})
@@ -103,7 +103,7 @@ fn test_db_2() -> rusqlite::Result<Connection> {
                                                                                   build_env_ref: "".to_string(), signatures: vec![], key_vals: vec![],
                                                                                   files: vec![
                                                                                       TestFiles{path: "/r1/1".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
-                                                                                                key_vals: vec![TestKeyValues{key_value: "packageName".to_string(), val_value: Some("project-one".to_string()), ext_value: None}]}
+                                                                                                key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("project-one".to_string()), ext_value: None}]}
                                                                                               ]}
                                                                                ]}
                                                                 ]})
@@ -132,7 +132,7 @@ fn test_db_3() -> rusqlite::Result<Connection> {
                                   files: vec![],
                                   children: vec![],
                                   key_vals: vec![
-                                      TestKeyValues{key_value: "name".to_string(),
+                                      TestKeyValues{key_value: "TextKey \"name\"".to_string(),
                                                     val_value: Some("test-package".to_string()),
                                                     ext_value: None}
                                   ],

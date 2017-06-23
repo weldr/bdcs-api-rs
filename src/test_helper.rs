@@ -459,25 +459,25 @@ pub fn testpkg(name: &str, epoch: Option<u32>, version: &str, release: &str, arc
 pub fn create_test_packages(data: &[TestPkg]) -> rusqlite::Result<Connection> {
     fn pkg_to_group(pkg: &TestPkg) -> TestData {
         let mut key_vals: Vec<TestKeyValues> = vec![
-            TestKeyValues{key_value: "name".to_string(), val_value: Some(pkg.name.clone()), ext_value: None},
-            TestKeyValues{key_value: "version".to_string(), val_value: Some(pkg.evr.version.clone()), ext_value: None},
-            TestKeyValues{key_value: "release".to_string(), val_value: Some(pkg.evr.release.clone()), ext_value: None},
-            TestKeyValues{key_value: "arch".to_string(), val_value: Some(pkg.arch.clone()), ext_value: None}];
+            TestKeyValues{key_value: "TextKey \"name\"".to_string(), val_value: Some(pkg.name.clone()), ext_value: None},
+            TestKeyValues{key_value: "TextKey \"version\"".to_string(), val_value: Some(pkg.evr.version.clone()), ext_value: None},
+            TestKeyValues{key_value: "TextKey \"release\"".to_string(), val_value: Some(pkg.evr.release.clone()), ext_value: None},
+            TestKeyValues{key_value: "TextKey \"arch\"".to_string(), val_value: Some(pkg.arch.clone()), ext_value: None}];
 
         if let Some(epoch) = pkg.evr.epoch {
-            key_vals.push(TestKeyValues{key_value: "epoch".to_string(), val_value: Some(epoch.to_string()), ext_value: None});
+            key_vals.push(TestKeyValues{key_value: "TextKey \"epoch\"".to_string(), val_value: Some(epoch.to_string()), ext_value: None});
         }
 
         for p in &pkg.provides {
-            key_vals.push(TestKeyValues{key_value: "rpm-provide".to_string(), val_value: Some(p.name.clone()), ext_value: Some(p.to_string())});
+            key_vals.push(TestKeyValues{key_value: "TextKey \"rpm-provide\"".to_string(), val_value: Some(p.name.clone()), ext_value: Some(p.to_string())});
         }
 
         for o in &pkg.obsoletes {
-            key_vals.push(TestKeyValues{key_value: "rpm-obsolete".to_string(), val_value: Some(o.name.clone()), ext_value: Some(o.to_string())});
+            key_vals.push(TestKeyValues{key_value: "TextKey \"rpm-obsolete\"".to_string(), val_value: Some(o.name.clone()), ext_value: Some(o.to_string())});
         }
 
         for c in &pkg.conflicts {
-            key_vals.push(TestKeyValues{key_value: "rpm-conflict".to_string(), val_value: Some(c.name.clone()), ext_value: Some(c.to_string())});
+            key_vals.push(TestKeyValues{key_value: "TextKey \"rpm-conflict\"".to_string(), val_value: Some(c.name.clone()), ext_value: Some(c.to_string())});
         }
 
         let requirements: Vec<TestRequirements> = pkg.requires.iter().map(|r| TestRequirements{req_language: "RPM".to_string(), req_context: "Runtime".to_string(),
@@ -498,11 +498,11 @@ pub fn get_nevra_group_id(conn: &Connection, name: &str, epoch: Option<u32>, ver
     conn.query_row_named("
         select groups.id
         from groups
-        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'name') name on groups.id == name.group_id
-        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'version') ver  on groups.id == ver.group_id
-        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'release') rel on groups.id == rel.group_id
-        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'arch') arch on groups.id == arch.group_id
-        left outer join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'epoch') epoch on groups.id == epoch.group_id
+        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'TextKey \"name\"') name on groups.id == name.group_id
+        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'TextKey \"version\"') ver  on groups.id == ver.group_id
+        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'TextKey \"release\"') rel on groups.id == rel.group_id
+        join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'TextKey \"arch\"') arch on groups.id == arch.group_id
+        left outer join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'TextKey \"epoch\"') epoch on groups.id == epoch.group_id
         where name.val_value == :name and
               epoch.val_value is :epoch and
               ver.val_value  == :version and

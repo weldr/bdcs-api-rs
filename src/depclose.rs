@@ -52,7 +52,7 @@ impl fmt::Display for DepExpression {
 fn group_matches_arch(conn: &Connection, group_id: i64, arches: &[String]) -> bool {
     match get_groups_kv_group_id(conn, group_id) {
         Ok(kvs) => { for kv in kvs {
-                         if kv.key_value == "arch" {
+                         if kv.key_value == "TextKey \"arch\"".to_string() {
                              return kv.val_value == Some("noarch".to_string()) || arches.contains(&kv.val_value.unwrap_or_default());
                          }
                      }
@@ -84,11 +84,11 @@ fn group_id_to_requirement(conn: &Connection, group_id: GroupId) -> Result<(Grou
         Ok(group_key_vals) => {
             for kv in group_key_vals {
                 match kv.key_value.as_str() {
-                    "name"    => name =    kv.val_value,
-                    "version" => version = kv.val_value,
-                    "epoch"   => epoch =   kv.val_value,
-                    "release" => release = kv.val_value,
-                    _         => ()
+                    "TextKey \"name\""      => name     = kv.val_value,
+                    "TextKey \"version\""   => version  = kv.val_value,
+                    "TextKey \"epoch\""     => epoch    = kv.val_value,
+                    "TextKey \"release\""   => release  = kv.val_value,
+                    _                       => ()
                 }
             }
         },
@@ -230,9 +230,9 @@ fn depclose_package(conn: &Connection, arches: &[String], group_id: GroupId, par
         Ok(ref group_key_vals) => {
             for kv in group_key_vals.iter() {
                 match kv.key_value.as_str() {
-                    "rpm-conflict" => conflicts.push(try!(kv_to_req(kv))),
-                    "rpm-obsolete" => obsoletes.push(try!(kv_to_req(kv))),
-                    _              => ()
+                    "TextKey \"rpm-conflict\"" => conflicts.push(try!(kv_to_req(kv))),
+                    "TextKey \"rpm-obsolete\"" => obsoletes.push(try!(kv_to_req(kv))),
+                    _                          => ()
                 }
             }
         },
@@ -403,14 +403,14 @@ macro_rules! assert_eq_no_order {
 #[test]
 fn test_provider_to_requirement_err() {
     assert!(provider_to_requirement(&Groups{id: 1, name: "whatever".to_string(), group_type: "test".to_string()},
-                                    &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: Some("something".to_string()), ext_value: None}
+                                    &KeyVal{id: 1, key_value: "TextKey \"rpm-provide\"".to_string(), val_value: Some("something".to_string()), ext_value: None}
                                    ).is_err());
 }
 
 #[test]
 fn test_provider_to_requirement_ok() -> () {
     assert_eq!(provider_to_requirement(&Groups{id: 47, name: "whatever".to_string(), group_type: "test".to_string()},
-                                       &KeyVal{id: 1, key_value: "rpm-provide".to_string(), val_value: Some("something".to_string()), ext_value: Some("something >= 1.0".to_string())}),
+                                       &KeyVal{id: 1, key_value: "TextKey \"rpm-provide".to_string(), val_value: Some("something".to_string()), ext_value: Some("something >= 1.0".to_string())}),
                Ok((47, Requirement::from("something >= 1.0"))));
 }
 

@@ -188,7 +188,11 @@ impl KeyVal {
 fn keyval_hash(kvs: &[KeyVal]) -> HashMap<String, (Option<String>, Option<String>)> {
     let mut hash: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
     for kv in kvs {
-        hash.entry(kv.key_value.clone()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
+        // The database was made by the Haskell-based importer, which has special types
+        // for the key column.  We do not, so we have to understand how Haskell serializes
+        // those types and undo it here.
+        let key = kv.key_value.trim_left_matches("TextKey ").trim_matches('"');
+        hash.entry(key.clone().to_string()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
     }
     hash
 }
@@ -299,7 +303,7 @@ pub fn get_pkg_files_name(conn: &Connection, pkgname: &str) -> rusqlite::Result<
             from files, key_val, file_key_values
             on key_val.id == file_key_values.key_val_id and
                file_key_values.file_id == files.id
-            where key_val.key_value == 'packageName' and
+            where key_val.key_value == 'TextKey \"packageName\"' and
                   key_val.val_value == :pkgname"));
     let mut rows = try!(stmt.query_named(&[(":pkgname", &pkgname)]));
 
@@ -357,7 +361,7 @@ pub fn get_groups_by_name (conn: &Connection, group_name: &str, group_type: &str
         on groups.id == group_key_values.group_id and
            key_val.id == group_key_values.key_val_id
         where groups.group_type == :type
-          and key_val.key_value == 'name'
+          and key_val.key_value == 'TextKey \"name\"'
           and key_val.val_value == :name
     "));
     let rows = try!(stmt.query_map_named(
@@ -404,7 +408,7 @@ pub fn get_pkg_files_nevra (conn: &Connection, pkgname: &str,
                builds.source_id == sources.id and
                build_files.build_id == builds.id and
                build_files.file_id == files.id
-            where key_val.key_value == 'packageName' and
+            where key_val.key_value == 'TextKey \"packageName\"' and
                   key_val.val_value == :pkgname and
                   sources.version == :version and
                   builds.epoch == :epoch and
@@ -989,7 +993,7 @@ pub fn get_group_obsoletes(conn: &Connection, group_id: i64) -> rusqlite::Result
             select distinct groups.*, key_val.*
             from groups, key_val, group_key_values
             on key_val.id == group_key_values.key_val_id and group_key_values.group_id == groups.id
-            where groups.id == :group_id and key_val.key_value == 'rpm-obsolete'"));
+            where groups.id == :group_id and key_val.key_value == 'TextKey \"rpm-obsolete\"'"));
     let mut rows = try!(stmt.query_named(&[(":group_id", &group_id)]));
 
     let mut contents = Vec::new();
@@ -1032,7 +1036,7 @@ pub fn get_provider_groups(conn: &Connection, thing: &str) -> rusqlite::Result<V
             select distinct groups.*, key_val.*
             from groups, key_val, group_key_values
             on key_val.id == group_key_values.key_val_id and group_key_values.group_id == groups.id
-            where key_val.val_value == :thing and key_val.key_value == 'rpm-provide'"));
+            where key_val.val_value == :thing and key_val.key_value == 'TextKey \"rpm-provide\"'"));
     let mut rows = try!(stmt.query_named(&[(":thing", &base_thing)]));
 
     let mut contents = Vec::new();
