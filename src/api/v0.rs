@@ -108,7 +108,7 @@ use db::*;
 use depclose::*;
 use depsolve::*;
 use recipe::{self, RecipeRepo, Recipe, RecipeCommit};
-use api::{CORS, Filter, Format, OFFSET, LIMIT};
+use api::{ApiError, CORS, Filter, Format, OFFSET, LIMIT};
 use api::toml::TOML;
 use workspace::{write_to_workspace, read_from_workspace, workspace_dir};
 
@@ -1096,7 +1096,7 @@ pub fn recipes_info(recipe_names: &str, repo_state: State<RecipeRepo>) -> CORS<J
             debug!("recipes_info"; "recipe" => format!("{:?}", recipe));
             let ws_recipe = match read_from_workspace(&workspace_dir(&repo, "master"), name) {
                 Some(r) => r,
-                None => recipe
+                None => recipe.clone()
             };
             let changed = recipe != ws_recipe;
             debug!("workspace vs. git"; "changed" => format!("{:?}", changed));
@@ -1122,25 +1122,20 @@ pub fn recipes_info(recipe_names: &str, repo_state: State<RecipeRepo>) -> CORS<J
 ///
 /// TODO Figure out how to add custom content types
 #[get("/recipes/info/<recipe_name>?<format>", rank=3)]
-pub fn recipes_info_toml(recipe_name: &str, format: Format, repo: State<RecipeRepo>) -> CORS<TOML<Recipe>> {
+pub fn recipes_info_toml(recipe_name: &str, format: Format, repo_state: State<RecipeRepo>) -> Result<CORS<TOML<Recipe>>, ApiError> {
     info!("/recipes/info/ (TOML)"; "recipe_name" => recipe_name, "format" => format!("{:?}", format));
     // TODO Get the user's branch name. Use master for now.
 
-    let result = match recipe::read(&repo.repo(), recipe_name, "master", None) {
-        Ok(recipe) => {
-            let ws_recipe = match read_from_workspace(&workspace_dir(&repo.repo(), "master"), recipe_name) {
-                Some(r) => r,
-                None => recipe
-            };
-            let changed = recipe == ws_recipe;
-            debug!("workspace vs. git"; "changed" => format!("{:?}", changed));
-            ws_recipe
-        }
-        Err(e) => Err(e)
-    });
+    let repo = repo_state.repo();
+    let recipe = try!(recipe::read(&repo, recipe_name, "master", None));
+    let ws_recipe = match read_from_workspace(&workspace_dir(&repo, "master"), recipe_name) {
+        Some(r) => r,
+        None => recipe.clone()
+    };
+    let changed = recipe == ws_recipe;
+    debug!("workspace vs. git"; "changed" => format!("{:?}", changed));
 
-    // TODO Error handling for format requests other than toml
-    Ok(CORS(TOML(result)))
+    Ok(CORS(TOML(ws_recipe)))
 }
 
 // /recipes/freeze/<names>

@@ -97,11 +97,15 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
+use std::fmt;
+use std::error::Error as StdError;
 
 use hyper::method::Method;
 use rocket::http::hyper::header;
+use rocket::http::Status;
 use rocket::response::{self, Responder, Response};
 
+use recipe::RecipeError;
 
 pub mod v0;
 pub mod mock;
@@ -163,5 +167,47 @@ impl<'r, R: Responder<'r>> Responder<'r> for CORS<R> {
                 "Accept".into(),
             ]))
             .ok()
+    }
+}
+
+
+/// API Error handler
+#[derive(Debug)]
+pub enum ApiError {
+    NotFound,
+    InternalServerError,
+}
+
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ApiError::NotFound => f.write_str("NotFound"),
+            ApiError::InternalServerError => f.write_str("InternalServerError"),
+        }
+    }
+}
+
+impl StdError for ApiError {
+    fn description(&self) -> &str {
+        match *self {
+            ApiError::NotFound => "Not found",
+            ApiError::InternalServerError => "Internal server error",
+        }
+    }
+}
+
+impl<'r> Responder<'r> for ApiError {
+    fn respond(self) -> Result<Response<'r>, Status> {
+        match self {
+            ApiError::NotFound => Err(Status::NotFound),
+            _ => Err(Status::InternalServerError),
+        }
+    }
+}
+
+// Map all RecipeErrors to NotFound for now
+impl From<RecipeError> for ApiError {
+    fn from(_err: RecipeError) -> ApiError {
+        ApiError::NotFound
     }
 }
