@@ -174,6 +174,8 @@ fn main() {
                                    v0::recipes_changes_default, v0::recipes_changes_filter,
                                    v0::recipes_diff,
                                    v0::options_recipes_new, v0::recipes_new_json, v0::recipes_new_toml,
+                                   v0::options_recipes_workspace,
+                                   v0::recipes_workspace_json, v0::recipes_workspace_toml,
                                    v0::options_recipes_delete, v0::recipes_delete,
                                    v0::recipes_undo,
                                    v0::recipes_depsolve])

@@ -70,6 +70,11 @@
 //! * POST `/api/v0/recipes/undo/<recipe>/<commit>`
 //!  - Revert a recipe to a previous commit
 //!  - [Example JSON](fn.recipes_undo.html#examples)
+//! * POST `/api/v0/recipes/workspace`
+//!  - Update the temporary recipe workspace
+//!  - The body of the post is a JSON representation of the recipe, using the same format
+//!    received by `/api/v0/recipes/info/<recipes>` and `/api/v0/recipes/new`
+//!  - [Example JSON](fn.recipes_workspace.html#examples)
 //!
 //!
 //! ## TODO
@@ -1738,6 +1743,142 @@ pub fn recipes_undo(recipe_name: &str, commit: &str, repo: State<RecipeRepo>) ->
 
     // TODO Return error information
     CORS(JSON(RecipesUndoResponse {
+            status: status
+    }))
+}
+
+
+/// The CORS system 'protects' the client via an OPTIONS request to make sure it is allowed
+///
+/// This returns an empty response, with the CORS headers set by [CORS](struct.CORS.html).
+// Rocket has a collision with Diesel so uses route instead
+//#[options("/recipes/workspace/")]
+#[route(OPTIONS, "/recipes/workspace")]
+pub fn options_recipes_workspace() -> CORS<&'static str> {
+    CORS("")
+}
+
+
+/// Handler for `/recipes/workspace`
+/// Store a recipe in the temporary workspace
+///
+/// # Arguments
+///
+/// * `recipe` - Recipe to save, in JSON format
+///
+/// # Response
+///
+/// * JSON response with "status" set to true or false.
+///
+/// The body of the POST should be a valid Recipe in JSON format. If it cannot be parsed an
+/// error 400 will be returned.
+///
+///
+/// The temporary workspace storage is used as a convienient place to store a recipe while it is
+/// being edited. The workspace content will be returned by `/recipes/info/<name>` instead of the
+/// most recent commit. It will also be overwritten when a POST `/recipes/new` is executed.
+///
+/// # Examples
+///
+/// ## POST body
+///
+/// ```json
+/// {
+///     "name": "http-server",
+///     "description": "An example http server with PHP and MySQL support.",
+///     "version": "0.0.1",
+///     "modules": [
+///         {
+///             "name": "httpd",
+///             "version": "2.4.*"
+///         },
+///         {
+///             "name": "mod_auth_kerb",
+///             "version": "5.4"
+///         },
+///         {
+///             "name": "mod_ssl",
+///             "version": "2.4.*"
+///         },
+///         {
+///             "name": "php",
+///             "version": "5.4.*"
+///         },
+///         {
+///             "name": "php-mysql",
+///             "version": "5.4.*"
+///         }
+///     ],
+///     "packages": [
+///         {
+///             "name": "tmux",
+///             "version": "2.2"
+///         },
+///         {
+///             "name": "openssh-server",
+///             "version": "6.6.*"
+///         },
+///         {
+///             "name": "rsync",
+///             "version": "3.0.*"
+///         }
+///     ]
+/// }
+/// ```
+///
+/// ## Response
+///
+/// ```json
+/// {
+///     "status": true
+/// }
+/// ```
+#[post("/recipes/workspace", format="application/json", data="<recipe>")]
+pub fn recipes_workspace_json(recipe: JSON<Recipe>, repo_state: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+    info!("/recipes/workspace/ (JSON)"; "recipe.name" => recipe.name);
+    // TODO Get the user's branch name. Use master for now.
+
+    let repo = repo_state.repo();
+    // Update the workspace copy, log any errors
+    let status = match write_to_workspace(&workspace_dir(&repo, "master"), &recipe) {
+        Ok(_) => true,
+        Err(e) => {
+            error!("recipes_workspace_json"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+            false
+        }
+    };
+
+    // TODO Return error information
+    CORS(JSON(RecipesNewResponse {
+            status: status
+    }))
+}
+
+
+/// Accept a TOML formatted POST to /recipes/workspace
+///
+/// This requires that the client set the type to "text/x-toml" and that the data be passed
+/// without change.
+///
+/// eg. `curl -H "Content-Type: text/x-toml" -X POST --data-binary @nginx.toml http://API/URL`
+///
+#[post("/recipes/workspace", data="<recipe>", rank=2)]
+pub fn recipes_workspace_toml(recipe: TOML<Recipe>, repo_state: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+    info!("/recipes/workspace/ (TOML)"; "recipe.name" => recipe.name);
+    // TODO Get the user's branch name. Use master for now.
+
+    let repo = repo_state.repo();
+    // Update the workspace copy, log any errors
+    let status = match write_to_workspace(&workspace_dir(&repo, "master"), &recipe) {
+        Ok(_) => true,
+        Err(e) => {
+            error!("recipes_workspace_toml"; "recipe" => format!("{:?}", recipe), "error" => format!("{:?}", e));
+            false
+        }
+    };
+
+    // TODO Return error information
+    CORS(JSON(RecipesNewResponse {
             status: status
     }))
 }
