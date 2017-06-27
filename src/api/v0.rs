@@ -1015,10 +1015,35 @@ pub fn recipes_list(offset: i64, limit: i64, repo: State<RecipeRepo>) -> CORS<JS
 
 
 // /recipes/info/<names>
+/// Structure to hold whether or not a recipe workspace has changed since the last commit
+#[derive(Debug, Serialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct WorkspaceChanges {
+    name: String,
+    changed: bool
+}
+
+impl WorkspaceChanges {
+    /// Create a new WorkspaceChanged struct
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Name of the recipe
+    /// * `changed` - Whether or not the recipe workspace has changed since the last commit
+    ///
+    /// # Returns
+    ///
+    /// * A new [WorkspaceChanges](struct.WorkspaceChanges.html) struct
+    ///
+    fn new<S: Into<String>>(name: S, changed: bool) -> WorkspaceChanges {
+        WorkspaceChanges { name: name.into(), changed: changed }
+    }
+}
+
 
 /// Hold the JSON response for /recipes/info/
 #[derive(Debug, Serialize)]
 pub struct RecipesInfoResponse {
+    changes: Vec<WorkspaceChanges>,
     recipes: Vec<Recipe>,
 }
 
@@ -1043,6 +1068,12 @@ pub struct RecipesInfoResponse {
 ///
 /// ```json
 /// {
+///     "changes": [
+///         {
+///             "name": "recipe-test",
+///             "changed": true
+///         },
+///     ],
 ///     "recipes": [
 ///         {
 ///             "name": "http-server",
@@ -1096,23 +1127,44 @@ pub fn recipes_info(recipe_names: &str, repo_state: State<RecipeRepo>) -> CORS<J
 
     let repo = repo_state.repo();
     let mut result = Vec::new();
+    let mut changes = Vec::new();
     for name in recipe_names.split(',') {
-        let _ = recipe::read(&repo, name, "master", None).map(|recipe| {
+        // NOTE This is a kludge to squash Result errors until this route handles them properly
+        // Reading a recipe may fail, if it does it may only exist in the workspace, so check
+        // there. If neither succeeds then nothing is pushed into the result and changes Vecs
+        let _: Result<(), String> = recipe::read(&repo, name, "master", None).map(|recipe| {
             debug!("recipes_info"; "recipe" => format!("{:?}", recipe));
             let ws_recipe = match read_from_workspace(&workspace_dir(&repo, "master"), name) {
                 Some(r) => r,
                 None => recipe.clone()
             };
             let changed = recipe != ws_recipe;
+            changes.push(WorkspaceChanges::new(name, changed));
             debug!("workspace vs. git"; "changed" => format!("{:?}", changed));
             result.push(ws_recipe);
+        }).or_else(|_| {
+            // Reading the recipe from git failed. Check the workspace.
+            match read_from_workspace(&workspace_dir(&repo, "master"), name) {
+                Some(ws_recipe) => {
+                    debug!("workspace recipe"; "name" => name, "recipe" => format!("{:?}", ws_recipe));
+                    changes.push(WorkspaceChanges::new(name, true));
+                    result.push(ws_recipe);
+                    Ok(())
+                },
+                None => Ok(())
+            }
         });
     }
-    // Sort by case-insensitive name
+    // Sort recipes by case-insensitive name
     result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     result.dedup();
 
+    // Sort changes by case-insensitive name
+    changes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    changes.dedup();
+
     CORS(JSON(RecipesInfoResponse {
+        changes: changes,
         recipes: result,
     }))
 }
