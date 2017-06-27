@@ -71,6 +71,7 @@ impl TestFramework {
                                             v0::recipes_changes_default, v0::recipes_changes_filter,
                                             v0::recipes_diff,
                                             v0::recipes_new_json, v0::recipes_new_toml,
+                                            v0::recipes_workspace_json, v0::recipes_workspace_toml,
                                             v0::recipes_delete,
                                             v0::recipes_undo,
                                             v0::recipes_depsolve])
@@ -459,10 +460,30 @@ fn test_v0_recipes() {
     assert_eq!(j["recipes"][0]["diff"][22], "+name = \"ruby\"".to_string());
     assert_eq!(j["recipes"][0]["diff"][23], "+version = \"2.0.0.598\"".to_string());
 
-    // v0_recipes_undo()
     // First write some changes to the recipe
     let recipe_json = include_str!("results/v0/recipes-new-v2.json").trim_right();
 
+    // v0_recipes_workspace
+    // Write the new recipe to the workspace first, confirm recipes/info returns changed:true
+    let mut req = MockRequest::new(Method::Post, "/recipes/workspace")
+                    .header(ContentType::JSON)
+                    .body(recipe_json);
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/recipe-test");
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["changes"][0]["name"], "recipe-test".to_string());
+    assert_eq!(j["changes"][0]["changed"], Value::Bool(true));
+
+    // v0_recipes_undo()
     let mut req = MockRequest::new(Method::Post, "/recipes/new")
                     .header(ContentType::JSON)
                     .body(recipe_json);
@@ -471,6 +492,16 @@ fn test_v0_recipes() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    // Confirm that info now shows changed:false
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/recipe-test");
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["changes"][0]["name"], "recipe-test".to_string());
+    assert_eq!(j["changes"][0]["changed"], Value::Bool(false));
 
     // Get the original commit
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/recipe-test");
