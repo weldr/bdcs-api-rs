@@ -2094,3 +2094,57 @@ pub fn recipes_depsolve(recipe_names: &str, db: State<DBPool>, repo: State<Recip
             recipes: result
     }))
 }
+
+
+/// The CORS system 'protects' the client via an OPTIONS request to make sure it is allowed
+///
+/// This returns an empty response, with the CORS headers set by [CORS](struct.CORS.html).
+// Rocket has a collision with Diesel so uses route instead
+//#[options("/recipes/tag/<recipe_name>")]
+#[route(OPTIONS, "/recipes/tag/<recipe_name>")]
+#[allow(unused_variables)]
+pub fn options_recipes_tag(recipe_name: &str) -> CORS<&'static str> {
+    CORS("")
+}
+
+
+/// Handler for `/recipes/tag/<recipe_name>`
+/// Tag a recipe's latest recipe commit as a 'revision'
+///
+/// # Arguments
+///
+/// * `recipe_name` - Name of the recipe to tag
+///
+/// # Response
+///
+/// * JSON response with "status" set to true or false.
+///
+///
+/// This will make a new commit with "[revision X] <recipe name>" in the summary.
+///
+/// ## Response
+///
+/// ```json
+/// {
+///     "status": true
+/// }
+/// ```
+#[post("/recipes/tag/<recipe_name>")]
+pub fn recipes_tag(recipe_name: &str, repo_state: State<RecipeRepo>) -> CORS<JSON<RecipesNewResponse>> {
+    info!("/recipes/tag/"; "recipe_name" => recipe_name);
+    // TODO Get the user's branch name. Use master for now.
+
+    let repo = repo_state.repo();
+    let status = match recipe::tag(&repo, recipe_name, "master") {
+        Ok(result) => result,
+        Err(e) => {
+            error!("recipes_tag"; "error" => format!("{:?}", e));
+            false
+        }
+    };
+
+    // TODO Return error information
+    CORS(JSON(RecipesNewResponse {
+            status: status
+    }))
+}

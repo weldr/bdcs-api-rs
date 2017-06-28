@@ -35,6 +35,7 @@ use chrono::{DateTime, NaiveDateTime, FixedOffset};
 use git2::{self, BranchType, Commit, DiffFormat, DiffOptions, Oid, ObjectType};
 use git2::{Repository, Signature, Time};
 use glob::{self, glob};
+use regex::{self, Regex};
 use semver;
 use toml;
 
@@ -64,6 +65,7 @@ pub enum RecipeError {
     TomlSer(toml::ser::Error),
     TomlDe(toml::de::Error),
     SemVerError(semver::SemVerError),
+    RegexError(regex::Error),
     RecipeName,
     Branch,
     ParseTOML
@@ -108,6 +110,12 @@ impl From<toml::de::Error> for RecipeError {
 impl From<semver::SemVerError> for RecipeError {
     fn from(err: semver::SemVerError) -> RecipeError {
         RecipeError::SemVerError(err)
+    }
+}
+
+impl From<regex::Error> for RecipeError {
+    fn from(err: regex::Error) -> RecipeError {
+        RecipeError::RegexError(err)
     }
 }
 
@@ -236,6 +244,52 @@ fn time_rfc2822(time: Time) -> String {
     let offset = FixedOffset::east(time.offset_minutes() * 60);
     let dt = DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(time.seconds(), 0), offset);
     dt.to_rfc2822()
+}
+
+
+/// Find all tags pointing to a commit id
+///
+/// # Arguments
+///
+/// * `commit` - A Commit hash
+/// * `repo` - An open repository
+///
+/// # Retuns
+///
+/// * A Vec of Tag names of the form <branch>/<filename>/r<rev>
+///
+/// This searches all repo tags on every call and returns a list of all of the ones pointing
+/// to the commit.
+///
+fn find_commit_tags(repo: &Repository, branch: &str, filename: &str, commit: git2::Oid) -> Result<Vec<String>, git2::Error> {
+    let mut tags = Vec::new();
+    for r in try!(repo.references_glob(&format!("refs/tags/{}/{}/r*", branch, filename))) {
+        // Get the tag reference and the commit it points to. Skip everything else
+        let tag_ref = match r {
+            Ok(r) => r,
+            Err(_) => continue
+        };
+        let tagged_commit = match tag_ref.peel(git2::ObjectType::Commit) {
+            Ok(t) => t,
+            Err(_) => continue
+        };
+        // Is this the commit we are looking for?
+        if tagged_commit.id() != commit {
+            continue;
+        }
+        // Convert the tag name into branch/filename/rX string, trimming off refs/tags/
+        // Because Rust is really crappy at just trimming off the first 10 characters of a string.
+        let tag_name = match tag_ref.name() {
+            Some(name) => name.trim_left_matches("refs/tags/").to_string(),
+            None => continue
+        };
+        debug!("find_commit_tags"; "name" => tag_name,
+                                   "target" => format!("{:?}", tag_ref.target()),
+                                   "tagged commit" => format!("{:?}", tagged_commit.id()));
+        tags.push(tag_name);
+    }
+
+    Ok(tags)
 }
 
 
@@ -599,7 +653,9 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
 pub struct RecipeCommit {
     pub commit: String,
     pub time: String,
-    pub message: String
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>
 }
 
 /// List the commits for a recipe in a branch
@@ -617,6 +673,8 @@ pub struct RecipeCommit {
 /// If the name is None all changes for the branch will be returned.
 ///
 pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<RecipeCommit>, RecipeError> {
+    let re = try!(Regex::new(r"^.*r(\d+)"));
+
     // Does the branch exist? If not, it's an error
     match repo.find_branch(branch, BranchType::Local) {
         Ok(_) => {}
@@ -645,11 +703,31 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
                 .unwrap_or(false)
             });
             if m {
-                commits.push(RecipeCommit {
-                                commit: commit.id().to_string(),
-                                time: time_rfc2822(commit.time()),
-                                message: commit.message().unwrap_or("Missing").to_string()
+                // Is there a tag pointing to commit?
+                let tags = try!(find_commit_tags(repo, branch, &filename, commit.id()));
+                if tags.len() > 1 {
+                    error!("Too many tags"; "commit" => format!("{:?}", commit.id()),
+                                            "tags" => format!("{:?}", tags));
+                }
+                // Convert the tag to the revision number only
+                let revision = {
+                    if tags.len() == 0 {
+                        None
+                    } else {
+                        match re.captures(&tags[0]) {
+                            // Yes, this is a pile of unwraps, but thanks to the regex it should
+                            // not fail since it won't match without digits.
+                            Some(caps) => Some(caps.get(1).unwrap().as_str().parse().unwrap()),
+                            None => None
+                        }
+                    }
+                };
 
+                commits.push(RecipeCommit {
+                                commit:   commit.id().to_string(),
+                                time:     time_rfc2822(commit.time()),
+                                message:  commit.message().unwrap_or("Missing").to_string(),
+                                revision: revision
                 });
             }
         }
@@ -745,4 +823,49 @@ pub fn diff(repo: &Repository,
     }));
 
     Ok(diff_lines)
+}
+
+
+/// Tag a recipe's most recent commit with a "[revision X] <recipe_name>"
+///
+/// # Arguments
+///
+/// * `repo` - An open Repository
+/// * `name` - Recipe name
+///
+/// # Return
+///
+/// * true if the tag was successful, false if not or if already tagged.
+///
+pub fn tag(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, RecipeError> {
+    // Check the recipe's history for a previous revision
+
+    // Is it the most recent commit? If so, return false
+
+    // Make a new commit with the new summary
+
+    let commits = try!(commits(repo, recipe_name, branch));
+    if commits.len() < 1 {
+        return Ok(false);
+    }
+
+    let mut last_rev = 0;
+    for entry in commits.iter() {
+        if entry.revision.is_some() {
+            if entry.commit == commits[0].commit {
+                // There are no new commits since the last revision
+                debug!("recipe tag: No new commits"; "name" => recipe_name, "branch" => branch);
+                return Ok(false);
+            }
+
+            // Extract the revision number from the tag.
+            last_rev = entry.revision.unwrap();
+            break;
+        }
+    }
+    // At this point we have a new commit in commits[0], and a previous revision in last_rev
+    info!("recipe tag"; "commit" => commits[0].commit, "last_rev" => last_rev);
+
+    // Create a new commit with the next revision
+    Ok(true)
 }
