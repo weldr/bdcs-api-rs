@@ -35,6 +35,7 @@ extern crate hyper;
 extern crate r2d2;
 extern crate r2d2_sqlite;
 extern crate rocket;
+extern crate regex;
 extern crate rocket_contrib;
 extern crate rusqlite;
 extern crate semver;
