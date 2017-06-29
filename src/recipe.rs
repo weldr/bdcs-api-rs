@@ -867,5 +867,13 @@ pub fn tag(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, R
     info!("recipe tag"; "commit" => commits[0].commit, "last_rev" => last_rev);
 
     // Create a new commit with the next revision
+    let filename = try!(recipe_filename(recipe_name));
+    let name = format!("{}/{}/r{}", branch, filename, last_rev+1);
+    let sig = try!(Signature::now("bdcs-api-server", "user-email"));
+    let commit_oid = try!(Oid::from_str(&commits[0].commit));
+    let target = try!(repo.find_object(commit_oid, Some(git2::ObjectType::Commit)));
+
+    try!(repo.tag(&name, &target, &sig, &name, false));
+
     Ok(true)
 }
