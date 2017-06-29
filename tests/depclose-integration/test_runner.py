@@ -13,8 +13,16 @@ _TEST_DIR = os.path.dirname(__file__)
 _RECIPE_DIR = os.path.join(_TEST_DIR, '..', '..', 'examples', 'recipes')
 _RECIPE_DIR = os.path.abspath(_RECIPE_DIR)
 
+_KCOV = []
+if os.environ.get('KCOV', os.environ.get('TRAVIS_JOB_ID')):
+    _KCOV = [
+        'kcov',
+        '--include-path=../../src',
+        os.path.abspath(os.path.join(_TEST_DIR, '..', '..', 'target', 'kcov')),
+    ]
+
 _DEPCLOSE = os.path.join(_TEST_DIR, '..', '..', 'target', 'debug', 'depclose')
-_DEPCLOSE = [
+_DEPCLOSE = _KCOV + [
     os.path.abspath(_DEPCLOSE),
     os.environ.get('METADATA_DB', 'metadata.db')
 ]

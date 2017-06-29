@@ -5,7 +5,12 @@ rust:
 before_install:
     - sudo apt-get update
     - pip install -r ./tests/depclose-integration/requirements.txt
-    - if [ "$_CMD" == "test" ]; then cargo install cargo-travis; fi
+    - |
+        LOCAL="~/.local" && export PATH=$LOCAL/bin:$PATH &&
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+        tar xzf master.tar.gz && mkdir kcov-master/build && cd kcov-master/build &&
+        cmake -DCMAKE_INSTALL_PREFIX:PATH=$LOCAL .. && make && make install && cd ../..
+
 addons:
   apt:
     packages:
@@ -19,14 +24,20 @@ addons:
       - libdw-dev
       - binutils-dev
       - cmake
-env:
-  - _CMD=test
-  - _CMD=clippy
-  - _CMD=depclose-travis
+      - libiberty-dev
+
 script:
-  - make $_CMD
-after_success:
-  - if [ "$_CMD" == "test" ]; then cargo coveralls; fi
+  - make travis-ci
+after_script:
+  - |
+      ls -l target/debug &&
+      for file in target/debug/*-*; do
+        if [[ "${file: -2}" != ".d" ]]; then
+          mkdir -p "target/kcov/$(basename $file)";
+          kcov --include-path=./src --verify "target/kcov/$(basename $file)" "$file";
+        fi;
+      done &&
+      kcov --coveralls-id=$TRAVIS_JOB_ID --merge target/kcov target/kcov/*
 notifications:
   email:
     on_failure: change
