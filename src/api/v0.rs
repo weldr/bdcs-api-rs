@@ -115,7 +115,7 @@ use depsolve::*;
 use recipe::{self, RecipeRepo, Recipe, RecipeCommit};
 use api::{ApiError, CORS, Filter, Format, OFFSET, LIMIT};
 use api::toml::TOML;
-use workspace::{write_to_workspace, read_from_workspace, workspace_dir};
+use workspace::{write_to_workspace, read_from_workspace, workspace_dir, delete_workspace};
 
 
 
@@ -1737,13 +1737,24 @@ pub fn recipes_delete(recipe_name: &str, repo: State<RecipeRepo>) -> CORS<JSON<R
     info!("/recipes/delete/"; "recipe_name" => recipe_name);
     // TODO Get the user's branch name. Use master for now.
 
-    let status = match recipe::delete(&repo.repo(), recipe_name, "master") {
+    let repo = repo.repo();
+    let mut status = match recipe::delete(&repo, recipe_name, "master") {
         Ok(result) => result,
         Err(e) => {
             error!("recipes_delete"; "recipe_name" => recipe_name, "error" => format!("{:?}", e));
             false
         }
     };
+
+    if status == true {
+        match delete_workspace(&workspace_dir(&repo, "master"), recipe_name) {
+            Ok(_) => (),
+            Err(e) => {
+                error!("recipes_delete workspace"; "recipe_name" => recipe_name, "error" => format!("{:?}", e));
+                status = false;
+            }
+        };
+    }
 
     // TODO Return error information
     CORS(JSON(RecipesDeleteResponse {
@@ -1785,13 +1796,28 @@ pub fn recipes_undo(recipe_name: &str, commit: &str, repo: State<RecipeRepo>) ->
     info!("/recipes/undo/"; "recipe_name" => recipe_name, "commit" => commit);
     // TODO Get the user's branch name. Use master for now.
 
-    let status = match recipe::revert(&repo.repo(), recipe_name, "master", commit) {
+    let repo = repo.repo();
+    let mut status = match recipe::revert(&repo, recipe_name, "master", commit) {
         Ok(result) => result,
         Err(e) => {
             error!("recipes_undo"; "recipe_name" => recipe_name, "commit" => commit, "error" => format!("{:?}", e));
             false
         }
     };
+
+    if status == true {
+        // Read the latest commit and update the workspace copy
+        let _ = recipe::read(&repo, recipe_name, "master", None).map(|new_recipe| {
+            // Update the workspace copy, log any errors
+            match write_to_workspace(&workspace_dir(&repo, "master"), &new_recipe) {
+                Ok(_) => (),
+                Err(e) => {
+                    error!("recipes_undo workspace"; "recipe_name" => recipe_name, "error" => format!("{:?}", e));
+                    status = false;
+                }
+            };
+        });
+    }
 
     // TODO Return error information
     CORS(JSON(RecipesUndoResponse {

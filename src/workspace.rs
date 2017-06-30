@@ -24,7 +24,7 @@
 // You should have received a copy of the GNU General Public License
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fs::{File, OpenOptions, create_dir_all};
+use std::fs::{File, OpenOptions, create_dir_all, remove_file};
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
@@ -134,7 +134,7 @@ fn workspace_recipe_filename(workspace: &Path, recipe_filename: &str) -> PathBuf
 /// * The Recipe, if it exists
 ///
 pub fn read_from_workspace(workspace: &Path, name: &str ) -> Option<Recipe> {
-    debug!("read_from_workspace"; "workspace" => format!("{:?}", workspace), "name" => format!("{:?}", name));
+    debug!("read_from_workspace"; "workspace" => format!("{:?}", workspace), "name" => name);
     err_opt!(check_workspace_dir(workspace), None);
 
     let filename = err_opt!(recipe_filename(name), None);
@@ -172,6 +172,30 @@ pub fn write_to_workspace(workspace: &Path, recipe: &Recipe) -> Result<(), Works
                                     .open(ws_filename));
     let recipe_toml = try!(toml::Value::try_from(&recipe));
     try!(file.write_all(recipe_toml.to_string().as_bytes()));
+
+    Ok(())
+}
+
+
+/// Delete a recipe from the workspace
+///
+/// # Arguments
+///
+/// * `workspace` - The full path of the branch's workspace directory
+/// * `name` - The name of the recipe to delete
+///
+/// # Returns
+///
+/// And empty Ok or a WorkspaceError
+///
+pub fn delete_workspace(workspace: &Path, name: &str) -> Result<(), WorkspaceError> {
+    debug!("delete_workspace"; "workspace" => format!("{:?}", workspace), "name" => name);
+
+    let filename = try!(recipe_filename(name));
+    let ws_filename = workspace_recipe_filename(workspace, &filename);
+    if ws_filename.exists() {
+        try!(remove_file(ws_filename));
+    }
 
     Ok(())
 }
