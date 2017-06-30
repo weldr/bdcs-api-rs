@@ -826,7 +826,7 @@ pub fn diff(repo: &Repository,
 }
 
 
-/// Tag a recipe's most recent commit with a "[revision X] <recipe_name>"
+/// Tag a recipe's most recent commit
 ///
 /// # Arguments
 ///
@@ -837,13 +837,12 @@ pub fn diff(repo: &Repository,
 ///
 /// * true if the tag was successful, false if not or if already tagged.
 ///
+/// This uses git tags, of the form `refs/tags/<branch>/<filename>/r<revision>`
+/// Only the most recent recipe commit can be tagged to prevent out of order tagging.
+/// Revisions start at 1 and increment for each new commit that is tagged.
+/// If the commit has already been tagged it will return false.
+///
 pub fn tag(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, RecipeError> {
-    // Check the recipe's history for a previous revision
-
-    // Is it the most recent commit? If so, return false
-
-    // Make a new commit with the new summary
-
     let commits = try!(commits(repo, recipe_name, branch));
     if commits.len() < 1 {
         return Ok(false);
