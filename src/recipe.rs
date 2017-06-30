@@ -711,7 +711,7 @@ pub fn commits(repo: &Repository, name: &str, branch: &str) -> Result<Vec<Recipe
                 }
                 // Convert the tag to the revision number only
                 let revision = {
-                    if tags.len() == 0 {
+                    if tags.is_empty() {
                         None
                     } else {
                         match re.captures(&tags[0]) {
@@ -849,7 +849,7 @@ pub fn tag(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, R
     }
 
     let mut last_rev = 0;
-    for entry in commits.iter() {
+    for entry in &commits {
         if entry.revision.is_some() {
             if entry.commit == commits[0].commit {
                 // There are no new commits since the last revision
