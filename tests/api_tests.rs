@@ -74,7 +74,8 @@ impl TestFramework {
                                             v0::recipes_workspace_json, v0::recipes_workspace_toml,
                                             v0::recipes_delete,
                                             v0::recipes_undo,
-                                            v0::recipes_depsolve])
+                                            v0::recipes_depsolve,
+                                            v0::recipes_tag])
                                     .manage(db_pool)
                                     .manage(recipe_repo);
 
@@ -483,7 +484,7 @@ fn test_v0_recipes() {
     assert_eq!(j["changes"][0]["name"], "recipe-test".to_string());
     assert_eq!(j["changes"][0]["changed"], Value::Bool(true));
 
-    // v0_recipes_undo()
+    // Test workspace changes booleans
     let mut req = MockRequest::new(Method::Post, "/recipes/new")
                     .header(ContentType::JSON)
                     .body(recipe_json);
@@ -503,6 +504,14 @@ fn test_v0_recipes() {
     assert_eq!(j["changes"][0]["name"], "recipe-test".to_string());
     assert_eq!(j["changes"][0]["changed"], Value::Bool(false));
 
+    // Tag the latest recipe commit (it will be revision 1)
+    let mut req = MockRequest::new(Method::Post, "/recipes/tag/recipe-test");
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
     // Get the original commit
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/recipe-test");
     let mut response = req.dispatch_with(rocket);
@@ -511,6 +520,7 @@ fn test_v0_recipes() {
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "recipe-test".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["revision"], 1);
 
     // Convert serde::Value to a &str
     let commit_id = match j["recipes"][0]["changes"][1]["commit"].as_str() {
@@ -525,4 +535,15 @@ fn test_v0_recipes() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    // Confirm that info has reverted to the previous commit and has no revision
+    let mut req = MockRequest::new(Method::Get, "/recipes/info/recipe-test");
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
+    let j: Value = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(j["recipes"][0]["name"], "recipe-test".to_string());
+    assert_eq!(j["recipes"][0]["version"], "0.0.1".to_string());
+    assert_eq!(j["recipes"][0]["changes"][0]["revision"], Value::Null);
 }
