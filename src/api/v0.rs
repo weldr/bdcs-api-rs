@@ -1636,7 +1636,7 @@ pub fn recipes_new_json(recipe: JSON<Recipe>, repo_state: State<RecipeRepo>) -> 
         }
     };
 
-    if status == true {
+    if status {
         // Read the latest commit, the version may have been changed so it could be different
         let _ = recipe::read(&repo, &recipe.name, "master", None).map(|new_recipe| {
             // Update the workspace copy, log any errors
@@ -1746,7 +1746,7 @@ pub fn recipes_delete(recipe_name: &str, repo: State<RecipeRepo>) -> CORS<JSON<R
         }
     };
 
-    if status == true {
+    if status {
         match delete_workspace(&workspace_dir(&repo, "master"), recipe_name) {
             Ok(_) => (),
             Err(e) => {
@@ -1805,7 +1805,7 @@ pub fn recipes_undo(recipe_name: &str, commit: &str, repo: State<RecipeRepo>) ->
         }
     };
 
-    if status == true {
+    if status {
         // Read the latest commit and update the workspace copy
         let _ = recipe::read(&repo, recipe_name, "master", None).map(|new_recipe| {
             // Update the workspace copy, log any errors
