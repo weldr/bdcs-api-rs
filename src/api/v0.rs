@@ -75,6 +75,9 @@
 //!  - The body of the post is a JSON representation of the recipe, using the same format
 //!    received by `/api/v0/recipes/info/<recipes>` and `/api/v0/recipes/new`
 //!  - [Example JSON](fn.recipes_workspace.html#examples)
+//! * POST `/api/v0/recipes/tag/<recipe>`
+//!  - Tag the most recent recipe commit as the next revision
+//!  - [Example](fn.recipes_tag.html)
 //!
 //!
 //! ## TODO
@@ -1361,6 +1364,10 @@ pub fn recipes_changes_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<J
 /// This means that there will be cases where changes will be empty, when offset > total
 /// for the recipe.
 ///
+/// If a recipe commit has been tagged as a new revision the `changes` will include a
+/// `revision` field set to the revision number. If the commit has not been tagged it
+/// will not have this field included.
+///
 /// # Examples
 ///
 /// ```json
@@ -1377,7 +1384,8 @@ pub fn recipes_changes_default(recipes: &str, repo: State<RecipeRepo>) -> CORS<J
 ///                 {
 ///                     "commit": "857e1740f983bf033345c3242204af0ed7b81f37",
 ///                     "time": "Wed,  1 Mar 2017 09:28:53 -0800",
-///                     "summary": "Recipe nfs-server saved"
+///                     "summary": "Recipe nfs-server saved",
+///                     "revision" : 1
 ///                 }
 ///             ],
 ///             "total": 2
@@ -2120,7 +2128,9 @@ pub fn options_recipes_tag(recipe_name: &str) -> CORS<&'static str> {
 /// * JSON response with "status" set to true or false.
 ///
 ///
-/// This will make a new commit with "[revision X] <recipe name>" in the summary.
+/// This will tag the most recent recipe commit as the next revision.
+/// Tags are visible in the `/recipes/changes/` output. If a commit has
+/// been tagged it will include `"revision": <revision>` in the JSON.
 ///
 /// ## Response
 ///
