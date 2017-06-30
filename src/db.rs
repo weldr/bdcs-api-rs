@@ -192,7 +192,7 @@ fn keyval_hash(kvs: &[KeyVal]) -> HashMap<String, (Option<String>, Option<String
         // for the key column.  We do not, so we have to understand how Haskell serializes
         // those types and undo it here.
         let key = kv.key_value.trim_left_matches("TextKey ").trim_matches('"');
-        hash.entry(key.clone().to_string()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
+        hash.entry((*key).to_string()).or_insert((kv.val_value.clone(), kv.ext_value.clone()));
     }
     hash
 }

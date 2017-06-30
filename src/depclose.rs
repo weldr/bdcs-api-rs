@@ -52,7 +52,7 @@ impl fmt::Display for DepExpression {
 fn group_matches_arch(conn: &Connection, group_id: i64, arches: &[String]) -> bool {
     match get_groups_kv_group_id(conn, group_id) {
         Ok(kvs) => { for kv in kvs {
-                         if kv.key_value == "TextKey \"arch\"".to_string() {
+                         if kv.key_value == "TextKey \"arch\"" {
                              return kv.val_value == Some("noarch".to_string()) || arches.contains(&kv.val_value.unwrap_or_default());
                          }
                      }
