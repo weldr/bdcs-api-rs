@@ -447,19 +447,15 @@ fn test_v0_recipes() {
         None => ""
     };
 
+    // Check the diff
+    let expected_diff = include_str!("results/v0/recipes-diff.json").trim_right();
+
     let mut req = MockRequest::new(Method::Get, format!("/recipes/diff/http-server/{}/NEWEST", commit_id));
     let mut response = req.dispatch_with(rocket);
 
     assert_eq!(response.status(), Status::Ok);
-    let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
-    let j: Value = serde_json::from_str(&body_str).unwrap();
-    assert_eq!(j["recipes"][0]["name"], "http-server".to_string());
-    assert_eq!(j["recipes"][0]["from"], commit_id);
-    assert_eq!(j["recipes"][0]["to"], "NEWEST".to_string());
-    assert_eq!(j["recipes"][0]["diff"][8], "+version = \"0.0.2\"".to_string());
-    assert_eq!(j["recipes"][0]["diff"][16], "-name = \"php\"".to_string());
-    assert_eq!(j["recipes"][0]["diff"][22], "+name = \"ruby\"".to_string());
-    assert_eq!(j["recipes"][0]["diff"][23], "+version = \"2.0.0.598\"".to_string());
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected_diff.to_string()));
 
     // First write some changes to the recipe
     let recipe_json = include_str!("results/v0/recipes-new-v2.json").trim_right();
@@ -511,6 +507,28 @@ fn test_v0_recipes() {
     assert_eq!(response.status(), Status::Ok);
     let body_str = response.body().and_then(|b| b.into_string());
     assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    // Write some new changes to the workspace
+    let recipe_json = include_str!("results/v0/recipes-new-v3.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Post, "/recipes/workspace")
+                    .header(ContentType::JSON)
+                    .body(recipe_json);
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some("{\"status\":true}".to_string()));
+
+    // Check the diff between the NEWEST and WORKSPACE
+    let expected_diff = include_str!("results/v0/recipes-diff-workspace.json").trim_right();
+
+    let mut req = MockRequest::new(Method::Get, "/recipes/diff/recipe-test/NEWEST/WORKSPACE");
+    let mut response = req.dispatch_with(rocket);
+
+    assert_eq!(response.status(), Status::Ok);
+    let body_str = response.body().and_then(|b| b.into_string());
+    assert_eq!(body_str, Some(expected_diff.to_string()));
 
     // Get the original commit
     let mut req = MockRequest::new(Method::Get, "/recipes/changes/recipe-test");
