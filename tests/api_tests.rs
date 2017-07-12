@@ -562,6 +562,6 @@ fn test_v0_recipes() {
     let body_str = response.body().and_then(|b| b.into_string()).unwrap_or_default();
     let j: Value = serde_json::from_str(&body_str).unwrap();
     assert_eq!(j["recipes"][0]["name"], "recipe-test".to_string());
-    assert_eq!(j["recipes"][0]["version"], "0.0.1".to_string());
+    assert_eq!(j["recipes"][0]["version"], "0.3.12".to_string());
     assert_eq!(j["recipes"][0]["changes"][0]["revision"], Value::Null);
 }
