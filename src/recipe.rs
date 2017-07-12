@@ -24,6 +24,7 @@
 // along with bdcs-api-server.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::clone::Clone;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
@@ -175,6 +176,40 @@ impl Recipe {
         self.version = version.to_string();
         Ok(())
     }
+
+    /// Return a HashSet of the module names
+    pub fn module_names_set(&self) -> HashSet<String> {
+        let mut names = HashSet::new();
+        for m in &self.modules {
+            names.insert(m.name.clone());
+        }
+        names
+    }
+
+    /// Return a HashSet of the package names
+    pub fn package_names_set(&self) -> HashSet<String> {
+        let mut names = HashSet::new();
+        for p in &self.packages {
+            names.insert(p.name.clone());
+        }
+        names
+    }
+
+    /// Return the matching module entry
+    pub fn find_module(&self, name: &String) -> Option<Modules> {
+        match self.modules.binary_search_by_key(name, |m| m.name.clone()) {
+            Ok(idx) => Some(self.modules[idx].clone()),
+            Err(_) => None
+        }
+    }
+
+    /// Return the matching package entry
+    pub fn find_package(&self, name: &String) -> Option<Packages> {
+        match self.packages.binary_search_by_key(name, |p| p.name.clone()) {
+            Ok(idx) => Some(self.packages[idx].clone()),
+            Err(_) => None
+        }
+    }
 }
 
 
@@ -197,6 +232,29 @@ pub struct Modules {
 pub struct Packages {
     pub name: String,
     pub version: Option<String>
+}
+
+
+/// Recipe Diff Types
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub enum RecipeDiffValue {
+    Module(Modules),
+    Package(Packages),
+    Name(String),
+    Description(Option<String>),
+    Version(String)
+}
+
+/// Differences between two recipes
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RecipeDiffEntry {
+    pub old: Option<RecipeDiffValue>,
+    pub new: Option<RecipeDiffValue>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RecipeDiff {
+    pub diff: Vec<RecipeDiffEntry>
 }
 
 
@@ -776,7 +834,7 @@ fn match_with_parent(repo: &Repository, commit: &Commit, parent: &Commit,
 ///
 /// If new_commit is None HEAD will be used.
 ///
-pub fn diff(repo: &Repository,
+pub fn old_diff(repo: &Repository,
                       name: &str,
                       branch: &str,
                       old_commit: &str,
@@ -875,4 +933,148 @@ pub fn tag(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, R
     try!(repo.tag(&name, &target, &sig, &name, false));
 
     Ok(true)
+}
+
+
+/// Diff two versions of a recipe
+///
+/// # Arguments
+///
+/// * `old_recipe` - Older recipe to use
+/// * `new_recipe` - New recipe to use
+///
+/// # Return
+///
+/// * A Vec of RecipeDiffEntry
+///
+/// Normally this is used to diff 2 versions of the same recipe, but it can
+/// also be used to diff arbitrary recipes, the differences will just be greater
+/// and the name will be included as a difference.
+///
+pub fn diff(old: Recipe, new: Recipe) -> Vec<RecipeDiffEntry> {
+    debug!("diff"; "old" => format!("{:?}", old), "new" => format!("{:?}", new));
+
+    let mut diffs = Vec::new();
+
+    // name cannot be added or removed, just different
+    if old.name != new.name {
+        diffs.push(RecipeDiffEntry {
+            old: Some(RecipeDiffValue::Name(old.name.clone())),
+            new: Some(RecipeDiffValue::Name(new.name.clone()))
+        });
+    }
+
+    // description cannot be added or removed, just different
+    if old.description != new.description {
+        diffs.push(RecipeDiffEntry {
+            old: Some(RecipeDiffValue::Description(old.description.clone())),
+            new: Some(RecipeDiffValue::Description(new.description.clone()))
+        });
+    }
+
+    // version canot be added or removed, just different
+    if old.version != new.version {
+        diffs.push(RecipeDiffEntry {
+            old: Some(RecipeDiffValue::Version(old.version.clone())),
+            new: Some(RecipeDiffValue::Version(new.version.clone()))
+        });
+    }
+
+    // TODO If the recipe modules and packages are converted to the same struct
+    // the following code duplication could be simplified somewhat. eg. Use a
+    // NEVRA struct for both.
+
+    // modules can be added, removed, or changed.
+    let old_names = old.clone().module_names_set();
+    let new_names = new.clone().module_names_set();
+    let added_set: HashSet<String> = new_names.difference(&old_names).cloned().collect();
+    let mut added: Vec<String> = added_set.into_iter().collect();
+    added.sort_by_key(|n| n.to_lowercase());
+
+    let removed_set: HashSet<String> = old_names.difference(&new_names).cloned().collect();
+    let mut removed: Vec<String> = removed_set.into_iter().collect();
+    removed.sort_by_key(|n| n.to_lowercase());
+
+    let same_set: HashSet<String> = old_names.intersection(&new_names).cloned().collect();
+    let mut same: Vec<String> = same_set.into_iter().collect();
+    same.sort_by_key(|n| n.to_lowercase());
+
+    for name in &added {
+        // name must exist in new, so unwrap() is safe
+        let new_module = new.find_module(name).unwrap();
+        diffs.push(RecipeDiffEntry {
+            old: None,
+            new: Some(RecipeDiffValue::Module(new_module.clone()))
+        });
+    }
+
+    for name in &removed {
+        // name must exist in old, so unwrap() is safe
+        let old_module = old.find_module(name).unwrap();
+        diffs.push(RecipeDiffEntry {
+            old: Some(RecipeDiffValue::Module(old_module.clone())),
+            new: None
+        });
+    }
+
+    // Check each of the unchanged names for other changes
+    for name in &same {
+        // Everything in same must exist in both, so unwrap() is safe.
+        let old_module = old.find_module(name).unwrap();
+        let new_module = new.find_module(name).unwrap();
+        if old_module != new_module {
+            diffs.push(RecipeDiffEntry {
+                old: Some(RecipeDiffValue::Module(old_module.clone())),
+                new: Some(RecipeDiffValue::Module(new_module.clone()))
+            });
+        }
+    }
+
+    // packages can be added, removed or changed.
+    let old_names = old.clone().package_names_set();
+    let new_names = new.clone().package_names_set();
+    let added_set: HashSet<String> = new_names.difference(&old_names).cloned().collect();
+    let mut added: Vec<String> = added_set.into_iter().collect();
+    added.sort_by_key(|n| n.to_lowercase());
+
+    let removed_set: HashSet<String> = old_names.difference(&new_names).cloned().collect();
+    let mut removed: Vec<String> = removed_set.into_iter().collect();
+    removed.sort_by_key(|n| n.to_lowercase());
+
+    let same_set: HashSet<String> = old_names.intersection(&new_names).cloned().collect();
+    let mut same: Vec<String> = same_set.into_iter().collect();
+    same.sort_by_key(|n| n.to_lowercase());
+
+    for name in &added {
+        // name must exist in new, so unwrap() is safe
+        let new_package = new.find_package(name).unwrap();
+        diffs.push(RecipeDiffEntry {
+            old: None,
+            new: Some(RecipeDiffValue::Package(new_package.clone()))
+        });
+    }
+
+    for name in &removed {
+        // name must exist in old, so unwrap() is safe
+        let old_package = old.find_package(name).unwrap();
+        diffs.push(RecipeDiffEntry {
+            old: Some(RecipeDiffValue::Package(old_package.clone())),
+            new: None
+        });
+    }
+
+    // Check each of the unchanged names for other changes
+    for name in &same {
+        // Everything in same must exist in both, so unwrap() is safe.
+        let old_package = old.find_package(name).unwrap();
+        let new_package = new.find_package(name).unwrap();
+        if old_package != new_package {
+            diffs.push(RecipeDiffEntry {
+                old: Some(RecipeDiffValue::Package(old_package.clone())),
+                new: Some(RecipeDiffValue::Package(new_package.clone()))
+            });
+        }
+    }
+
+    diffs
 }

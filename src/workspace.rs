@@ -142,7 +142,9 @@ pub fn read_from_workspace(workspace: &Path, name: &str ) -> Option<Recipe> {
     let mut input = String::new();
     let _ = err_opt!(File::open(ws_filename), None)
                           .read_to_string(&mut input);
-    let recipe = err_opt!(toml::from_str::<Recipe>(&input), None);
+    let mut recipe = err_opt!(toml::from_str::<Recipe>(&input), None);
+    recipe.packages.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    recipe.modules.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 
     Some(recipe)
 }
