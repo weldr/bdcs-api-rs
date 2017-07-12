@@ -115,7 +115,7 @@ use rusqlite::Connection;
 use db::*;
 use depclose::*;
 use depsolve::*;
-use recipe::{self, RecipeRepo, Recipe, RecipeCommit};
+use recipe::{self, RecipeRepo, Recipe, RecipeCommit, RecipeDiff};
 use api::{ApiError, CORS, Filter, Format, OFFSET, LIMIT};
 use api::toml::TOML;
 use workspace::{write_to_workspace, read_from_workspace, workspace_dir, delete_workspace};
@@ -1465,37 +1465,92 @@ pub struct RecipeDiffInfo {
 /// # Arguments
 ///
 /// * `recipe_name` - Recipe name
-/// * `from_commit` - The older commit to caclulate the difference from
-/// * `to_commit` - The newer commit to calculate the diff. to or NEWEST
+/// * `from_commit` - The older commit to caclulate the difference from, can also be NEWEST
+/// * `to_commit` - The newer commit to calculate the diff. to, can also be NEWEST or WORKSPACE
 ///
 /// # Response
 ///
 /// * JSON response with recipe changes.
 ///
+/// # Errors
+///
+/// If there is an error retrieving a commit (eg. it cannot find the hash), it will use HEAD
+/// instead and log an error.
+///
+///
+/// In addition to the commit hashes listed by a call to `/recipes/changes/<recipe-name>` you
+/// can use `NEWEST` to compare the latest commit, and `WORKSPACE` to compare it with
+/// the current temporary workspace version of the recipe. eg. to see what the differences
+/// are between the current workspace and most recent commit of `http-server` you would call:
+///
+/// `/recipes/diff/http-server/NEWEST/WORKSPACE`
+///
+///
+/// Each entry in the response's diff object contains the old recipe value and the new one.
+/// If old is null and new is set, then it was added.
+/// If new is null and old is set, then it was removed.
+/// If both are set, then it was changed.
+///
+/// The old/new entries will have the name of the recipe field that was changed. This
+/// can be one of: Name, Description, Version, Module, or Package.
+/// The contents for these will be the old/new values for them.
+///
+/// In the example below the description and version were changed. The php module's
+/// version was changed, the rsync package was removed, and the vim-enhanced package
+/// was added.
 ///
 /// # Examples
 ///
 /// ```json
 /// {
-///     "recipes": [
+///     "diff": [
 ///         {
-///             "name": "nfs-server",
-///             "from": "857e1740f983bf033345c3242204af0ed7b81f37",
-///             "to": "NEWEST",
-///             "diff": [
-///                 "diff --git a/nfs-server.toml b/nfs-server.toml",
-///                 "index 72b2953..adcf5e3 100644",
-///                 "--- a/nfs-server.toml",
-///                 "+++ b/nfs-server.toml",
-///                 "@@ -5,3 +5,7 @@ name = \"nfs-server\"",
-///                 " [[packages]]",
-///                 " name = \"nfs\"",
-///                 " version = \"4.1\"",
-///                 "+",
-///                 "+[[packages]]",
-///                 "+name = \"NetworkManager\"",
-///                 "+version = \"1.0.6\""
-///             ]
+///             "old": {
+///                 "Description": "An example http server with PHP and MySQL support."
+///             },
+///             "new": {
+///                 "Description": "Apache HTTP Server"
+///             }
+///         },
+///         {
+///             "old": {
+///                 "Version": "0.0.1"
+///             },
+///             "new": {
+///                 "Version": "0.1.1"
+///             }
+///         },
+///         {
+///             "old": {
+///                 "Module": {
+///                     "name": "php",
+///                     "version": "5.4.*"
+///                 }
+///             },
+///             "new": {
+///                 "Module": {
+///                     "name": "php",
+///                     "version": "5.6.*"
+///                 }
+///             }
+///         },
+///         {
+///             "old": null,
+///             "new": {
+///                 "Package": {
+///                     "name": "vim-enhanced",
+///                     "version": "8.0.*"
+///                 }
+///             }
+///         },
+///         {
+///             "old": {
+///                 "Package": {
+///                     "name": "rsync",
+///                     "version": "3.0.*"
+///                 }
+///             },
+///             "new": null
 ///         }
 ///     ]
 /// }
@@ -1503,33 +1558,48 @@ pub struct RecipeDiffInfo {
 ///
 #[get("/recipes/diff/<recipe_name>/<from_commit>/<to_commit>")]
 pub fn recipes_diff(recipe_name: &str, from_commit: &str, to_commit: &str,
-                    repo: State<RecipeRepo>) -> CORS<JSON<RecipesDiffResponse>> {
+                    repo_state: State<RecipeRepo>) -> CORS<JSON<RecipeDiff>> {
     info!("/recipes/diff/"; "recipe_name" => recipe_name,
                             "from_commit" => from_commit, "to_commit" => to_commit);
     // TODO Get the user's branch name. Use master for now.
 
-    // Convert to_commit == NEWEST to None
-    let new_commit = match to_commit {
-        "NEWEST" => None,
-        commit => Some(commit)
-    };
-    let diff = match recipe::diff(&repo.repo(), recipe_name, "master", from_commit, new_commit) {
-        Ok(diff) => diff,
-        Err(e) => {
-            error!("Problem getting diff"; "recipe_name" => recipe_name, "error" => format!("{:?}", e));
-            vec![]
+    let repo = repo_state.repo();
+    // Get the from_commit recipe
+    // TODO Need to add error handling so this can be a try!()
+    let old_recipe = match from_commit {
+        "NEWEST" => recipe::read(&repo, recipe_name, "master", None).unwrap(),
+        commit => match recipe::read(&repo, recipe_name, "master", Some(commit)) {
+            Ok(c) => c,
+            Err(e) => {
+                error!("recipes_diff"; "error" => format!("{:?}", e));
+                recipe::read(&repo, recipe_name, "master", None).unwrap()
+            }
         }
     };
 
-    let result = RecipeDiffInfo {
-        name: recipe_name.to_string(),
-        from: from_commit.to_string(),
-        to: to_commit.to_string(),
-        diff: diff
+    let new_recipe = match to_commit {
+        "WORKSPACE" => {
+            let recipe = match read_from_workspace(&workspace_dir(&repo, "master"), recipe_name) {
+                    Some(r) => r,
+                    // TODO Need to add error handling so this can be a try!()
+                    None => recipe::read(&repo, recipe_name, "master", None).unwrap()
+            };
+            recipe
+        },
+        "NEWEST" => recipe::read(&repo, recipe_name, "master", None).unwrap(),
+        commit => match recipe::read(&repo, recipe_name, "master", Some(commit)) {
+            Ok(c) => c,
+            Err(e) => {
+                error!("recipes_diff"; "error" => format!("{:?}", e));
+                recipe::read(&repo, recipe_name, "master", None).unwrap()
+            }
+        }
     };
 
-    CORS(JSON(RecipesDiffResponse {
-        recipes: vec![result],
+    let diff = recipe::diff(old_recipe, new_recipe);
+
+    CORS(JSON(RecipeDiff {
+        diff: diff
     }))
 }
 
