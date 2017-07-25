@@ -4,6 +4,9 @@ rust:
   - nightly
 before_install:
     - sudo apt-get update
+    - virtualenv ./depclose
+    - source ./depclose/bin/activate
+    - pip install --upgrade pip
     - pip install -r ./tests/depclose-integration/requirements.txt
     - |
         LOCAL="~/.local" && export PATH=$LOCAL/bin:$PATH &&
@@ -14,6 +17,9 @@ before_install:
 addons:
   apt:
     packages:
+      # to fix Permission denied when installing pip packages
+      # b/c Travis will use system-wide Python when language != python
+      - python-virtualenv
       # dependencies for bdcs-api-rs
       - libssh2-1-dev
       # used by Makefile
