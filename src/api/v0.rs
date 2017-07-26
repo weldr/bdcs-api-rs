@@ -1579,12 +1579,11 @@ pub fn recipes_diff(recipe_name: &str, from_commit: &str, to_commit: &str,
 
     let new_recipe = match to_commit {
         "WORKSPACE" => {
-            let recipe = match read_from_workspace(&workspace_dir(&repo, "master"), recipe_name) {
-                    Some(r) => r,
-                    // TODO Need to add error handling so this can be a try!()
-                    None => recipe::read(&repo, recipe_name, "master", None).unwrap()
-            };
-            recipe
+            match read_from_workspace(&workspace_dir(&repo, "master"), recipe_name) {
+                Some(r) => r,
+                // TODO Need to add error handling so this can be a try!()
+                None => recipe::read(&repo, recipe_name, "master", None).unwrap()
+            }
         },
         "NEWEST" => recipe::read(&repo, recipe_name, "master", None).unwrap(),
         commit => match recipe::read(&repo, recipe_name, "master", Some(commit)) {
@@ -1596,7 +1595,7 @@ pub fn recipes_diff(recipe_name: &str, from_commit: &str, to_commit: &str,
         }
     };
 
-    let diff = recipe::diff(old_recipe, new_recipe);
+    let diff = recipe::diff(&old_recipe, &new_recipe);
 
     CORS(JSON(RecipeDiff {
         diff: diff

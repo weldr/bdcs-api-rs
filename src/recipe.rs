@@ -196,6 +196,7 @@ impl Recipe {
     }
 
     /// Return the matching module entry
+    #[cfg_attr(feature="cargo-clippy", allow(ptr_arg))]
     pub fn find_module(&self, name: &String) -> Option<Modules> {
         match self.modules.binary_search_by_key(name, |m| m.name.clone()) {
             Ok(idx) => Some(self.modules[idx].clone()),
@@ -204,6 +205,7 @@ impl Recipe {
     }
 
     /// Return the matching package entry
+    #[cfg_attr(feature="cargo-clippy", allow(ptr_arg))]
     pub fn find_package(&self, name: &String) -> Option<Packages> {
         match self.packages.binary_search_by_key(name, |p| p.name.clone()) {
             Ok(idx) => Some(self.packages[idx].clone()),
@@ -951,7 +953,7 @@ pub fn tag(repo: &Repository, recipe_name: &str, branch: &str) -> Result<bool, R
 /// also be used to diff arbitrary recipes, the differences will just be greater
 /// and the name will be included as a difference.
 ///
-pub fn diff(old: Recipe, new: Recipe) -> Vec<RecipeDiffEntry> {
+pub fn diff(old: &Recipe, new: &Recipe) -> Vec<RecipeDiffEntry> {
     debug!("diff"; "old" => format!("{:?}", old), "new" => format!("{:?}", new));
 
     let mut diffs = Vec::new();
