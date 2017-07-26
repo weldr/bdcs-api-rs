@@ -19,6 +19,5 @@ test: bdcs-api clippy
 	RUST_BACKTRACE=1 cargo test --features "strict"
 
 depclose: bdcs-api
-	wget https://s3.amazonaws.com/atodorov/metadata_centos7.db.gz
-	gunzip ./metadata_centos7.db.gz
-	METADATA_DB=`realpath ./metadata_centos7.db` make -C ./tests/depclose-integration/ test
+	wget https://s3.amazonaws.com/weldr/metadata.db
+	METADATA_DB=`realpath ./metadata.db` make -C ./tests/depclose-integration/ test

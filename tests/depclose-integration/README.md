@@ -44,4 +44,4 @@ which includes the following repositories:
 * [CentOS 7 Updates](http://mirror.centos.org/centos/7/updates/x86_64/)
 * [EPEL 7](https://dl.fedoraproject.org/pub/epel/7/x86_64/)
 
-CentOS metadata.db URL: https://s3.amazonaws.com/atodorov/metadata_centos7.db.gz
+CentOS metadata.db URL: https://s3.amazonaws.com/weldr/metadata.db
