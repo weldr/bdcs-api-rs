@@ -520,7 +520,7 @@ pub fn write(repo: &Repository, recipe: &Recipe, branch: &str, message: Option<&
     };
     let tree_id = {
         let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-        try!(tree.insert(try!(recipe.filename()), blob_id, 0o100644));
+        try!(tree.insert(try!(recipe.filename()), blob_id, 0o100_644));
         tree.write().unwrap()
     };
     let tree = try!(repo.find_tree(tree_id));
@@ -690,7 +690,7 @@ pub fn revert(repo: &Repository, recipe_name: &str, branch: &str, commit: &str) 
     let parent_commit = try!(repo.find_commit(branch_id));
     let tree_id = {
         let mut tree = repo.treebuilder(Some(&parent_commit.tree().unwrap())).unwrap();
-        try!(tree.insert(&filename, revert_id, 0o100644));
+        try!(tree.insert(&filename, revert_id, 0o100_644));
         tree.write().unwrap()
     };
     let tree = try!(repo.find_tree(tree_id));
