@@ -14,6 +14,23 @@ EXPOSE 4000
 # Volumes for database and recipe storage.
 VOLUME /mddb /bdcs-recipes /mockfiles
 
+RUN dnf --setopt=deltarpm=0 --verbose -y install python-toml && dnf clean all
+
 ## Do the things more likely to change below here. ##
-COPY . /bdcs-api-rs/
-RUN make -C /bdcs-api-rs/ bdcs-api doc
+RUN mkdir /bdcs-api-rs/
+COPY parse-cargo-toml.py /bdcs-api-rs/
+
+# Manually install cargo dependencies before building
+# so we can have a reusable intermediate container.
+# This workaround is needed until cargo can do this by itself:
+# https://github.com/rust-lang/cargo/issues/2644
+# https://github.com/rust-lang/cargo/pull/3567
+COPY Cargo.toml /bdcs-api-rs/
+WORKDIR /bdcs-api-rs/
+RUN python ./parse-cargo-toml.py | while read cmd; do \
+        $cmd;                                    \
+    done
+
+# NOTE: WORKDIR is already /bdcs-api-rs/
+COPY . .
+RUN make bdcs-api
