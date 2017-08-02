@@ -7,14 +7,25 @@ RUN curl https://sh.rustup.rs -sSf \
   | sh -s -- -y --default-toolchain nightly-2017-08-01
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EXPOSE 4000
 
 # Volumes for database and recipe storage.
 VOLUME /mddb /bdcs-recipes /mockfiles
 
-RUN dnf --setopt=deltarpm=0 --verbose -y install python-toml && dnf clean all
+# testing dependencies which don't belong here but this
+# is the best place to avoid executing these steps on every single build
+# when intermediate container cache is available
+RUN cargo install clippy
+RUN dnf --setopt=deltarpm=0 --verbose -y install \
+    pylint python-toml python-nose-parameterized \
+    elfutils-devel binutils-devel &&             \
+    dnf clean all
+
+ENV PATH="~/.local/bin:${PATH}"
+RUN curl https://codeload.github.com/SimonKagstrom/kcov/tar.gz/master > master.tar.gz
+RUN tar -xzf master.tar.gz
+RUN mkdir kcov-master/build && cd kcov-master/build && cmake -DCMAKE_INSTALL_PREFIX:PATH=~/.local .. && make && make install
+RUN rm -rf *.tar.gz kcov-master/
 
 ## Do the things more likely to change below here. ##
 RUN mkdir /bdcs-api-rs/
@@ -34,3 +45,8 @@ RUN python ./parse-cargo-toml.py | while read cmd; do \
 # NOTE: WORKDIR is already /bdcs-api-rs/
 COPY . .
 RUN make bdcs-api
+
+# NOTE: this must be at the bottom otherwise it invalidates
+# the intermediate Docker layers after it
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

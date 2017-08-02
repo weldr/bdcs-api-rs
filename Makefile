@@ -19,5 +19,5 @@ test: bdcs-api clippy
 	RUST_BACKTRACE=1 cargo test --features "strict"
 
 depclose: bdcs-api
-	wget https://s3.amazonaws.com/weldr/metadata.db
+	curl https://s3.amazonaws.com/weldr/metadata.db > metadata.db
 	METADATA_DB=`realpath ./metadata.db` make -C ./tests/depclose-integration/ test

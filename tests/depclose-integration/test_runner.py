@@ -5,7 +5,12 @@ import unittest
 from subprocess import check_output, CalledProcessError
 
 import toml
-from parameterized import parameterized
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    # on Fedora 25 (Docker)
+    from nose_parameterized import parameterized
 
 
 _TEST_DIR = os.path.dirname(__file__)
@@ -14,10 +19,10 @@ _RECIPE_DIR = os.path.join(_TEST_DIR, '..', '..', 'examples', 'recipes')
 _RECIPE_DIR = os.path.abspath(_RECIPE_DIR)
 
 _KCOV = []
-if os.environ.get('KCOV', os.environ.get('TRAVIS_JOB_ID')):
+if os.environ.get('KCOV'):
     _KCOV = [
-        'kcov',
-        '--include-path=../../src',
+        os.environ['KCOV'],
+        '--include-path=%s' % os.path.abspath(os.path.join(_TEST_DIR, '..', '..', 'src')),
         os.path.abspath(os.path.join(_TEST_DIR, '..', '..', 'target', 'kcov')),
     ]
 

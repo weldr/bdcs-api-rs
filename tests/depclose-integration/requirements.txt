@@ -1,3 +1,0 @@
-parameterized
-pylint
-toml

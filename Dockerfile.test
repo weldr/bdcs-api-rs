@@ -1,0 +1,11 @@
+# A Fedora 25 BDCS API Container
+FROM welder/bdcs-api-rs:latest
+MAINTAINER Alexander Todorov <atodorov@redhat.com>
+
+## Do the things more likely to change below here. ##
+## NOTE: test dependencies are moved to the welder/bdcs-api-rs
+## for optimization purposes b/c every command in here will be
+## executed from scratch once the base image changes
+
+WORKDIR /bdcs-api-rs/
+ENTRYPOINT ["/bdcs-api-rs/entrypoint-tests.sh"]
