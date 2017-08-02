@@ -2,8 +2,9 @@
 FROM welder/fedora:latest
 MAINTAINER Brian C. Lane <bcl@redhat.com>
 
+# NOTE: if you need updated rustc then make sure to update this line
 RUN curl https://sh.rustup.rs -sSf \
-  | sh -s -- -y --default-toolchain nightly-2017-07-10
+  | sh -s -- -y --default-toolchain nightly-2017-08-01
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -14,6 +15,5 @@ EXPOSE 4000
 VOLUME /mddb /bdcs-recipes /mockfiles
 
 ## Do the things more likely to change below here. ##
-## Run rustup update to pick up the latest nightly ##
 COPY . /bdcs-api-rs/
-RUN cd /bdcs-api-rs/ && rm -rf ./target/ Cargo.lock && rustup update && make bdcs-api doc
+RUN make -C /bdcs-api-rs/ bdcs-api doc
