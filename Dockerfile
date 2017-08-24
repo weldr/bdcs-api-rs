@@ -4,7 +4,7 @@ MAINTAINER Brian C. Lane <bcl@redhat.com>
 
 # NOTE: if you need updated rustc then make sure to update this line
 RUN curl https://sh.rustup.rs -sSf \
-  | sh -s -- -y --default-toolchain nightly-2017-08-01
+  | sh -s -- -y --default-toolchain nightly-2017-08-11
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 EXPOSE 4000
@@ -15,7 +15,7 @@ VOLUME /mddb /bdcs-recipes /mockfiles
 # testing dependencies which don't belong here but this
 # is the best place to avoid executing these steps on every single build
 # when intermediate container cache is available
-RUN cargo install clippy
+RUN cargo install clippy --vers 0.0.151
 RUN dnf --setopt=deltarpm=0 --verbose -y install \
     pylint python-toml python-nose-parameterized \
     elfutils-devel binutils-devel &&             \

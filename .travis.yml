@@ -11,6 +11,8 @@ before_install:
 
 script:
   - |
+      set -e
+
       # first compile the project
       sudo docker build -f Dockerfile -t welder/bdcs-api-rs:latest --cache-from welder/bdcs-api-rs:latest .
       sudo docker tag  welder/bdcs-api-rs:latest welder/bdcs-api-rs:$TRAVIS_BUILD_NUMBER
