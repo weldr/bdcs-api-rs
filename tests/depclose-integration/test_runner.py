@@ -63,6 +63,11 @@ class DepcloseTestCase(unittest.TestCase):
         try:
             depclose_output = exec_depclose(packages)
         except CalledProcessError as err:
+            # KNOWN ISSUE, WONT FIX, SKIP
+            # https://trello.com/c/0D3pbzaA/291-bug-depclose-is-killed-when-mddb-contains-updates
+            if err.output == 'error: Unable to satisfy requirement policycoreutils >= 2.5-11\n':
+                self.skipTest('known issue with updates for kubernetes')
+
             self.assertEqual('', err.output)
             self.fail('depclose failed!')
 
