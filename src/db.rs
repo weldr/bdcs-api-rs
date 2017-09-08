@@ -1185,7 +1185,7 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
     for project_name in projects {
         let projs = match get_projects_name(conn, project_name, 0, i64::max_value()) {
             Ok((_, p)) => p,
-            Err(_) => { continue; }
+            Err(_) => vec![]
         };
 
         for proj in projs  {
