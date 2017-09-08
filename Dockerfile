@@ -4,7 +4,7 @@ MAINTAINER Brian C. Lane <bcl@redhat.com>
 
 # NOTE: if you need updated rustc then make sure to update this line
 RUN curl https://sh.rustup.rs -sSf \
-  | sh -s -- -y --default-toolchain nightly-2017-08-11
+  | sh -s -- -y --default-toolchain nightly-2017-09-06
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 EXPOSE 4000
