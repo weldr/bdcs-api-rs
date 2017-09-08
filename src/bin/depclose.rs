@@ -1,7 +1,6 @@
 extern crate bdcs;
 extern crate r2d2;
 extern crate r2d2_sqlite;
-extern crate rusqlite;
 
 use bdcs::db::*;
 use bdcs::depclose::*;
