@@ -178,7 +178,8 @@ fn main() {
                                    v0::options_recipes_delete, v0::recipes_delete,
                                    v0::recipes_undo,
                                    v0::recipes_depsolve,
-                                   v0::options_recipes_tag, v0::recipes_tag])
+                                   v0::options_recipes_tag, v0::recipes_tag,
+                                   v0::status])
         .mount("/api/mock/", routes![mock::static_route, mock::static_route_filter,
                                      mock::static_route_param, mock::static_route_param_filter,
                                      mock::static_route_action, mock::static_route_action_filter])

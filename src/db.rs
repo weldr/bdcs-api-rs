@@ -38,6 +38,9 @@ use r2d2;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{self, Connection};
 
+// Database Schema Version that is supported
+const DB_VERSION: u32 = 1;
+
 /// Database pool connection, used with Rocket's managed state system
 pub struct DBPool(r2d2::Pool<SqliteConnectionManager>);
 impl DBPool {
@@ -1249,4 +1252,25 @@ pub fn get_projects_details(conn: &Connection, projects: &[&str]) -> rusqlite::R
         }
     }
     Ok(project_list)
+}
+
+/// Get details about database schema version support
+///
+/// # Arguments
+///
+/// * `conn` - The database connection
+///
+/// # Returns
+///
+/// * Tuple of Required Version, DB schema Version, Supported
+///
+/// Currently the code only supports an exact match between the DB schema version and the required
+/// version. This may changes, so use a Bool to indicate whether or not the DB version is
+/// supported.
+///
+pub fn get_schema_version(conn: &Connection) -> rusqlite::Result<(u32, u32, bool)> {
+    let mut stmt = try!(conn.prepare("pragma user_version"));
+    let schema_version = try!(stmt.query_row(&[], |row| row.get(0)));
+
+    Ok((DB_VERSION, schema_version, DB_VERSION == schema_version))
 }

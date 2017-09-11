@@ -104,6 +104,7 @@ use hyper::method::Method;
 use rocket::http::hyper::header;
 use rocket::http::Status;
 use rocket::response::{self, Responder, Response};
+use rusqlite;
 
 use recipe::RecipeError;
 
@@ -176,6 +177,7 @@ impl<'r, R: Responder<'r>> Responder<'r> for CORS<R> {
 pub enum ApiError {
     NotFound,
     InternalServerError,
+    SQLiteError,
 }
 
 impl fmt::Display for ApiError {
@@ -183,6 +185,7 @@ impl fmt::Display for ApiError {
         match *self {
             ApiError::NotFound => f.write_str("NotFound"),
             ApiError::InternalServerError => f.write_str("InternalServerError"),
+            ApiError::SQLiteError => f.write_str("SQLiteError"),
         }
     }
 }
@@ -192,6 +195,7 @@ impl StdError for ApiError {
         match *self {
             ApiError::NotFound => "Not found",
             ApiError::InternalServerError => "Internal server error",
+            ApiError::SQLiteError => "SQLite error",
         }
     }
 }
@@ -209,5 +213,11 @@ impl<'r> Responder<'r> for ApiError {
 impl From<RecipeError> for ApiError {
     fn from(_err: RecipeError) -> ApiError {
         ApiError::NotFound
+    }
+}
+
+impl From<rusqlite::Error> for ApiError {
+    fn from(_err: rusqlite::Error) -> ApiError {
+        ApiError::SQLiteError
     }
 }

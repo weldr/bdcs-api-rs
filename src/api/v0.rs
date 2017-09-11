@@ -12,6 +12,9 @@
 //! * `/api/v0/version`
 //!  - Return the build and api version for the running code.
 //!  - [Example JSON](fn.version.html#examples)
+//! * `/api/v0/status`
+//!  - Return the status of the server, including the build, database, schema version.
+//!  - [Example JSON](fn.status.html#examples)
 //! * `/api/v0/isos`
 //! * `/api/v0/compose`
 //! * `/api/v0/compose/cancel`
@@ -175,6 +178,53 @@ pub fn version() -> CORS<JSON<BuildVersion>> {
         build:   version.to_string(),
         api:     0
     }))
+}
+
+
+/// Structure to hold the status details
+#[derive(Serialize)]
+pub struct ServerStatus {
+    build:          String,
+    api:            u64,
+    db_version:     u32,
+    schema_version: u32,
+    db_supported:   bool
+}
+
+/// Return the server status
+///
+/// # Response
+///
+/// * a JSON object
+///
+/// # Examples
+///
+/// ```json
+/// {
+///     "build": "v0.3.0-67-g485875e",
+///     "api": 0,
+///     "db_version": 1,
+///     "schema_version": 1,
+///     "db_supported": true
+/// }
+/// ```
+#[get("/status")]
+pub fn status(db: State<DBPool>) -> Result<CORS<JSON<ServerStatus>>, ApiError> {
+    let version = match option_env!("GIT_COMMIT") {
+        Some(version) => version,
+        None          => crate_version!()
+    };
+
+    let (db_version, schema_version, supported) = try!(get_schema_version(&db.conn()));
+
+    Ok(CORS(JSON(ServerStatus {
+        build:          version.to_string(),
+        api:            0,
+        db_version:     db_version,
+        schema_version: schema_version,
+        db_supported:   supported
+
+    })))
 }
 
 
