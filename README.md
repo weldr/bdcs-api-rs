@@ -34,11 +34,20 @@ directory:
 
 `rustup override set nightly`
 
+You can install and run rustup as a user, no root access needed.
+
+If building fails try setting the override to the same version listed in the `Dockerfile` instead of `nightly`.
+
 ### Required Host Packages
 The host will need to have the following packages installed before building or running the bdcs-api-server
 * openssl-devel
 * sqlite-devel
 * cmake
+* development-tools
+
+eg. on Fedora run this to setup the system:
+
+`dnf install @development-tools openssl-devel sqlite-devel cmake`
 
 Running it directly on port 4000, using /var/tmp/recipes/ for recipe storage
 looks like this:
