@@ -15,7 +15,7 @@ clippy:
 	command -v cargo-clippy >/dev/null 2>&1 || cargo install clippy
 	cargo clippy -- --cfg test -D warnings -A doc-markdown -A type-complexity
 
-test: bdcs-api clippy
+test: bdcs-api #clippy
 	RUST_BACKTRACE=1 cargo test --features "strict"
 
 depclose: bdcs-api

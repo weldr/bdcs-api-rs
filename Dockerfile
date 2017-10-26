@@ -15,7 +15,7 @@ VOLUME /mddb /bdcs-recipes /mockfiles
 # testing dependencies which don't belong here but this
 # is the best place to avoid executing these steps on every single build
 # when intermediate container cache is available
-RUN cargo install clippy
+#RUN cargo install clippy
 RUN dnf --setopt=deltarpm=0 --verbose -y install \
     pylint python-toml python-nose-parameterized \
     elfutils-devel binutils-devel &&             \

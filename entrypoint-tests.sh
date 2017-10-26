@@ -5,7 +5,7 @@ set -e
 
 cd /bdcs-api-rs/
 
-make clippy
+make test
 
 for file in target/debug/*tests-*; do
     if [[ "${file: -2}" != ".d" ]]; then
