@@ -238,7 +238,8 @@ pub struct Groups {
     #[serde(skip_serializing)]
     pub id: i64,
     pub name: String,
-    pub group_type: String
+    pub group_type: String,
+    pub build_id: i64
 }
 
 /// Files included in a `Groups`
@@ -610,7 +611,8 @@ pub fn get_groups_filename(conn: &Connection, filename: &str) -> rusqlite::Resul
         contents.push(Groups {
                         id: row.get(0),
                         name: row.get(1),
-                        group_type: row.get(2)
+                        group_type: row.get(2),
+                        build_id: row.get_checked(3).unwrap_or(0),
                     });
     }
     Ok(contents)
@@ -835,6 +837,7 @@ pub fn get_groups_iname(conn: &Connection, group: &str, offset: i64, limit: i64)
                         id: row.get(0),
                         name: row.get(1),
                         group_type: row.get(2),
+                        build_id: row.get_checked(3).unwrap_or(0),
                     });
     }
     Ok(contents)
@@ -869,6 +872,7 @@ pub fn get_groups_name(conn: &Connection, group: &str, offset: i64, limit: i64) 
                         id: row.get(0),
                         name: row.get(1),
                         group_type: row.get(2),
+                        build_id: row.get_checked(3).unwrap_or(0),
                     });
     }
     Ok(contents)
@@ -897,6 +901,7 @@ pub fn get_groups_id(conn: &Connection, id: &i64) -> rusqlite::Result<Option<Gro
                     id: row.get(0),
                     name: row.get(1),
                     group_type: row.get(2),
+                    build_id: row.get_checked(3).unwrap_or(0),
         }))
     } else {
         Ok(None)
@@ -1006,12 +1011,13 @@ pub fn get_group_obsoletes(conn: &Connection, group_id: i64) -> rusqlite::Result
                          id: row.get(0),
                          name: row.get(1),
                          group_type: row.get(2),
+                         build_id: row.get_checked(3).unwrap_or(0),
                        },
                        KeyVal {
-                         id: row.get(3),
-                         key_value: row.get(4),
-                         val_value: row.get(5),
-                         ext_value: row.get(6),
+                         id: row.get(4),
+                         key_value: row.get(5),
+                         val_value: row.get(6),
+                         ext_value: row.get(7),
                        }));
     }
     Ok(contents)
@@ -1049,12 +1055,13 @@ pub fn get_provider_groups(conn: &Connection, thing: &str) -> rusqlite::Result<V
                          id: row.get(0),
                          name: row.get(1),
                          group_type: row.get(2),
+                         build_id: row.get_checked(3).unwrap_or(0),
                        },
                        KeyVal {
-                         id: row.get(3),
-                         key_value: row.get(4),
-                         val_value: row.get(5),
-                         ext_value: row.get(6),
+                         id: row.get(4),
+                         key_value: row.get(5),
+                         val_value: row.get(6),
+                         ext_value: row.get(7),
                        }));
     }
     Ok(contents)

@@ -402,14 +402,14 @@ macro_rules! assert_eq_no_order {
 // provider_to_requirement: takes a group and key/val and returns a (GroupId, Requirement)
 #[test]
 fn test_provider_to_requirement_err() {
-    assert!(provider_to_requirement(&Groups{id: 1, name: "whatever".to_string(), group_type: "test".to_string()},
+    assert!(provider_to_requirement(&Groups{id: 1, name: "whatever".to_string(), group_type: "test".to_string(), build_id: 0},
                                     &KeyVal{id: 1, key_value: "TextKey \"rpm-provide\"".to_string(), val_value: Some("something".to_string()), ext_value: None}
                                    ).is_err());
 }
 
 #[test]
 fn test_provider_to_requirement_ok() -> () {
-    assert_eq!(provider_to_requirement(&Groups{id: 47, name: "whatever".to_string(), group_type: "test".to_string()},
+    assert_eq!(provider_to_requirement(&Groups{id: 47, name: "whatever".to_string(), group_type: "test".to_string(), build_id: 0},
                                        &KeyVal{id: 1, key_value: "TextKey \"rpm-provide".to_string(), val_value: Some("something".to_string()), ext_value: Some("something >= 1.0".to_string())}),
                Ok((47, Requirement::from("something >= 1.0"))));
 }
