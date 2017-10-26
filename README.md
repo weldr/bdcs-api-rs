@@ -109,6 +109,11 @@ Use `RUST_TEST_THREADS=1` to force sequential execution and debug failing tests!
 Information about depclose integration testing can be found at
 [tests/depclose-integration/README.md](blob/master/tests/depclose-integration/)
 
+**NOTE:** API tests use a `metadata.db` file which is checked under git.
+This is generated via `make importer && make api-mddb` commands from the
+[bdcs](https://github.com/weldr/bdcs) repository! Everytime bdcs DB schema
+is updated that file also needs to be updated!
+
 General information about testing in Rust can be found at
 
 * [The Rust Testing Guide](http://aturon.github.io/stability-dashboard/guide-testing.html)
