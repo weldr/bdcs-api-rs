@@ -45,6 +45,7 @@ fn test_db_1() -> rusqlite::Result<Connection> {
     create_test_db(&[
                    TestData::Groups(TestGroups{name: "group-one".to_string(),
                                                group_type: "rpm".to_string(),
+                                               build_id: 0,
                                                files: vec![TestFiles{path: "/one/1".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
                                                                      key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("group-one".to_string()), ext_value: None}]},
                                                            TestFiles{path: "/one/2".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
@@ -54,6 +55,7 @@ fn test_db_1() -> rusqlite::Result<Connection> {
                                                requirements: vec![]}),
                    TestData::Groups(TestGroups{name: "group-two".to_string(),
                                                group_type: "rpm".to_string(),
+                                               build_id: 0,
                                                files: vec![TestFiles{path: "/two/1".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
                                                                      key_vals: vec![TestKeyValues{key_value: "TextKey \"packageName\"".to_string(), val_value: Some("group-two".to_string()), ext_value: None}]},
                                                            TestFiles{path: "/two/2".to_string(), file_user: "".to_string(), file_group: "".to_string(), mtime: 0,
@@ -129,6 +131,7 @@ fn test_db_3() -> rusqlite::Result<Connection> {
                    TestData::Groups(
                        TestGroups{name: "test-package".to_string(),
                                   group_type: "rpm".to_string(),
+                                  build_id: 0,
                                   files: vec![],
                                   children: vec![],
                                   key_vals: vec![

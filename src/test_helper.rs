@@ -84,6 +84,7 @@ pub struct TestRequirements {
 pub struct TestGroups {
     pub name: String,
     pub group_type: String,
+    pub build_id: i64,
     pub files: Vec<TestFiles>,
     pub children: Vec<Box<TestGroups>>,
     pub key_vals: Vec<TestKeyValues>,
@@ -230,8 +231,8 @@ pub fn create_test_db(data: &[TestData]) -> rusqlite::Result<Connection> {
 
         fn insert_group(conn: &Connection, group: &TestGroups) -> rusqlite::Result<i64> {
             try!(conn.execute_named("
-                insert into groups (name, group_type) values (:name, :group_type)",
-                &[(":name", &group.name), (":group_type", &group.group_type)]));
+                insert into groups (name, group_type, build_id) values (:name, :group_type, :build_id)",
+                &[(":name", &group.name), (":group_type", &group.group_type), (":build_id", &group.build_id)]));
             let group_id = conn.last_insert_rowid();
 
             for file in &group.files {
@@ -375,7 +376,8 @@ create index file_key_values_key_val_id_idx on file_key_values(key_val_id);
 create table groups (
     id integer primary key,
     name text not null,
-    group_type text not null
+    group_type text not null,
+    build_id integer references builds(id) null
 );
 create index groups_name_idx on groups(name);
 
@@ -483,7 +485,7 @@ pub fn create_test_packages(data: &[TestPkg]) -> rusqlite::Result<Connection> {
         let requirements: Vec<TestRequirements> = pkg.requires.iter().map(|r| TestRequirements{req_language: "RPM".to_string(), req_context: "Runtime".to_string(),
                                                                                                req_strength: "Must".to_string(), req_expr: r.to_string()}).collect();
 
-        TestData::Groups(TestGroups{name: pkg.name.clone(), group_type: "rpm".to_string(),
+        TestData::Groups(TestGroups{name: pkg.name.clone(), group_type: "rpm".to_string(), build_id: 0,
                                     files: vec![],
                                     children: vec![],
                                     key_vals: key_vals,
