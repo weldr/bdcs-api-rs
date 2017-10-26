@@ -1,1 +1,1 @@
-{"modules":[{"name":"basesystem","group_type":"rpm"},{"name":"bash","group_type":"rpm"},{"name":"filesystem","group_type":"rpm"},{"name":"httpd","group_type":"rpm"}],"offset":0,"limit":20,"total":4}
+{"modules":[{"name":"basesystem","group_type":"rpm","build_id":1},{"name":"bash","group_type":"rpm","build_id":2},{"name":"filesystem","group_type":"rpm","build_id":4},{"name":"httpd","group_type":"rpm","build_id":5}],"offset":0,"limit":20,"total":4}
