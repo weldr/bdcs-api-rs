@@ -61,12 +61,13 @@ class DepcloseTestCase(unittest.TestCase):
 
         # step 1: can we resolve all the dependencies
         try:
+            recipe_name = recipe_file.replace('.toml', '')
             depclose_output = exec_depclose(packages)
         except CalledProcessError as err:
             # KNOWN ISSUE, WONT FIX, SKIP
             # https://trello.com/c/0D3pbzaA/291-bug-depclose-is-killed-when-mddb-contains-updates
-            if err.output == 'error: Unable to satisfy requirement policycoreutils >= 2.5-11\n':
-                self.skipTest('known issue with updates for kubernetes')
+            if recipe_name in ['kubernetes', 'jboss']:
+                self.skipTest('known issue for %s' % recipe_name)
 
             self.assertEqual('', err.output)
             self.fail('depclose failed!')
