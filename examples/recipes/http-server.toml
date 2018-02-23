@@ -15,20 +15,16 @@ version = "2.4.*"
 
 [[modules]]
 name = "php"
-version = "5.4.*"
-
-[[modules]]
-name = "php-mysql"
-version = "5.4.*"
+version = "7.1.*"
 
 [[packages]]
 name = "tmux"
-version = "2.2"
+version = "2.5"
 
 [[packages]]
 name = "openssh-server"
-version = "6.6.*"
+version = "7.5*"
 
 [[packages]]
 name = "rsync"
-version = "3.0.*"
+version = "3.1.*"

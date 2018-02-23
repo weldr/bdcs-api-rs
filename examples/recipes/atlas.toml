@@ -6,5 +6,5 @@ name = "atlas"
 version = "3.10.*"
 
 [[modules]]
-name = "numpy"
-version = "1.7.*"
+name = "python2-numpy"
+version = "1.12.*"
